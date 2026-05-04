@@ -1,252 +1,171 @@
 # mml2vgm
-メガドライブ他向けVGM/XGM/XGM2/ZGMファイル作成ツール  
-  
-[概要]  
- このツールは、ユーザーが作成したMMLファイルを元にVGM/XGM/XGM2/ZGMファイルを作成します。  
- IDEでは更に  
-	mucomDotNET  
-	M98DotNET  
-	PMDDotNET  
-	moondriverDotNET  
- を使用し各ドライバ毎の演奏ファイルを作成したりランダムな曲を生成したりすることが可能です。  
- IDEについては、IDE.txtを参照してください。  
- スクリプトについては、各々のスクリプトに付属の説明をご覧ください。  
- スクリプト作成については、Script.txtを参照してください。  
-  
-[機能、特徴]  
- [VGM]  
- ・主にメガドライブ2台分の音源構成(YM2612 + SN76489 + RF5C164)*2にそったVGMを生成します。  
-   他、対応音源  
-	AY8910  
-	C140  
-	C352  
-	HuC6280  
-	K051649  
-	K053260  
-	QSound  
-	SegaPCM  
-    YM2151  
-	YM2203  
-	YM2413  
-	YM2608  
-	YM2610B  
-	YM3526  
-	Y8950  
-	YM3812  
-	YMF262  
-    NES  
-    FDS  
-    DMG  
-  
- ・FM音源(YM2612)は最大6ch(この内1chを効果音モードに指定すると更に3ch)使用可能です。  
- ・PCM(YM2612)を1ch使用可能です。(FM音源1chと排他的に使用します。)  
- ・PSG(DCSG)音源(SN76489)は4ch(この内1chはノイズチャンネル)使用可能です。  
- ・MEGA-CDのPCM音源(RF5C164)は8ch使用可能です。  
- ・以上、メガドライブ音源系だけで最大42ch(その他合計で300ch over)使用可能です。  
- （但し、RF5C164の2台目についてはVGMPlayでは今のところ正式には対応しておらず、鳴らすにはMDPlayerが必要です。)  
- ・MMLの仕様はFMP7(開発:Guu氏)に似せています。  
-  
- [XGM/2]  
- ・メガドライブの音源構成(YM2612 + SN76489)にそったXGMを生成します。  
- ・FM音源(YM2612)は最大6ch(この内1chを効果音モードに指定すると更に3ch)使用可能です。  
- ・ソフトウェアによる制御によりPCM(YM2612)を4ch(XGM2は3ch)同時使用可能です。(FM音源1chと排他的に使用します。)  
- ・PSG(DCSG)音源(SN76489)は4ch(この内1chはノイズチャンネル)使用可能です。  
- ・以上、最大16ch使用可能です。  
-  
- [ZGM]  
- ・VGMを拡張したフォーマットです。  
- ・YM2609やMIDI音源など使用することができます。  
-  
-[MMLコマンドの説明]  
- ・VGM/XGM/ZGM  
-   mmlCommandTable.mdを参照してください。  
- ・.muc(mucom88)  
-   mucom88の公式ページを参照してください。  
- ・M98  
-   m98コマンドリファレンス.pdfを参照してください。  
- ・.m/.m2/.mz(PMD)  
-   PMDの公式ページを参照してください。  
-  
-[MIDIキーボードの使用、制限について]  
- ・音色確認向けです。  
- ・現在、mucomDotNET,YM2608一枚目,FMのみ対応です。  
- ・パートカウンターのKBD列をクリックするとそのパートがアサインされます。  
- ・パートカウンターのKBD列名をクリックするとアサインがクリアされます。  
- ・アサインはひとつだけできます。  
- ・アサイン中はmml中の音符を発音しませんが発音以外のデータは送信されています。  
- ・鍵盤を叩くとその時点のアサインされたパートの音色、チャンネルでキーオンされます。  
 
-[必要な環境]  
- ・Windows7(x64)以降のOSがインストールされたPC。私はWindows11Home(x64)を使用しています。  
- XPでは動作しません。  
- ・テキストエディタ  
- ・時間と暇  
- ・気合と根性  
- ・.NET6をインストールしている必要あり。（近日.NET8にする予定です。）  
- ・Visual Studio 2012 更新プログラム 4 の Visual C++ 再頒布可能パッケージ をインストールしている必要あり。  
- ・Microsoft Visual C++ 2015 Redistributable(x86) - 14.0.23026をインストールしている必要あり。  
- ・音声を再生できるオーディオデバイスが必須。  
- そこそこ性能があるものが必要です。UMX250のおまけでついてたUCA222でも十分いけてました。  
- 私はこれを使っていたのですが、壊れてしまったので今はUR22mkIIを使用しています。  
- ・もしあれば、SPFM Light＋YM2612＋YM2608＋YM2151＋YMF262＋SPPCM  
- ・もしあれば、GIMIC＋YM2608＋YM2151＋YMF262  
- ・YM2608のエミュレーション時、リズム音を鳴らすために以下の音声ファイルが必要です。  
- 作成方法は申し訳ありませんがお任せします。  
-      
-      バスドラム      2608_BD.WAV  
-      ハイハット      2608_HH.WAV  
-      リムショット    2608_RIM.WAV  
-      スネアドラム    2608_SD.WAV  
-      タムタム        2608_TOM.WAV  
-      トップシンバル  2608_TOP.WAV  
-      (44.1KHz 16bitPCM モノラル 無圧縮Microsoft WAVE形式ファイル)  
-  
- ・そこそこ速いCPU。  
- 使用するChipなどによって必要な処理量が変わります。  
- 私はi7-9700K 3.6GHzを使用しています。  
-  
-  
-[注意事項]  
- ・SCCIやGIMICを利用した場合でvgmなどのストリーム系の再生は対応しておりません。  
- ・YM2612やSSGによるPCM再生など、実チップの場合は正確な割り込み処理ができないのでPCMの音がおかしな状態になります。  
- 
-[著作権・免責]  
-mml2vgm , mvc , mml2vgmIDEはGPLv3ライセンスに準ずる物とします。LICENSE.txtを参照。  
-著作権は作者が保有しています。  
-このソフトは無保証であり、このソフトを使用した事による  
-いかなる損害も作者は一切の責任を負いません。  
-また、著作権表示および本許諾表示は本ソフトでは不要です。  
-  
-以下のソフトウェアのソースコードをC#向けに改変し使用しています。  
-これらのソースは各著作者が著作権を持ちます。  
-ライセンスに関しては、各ドキュメントを参照してください。  
-  
-  ・EncAdpcmA.cs  参考元：https://wiki.neogeodev.org/index.php?title=ADPCM_codecs  
-  
-  
-以下のソフトウェアをライブラリとして動的・静的にリンクし使用しています。  
-これらのソースは各著作者が著作権を持ちます。  
-ライセンスに関しては、各ドキュメントを参照してください。  
+A tool for creating VGM/XGM/XGM2/ZGM files for Sega Mega Drive and other systems.
 
-  ・MDSound /動的リンク  
-    LGPL  
-  
-  以下、mml2vgmIDEのみ使用  
-  
-  ・NAudio /動的リンク  
-    ms-pl  
-  
-  ・NAudio.Lame /動的リンク  
-    MIT License  
-  
-  ・Azukiエディター  
-    zlib License  
-    オリジナルではなく改造したものを使用しています。  
-  
-  ・IronPython  
-    Apache License,Ver.2.0  
-  
-  ・NewtonsoftJson.NET  
-    MIT License  
-  
-  ・DockPanel Suite  
-    MIT License  
-  
-  ・DockPanel Suite.ThemeVS2015  
-    MIT License  
-  
-  ・DynamicLanguageRuntime  
-    Apache License 2.0  
-  
-  ・HtmlAgilityPack  
-    MIT License  
-  
-  ・IronPython  
-    Apache License 2.0  
-  
-  ・mucomDotNET /動的リンク  
-    CC BY-NC-SA 4.0  
+**日本語版**: [docs/README_JA.md](docs/README_JA.md) (original Japanese README)
 
-  ・M98DotNET /動的リンク  
-    CC BY-NC-SA 4.0  
+**Full Documentation**: See the [docs/](docs/) directory for complete English documentation.
 
-  ・musicDriverInterface /動的リンク  
-    MIT License  
+## Overview
 
-  ・RealChipCtlWrap /動的リンク  
-    MIT License  
+This tool creates VGM/XGM/XGM2/ZGM files from user-created MML (Music Macro Language) files.
 
-  ・SCCI /動的リンク  
-     ?  
+The IDE additionally supports:
+- **mucomDotNET** - For creating performance files for various drivers
+- **M98DotNET** - For random music generation
+- **PMDDotNET**
+- **moondriverDotNET**
 
-  ・c86ctl /動的リンク  
-    BSD 3-Clause  
-    
-  ・PMDDotNET /動的リンク  
-    MIT License(但しPMD関係は別ライセンス)  
+For IDE information, see [docs/IDE.md](docs/IDE.md).
+For script information, see the documentation included with each script.
+For script creation, see [docs/Scripting.md](docs/Scripting.md).
 
-  ・moondriverDotNET /動的リンク  
-    MIT License(但しmoondriver関係は別ライセンス)  
+## Features
 
-  
-  
-[SpecialThanks]  
- 本ツールは以下の方々にお世話になっております。また以下のソフトウェア、ウェブページを参考、使用しています。  
- 本当にありがとうございます。  
-  
- ・ラエル さん  
- ・WING☆ さん  
- ・とぼけがお さん  
- ・wani さん  
- ・mucom さん  
- ・UME-3 さん  
- ・おやぢぴぴ さん  
- ・なると さん  
- ・hex125 さん  
- ・くろま さん  
- ・TAN-Y さん  
- ・阿保 さん  
- ・Rerrah さん  
- ・ぼうきち さん  
- ・musicalman さん  
- ・欧場豪@マシㇼキ提督 さん  
- ・SND-L/KSND(itoken) さん  
- ・古代 さんはじめオープンMUCOMのみなさん  
- ・sdhizumi/S.Kudo さん  
- ・Ian Karlsson さん  
- ・KAJA さん  
- ・C60 さん  
- ・sio29 さん  
- ・きゃどん さん  
- ・さしゅ さん  
- ・djtuBIG-MaliceX さん  
-  
- ・XPCMK  
- ・FMP7  
- ・Music LALF  
- ・NRTDRV  
- ・Visual Studio Community 2015/2019  
- ・SGDK  
- ・VGM Player  
- ・Git  
- ・SourceTree  
- ・さくらエディター  
- ・Azuki  
- ・Dock Panel Suite  
- ・CodeWarrior  
- ・BambooTracker  
- ・みゅあっぷ  
- ・714MIDI  
- ・PMD  
- ・PMDWin  
- ・PPZ8  
- ・moondriver  
-  
- ・SGDKとは - nendo  
- ・FutureDriver  
- ・SMS Power!  
- ・DOBON.NET  
- ・Wikipedia  
- ・retroPC.net  
- ・VAL-SOUND  
- ・こえやさん  
+### VGM
+- Primarily generates VGM files matching the Mega Drive sound architecture (YM2612 + SN76489 + RF5C164) x 2
+- **Supported Sound Chips:**
+  - AY8910, C140, C352, HuC6280, K051649, K053260, QSound, SegaPCM
+  - YM2151, YM2203, YM2413, YM2608, YM2610B, YM3526, Y8950, YM3812, YMF262
+  - NES, FDS (Famicom Disk System), DMG (Game Boy)
+
+- **Channel Usage:**
+  - FM sound source (YM2612): Maximum 6 channels (designating 1 channel as sound effect mode adds 3 more channels)
+  - PCM (YM2612): 1 channel (exclusive with FM sound source channel 1)
+  - PSG (DCSG) sound source (SN76489): 4 channels (1 noise channel)
+  - Mega CD PCM sound source (RF5C164): 8 channels
+  - Total: Up to 42 channels for Mega Drive sound system (over 300 channels total across all systems)
+  - Note: The second RF5C164 is not officially supported by VGMPlay and requires MDPlayer for playback
+
+- MML specifications are based on FMP7 (developed by Guu)
+
+### XGM/XGM2
+- Generates XGM files matching the Mega Drive sound architecture (YM2612 + SN76489)
+- FM sound source (YM2612): Maximum 6 channels (designating 1 channel as sound effect mode adds 3 more)
+- Software control enables simultaneous use of 4 PCM channels (XGM2: 3 channels) (exclusive with FM sound source channel 1)
+- PSG (DCSG) sound source (SN76489): 4 channels (1 noise channel)
+- Maximum 16 channels total
+
+### ZGM
+- Extended VGM format
+- Supports YM2609, MIDI sound sources, and more
+
+## Documentation
+
+Full documentation is available in the [docs/](docs/) directory:
+- [IDE Documentation](docs/IDE.md) - Complete IDE guide
+- [MML Commands Reference](docs/MML_Commands.md) - MML syntax and commands
+- [CHANGELOG](docs/CHANGELOG.md) - Version history
+- [Scripting API](docs/Scripting.md) - IronPython scripting
+- [Development Notes](docs/Development.md) - For developers
+- [ZGM Specification](docs/ZGM_Specification.md) - ZGM format details
+- [Tutorial](docs/Tutorial.md) - Getting started guide
+
+## MIDI Keyboard Usage and Limitations
+
+- Intended for tone verification
+- Currently supports: mucomDotNET, YM2608 first board, FM only
+- Click the KBD column in the Part Counter to assign a part
+- Click the KBD column name in the Part Counter to clear the assignment
+- Only one assignment can be active at a time
+- During assignment, notes in the MML are not played, but other data is transmitted
+- Pressing keys triggers key-on for the assigned part's tone and channel
+
+## Requirements
+
+### Hardware
+- PC with Windows 7 (x64) or later (developer uses Windows 11 Home x64)
+- Windows XP is **not** supported
+
+### Software
+- Text editor
+- .NET 6 runtime (planned upgrade to .NET 8)
+- Visual Studio 2012 Update 4 Visual C++ Redistributable Package
+- Microsoft Visual C++ 2015 Redistributable (x86) - 14.0.23026
+- Audio device capable of sound playback (reasonable performance required)
+
+### Optional Hardware
+- Audio interface: UR22mkII recommended (developer previously used UCA222)
+- Real chip setup: SPFM Light + YM2612 + YM2608 + YM2151 + YMF262 + SPPCM
+- GIMIC + YM2608 + YM2151 + YMF262
+
+### YM2608 Rhythm Sound Files (Required for YM2608 emulation)
+When using YM2608 emulation, the following WAV files are required for rhythm sounds:
+- Bass Drum: 2608_BD.WAV
+- Hi-Hat: 2608_HH.WAV
+- Rim Shot: 2608_RIM.WAV
+- Snare Drum: 2608_SD.WAV
+- Tom-Tom: 2608_TOM.WAV
+- Top Cymbal: 2608_TOP.WAV
+
+Format: 44.1KHz, 16-bit PCM, Mono, Uncompressed, Microsoft WAVE format
+
+### CPU Requirements
+- Reasonably fast CPU required
+- Processing load varies depending on the chip used
+- Developer uses: i7-9700K 3.6GHz
+
+## Limitations
+
+- SCCI and GIMIC do not support playback of stream formats like VGM
+- With real chips, YM2612 and SSG PCM playback may have inaccurate interrupt processing, resulting in incorrect PCM sound
+
+## License and Disclaimer
+
+mml2vgm, mvc, and mml2vgmIDE are licensed under GPLv3. See [LICENSE.txt](LICENSE.txt).
+Copyright is retained by the author.
+
+This software is provided "AS IS" without warranty. The author accepts no responsibility for any damage caused by the use of this software.
+
+Copyright notices and license statements are not required to be displayed in this software.
+
+### Source Code Attribution
+
+The following source codes have been modified for C# and are used:
+- **EncAdpcmA.cs** - Reference: https://wiki.neogeodev.org/index.php?title=ADPCM_codecs
+
+### Linked Libraries
+
+The following software is linked dynamically or statically:
+
+#### Dynamic Links
+- **MDSound** - LGPL
+
+#### IDE Only
+- **NAudio** - ms-pl
+- **NAudio.Lame** - MIT License
+- **Azuki Editor** - zlib License (modified version used)
+- **IronPython** - Apache License, Ver. 2.0
+- **NewtonsoftJson.NET** - MIT License
+- **DockPanel Suite** - MIT License
+- **DockPanel Suite.ThemeVS2015** - MIT License
+- **DynamicLanguageRuntime** - Apache License 2.0
+- **HtmlAgilityPack** - MIT License
+- **mucomDotNET** - CC BY-NC-SA 4.0
+- **M98DotNET** - CC BY-NC-SA 4.0
+- **musicDriverInterface** - MIT License
+- **RealChipCtlWrap** - MIT License
+- **SCCI** - License unknown
+- **c86ctl** - BSD 3-Clause
+- **PMDDotNET** - MIT License (PMD-related portions have separate license)
+- **moondriverDotNET** - MIT License (moondriver-related portions have separate license)
+
+## Special Thanks
+
+This tool has received support from the following individuals and references/uses the following software and web pages. Thank you all!
+
+### Contributors and Supporters
+- Lael, WING☆, tobokegao, wani, mucom, UME-3, oyajipipi, naruto, hex125, kuroma
+- TAN-Y, Aho, Rerrah, boukichi, musicalman, Ogaba Go @ Masiroki Taitei
+- SND-L/KSND (itoken), Kodai and all Open MUCOM members, sdhizumi/S.Kudo
+- Ian Karlsson, KAJA, C60, sio29, kyadon, sashu, djtuBIG-MaliceX
+
+### Referenced Software
+- XPCMK, FMP7, Music LALF, NRTDRV
+- Visual Studio Community 2015/2019, SGDK, VGM Player
+- Git, SourceTree, Sakura Editor, Azuki, Dock Panel Suite
+- CodeWarrior, BambooTracker, muapp, 714MIDI, PMD, PMDWin, PPZ8, moondriver
+
+### Referenced Web Pages
+- SGDK Support - nendo, FutureDriver, SMS Power!, DOBON.NET
+- Wikipedia, retroPC.net, VAL-SOUND, Koe ya san

@@ -1,0 +1,86 @@
+[package]
+name = "mml2vgm-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["mml2vgm Team"]
+description = "A command-line utility for compiling MML files to VGM/XGM/ZGM formats"
+license = "GPL-3.0"
+readme = "README.md"
+homepage = "https://github.com/example/mml2vgm-rs"
+repository = "https://github.com/example/mml2vgm-rs"
+keywords = ["mml", "vgm", "xgm", "zgm", "sound", "music", "chiptune"]
+categories = ["command-line-utilities", "multimedia::audio"]
+
+# We'll use a library + binary structure
+[[bin]]
+name = "mml2vgm-rs"
+path = "src/main.rs"
+
+[lib]
+name = "mml2vgm"
+path = "src/lib.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Audio playback
+cpal = "0.15"
+rodio = "0.17"
+
+# File I/O
+memmap2 = "0.9"
+
+# Data structures
+hashbrown = { version = "0.14", features = ["serde"] }
+bitvec = "1.0"
+
+# Serialization (for config)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.7"
+
+# Parallel processing
+rayon = "1.7"
+
+# Path manipulation
+pathdiff = "0.2"
+
+[dev-dependencies]
+# Testing
+rstest = "0.18"
+approx = "0.5"
+tempfile = "3.8"
+
+# Benchmarking
+criterion = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
+
+[features]
+default = []
+# Enable all chip emulations (for release builds)
+all-chips = []
+# Individual chip features for conditional compilation
+chip-ym2612 = []
+chip-sn76489 = []
+chip-ym2151 = []
+chip-ym2608 = []

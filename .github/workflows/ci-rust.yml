@@ -1,0 +1,124 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'mml2vgm-rs/**'
+      - '.github/workflows/ci-rust.yml'
+  pull_request:
+    branches: [ master, main ]
+    paths:
+      - 'mml2vgm-rs/**'
+      - '.github/workflows/ci-rust.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust:
+          - stable
+          - nightly
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run cargo check
+        run: cd mml2vgm-rs && cargo check --all-targets --all-features
+
+      - name: Run tests
+        run: cd mml2vgm-rs && cargo test --all-features
+
+      - name: Run clippy
+        run: cd mml2vgm-rs && cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check formatting
+        run: cd mml2vgm-rs && cargo fmt --all -- --check
+
+  build:
+    name: Build release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: mml2vgm-rs-linux
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: mml2vgm-rs-windows.exe
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: mml2vgm-rs-macos
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          target: ${{ matrix.target }}
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release
+        run: cd mml2vgm-rs && cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: mml2vgm-rs/target/${{ matrix.target }}/release/mml2vgm-rs${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          if-no-files-found: error
+
+  docs:
+    name: Generate documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Generate documentation
+        run: cd mml2vgm-rs && cargo doc --all-features --no-deps
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: mml2vgm-rs/target/doc/
