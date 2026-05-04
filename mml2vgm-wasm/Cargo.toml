@@ -1,0 +1,57 @@
+[package]
+name = "mml2vgm-wasm"
+version = "0.1.0"
+edition = "2021"
+authors = ["mml2vgm Team"]
+description = "WebAssembly bindings for mml2vgm - MML to VGM/XGM/ZGM compiler"
+license = "GPL-3.0"
+readme = "README.md"
+homepage = "https://github.com/example/mml2vgm-rs"
+repository = "https://github.com/example/mml2vgm-rs"
+keywords = ["mml", "vgm", "xgm", "zgm", "wasm", "chiptune"]
+categories = ["wasm", "multimedia::audio"]
+
+# This is a WASM library, not a binary
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Local dependency on the core mml2vgm library
+# Package name is mml2vgm-rs, library name is mml2vgm
+mml2vgm = { path = "../mml2vgm-rs", package = "mml2vgm-rs" }
+
+# WASM bindings
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+
+# Serialization support for passing complex types between WASM and JS
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# For debugging in browser console
+web-sys = { version = "0.3", features = ["console"] }
+js-sys = "0.3"
+
+# Console logging for WASM
+console_log = "1.0"
+console_error_panic_hook = "0.1"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+# Optimize for size since this will be downloaded in the browser
+opt-level = 3
+lto = true
+# This can reduce WASM size but may increase compile time
+# codegen-units = 1
+
+[features]
+default = []
+# Feature to include all chip emulators (increases WASM size significantly)
+all-chips = ["mml2vgm/all-chips"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = true
+
+[package.metadata.wasm-pack.profile.dev]
+wasm-opt = false

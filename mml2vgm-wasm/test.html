@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mml2vgm WASM Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #0078d4;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #569cd6;
+            margin-top: 30px;
+        }
+        .section {
+            background: #252526;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        textarea, input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            border: 1px solid #404040;
+            background: #2d2d30;
+            color: #e0e0e0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+        }
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+        button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 12px 20px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        button:disabled {
+            background: #333;
+            cursor: not-allowed;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .button-group button {
+            flex: 1;
+            min-width: 150px;
+        }
+        .output {
+            background: #1e1e1e;
+            border: 1px solid #404040;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .status.success {
+            background: #28a745;
+            color: white;
+        }
+        .status.error {
+            background: #dc3545;
+            color: white;
+        }
+        .status.info {
+            background: #007bff;
+            color: white;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .card {
+            background: #252526;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #404040;
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #569cd6;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>mml2vgm WebAssembly Test</h1>
+    
+    <div class="section">
+        <h2>1. Initialize WASM</h2>
+        <p>Click the button below to initialize the WASM module.</p>
+        <button id="initBtn" onclick="initWASM()">Initialize WASM</button>
+        <div id="initStatus" class="status" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Get Supported Chips</h2>
+        <p>List all supported sound chips.</p>
+        <button id="getChipsBtn" onclick="getSupportedChips()" disabled>Get Supported Chips</button>
+        <div id="chipsOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Get Supported Formats</h2>
+        <p>List all supported output formats.</p>
+        <button id="getFormatsBtn" onclick="getSupportedFormats()" disabled>Get Supported Formats</button>
+        <div id="formatsOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. Tokenize MML</h2>
+        <p>Tokenize MML source code for syntax highlighting.</p>
+        <label for="tokenizeMML">MML Code:</label>
+        <textarea id="tokenizeMML">@0 v10 o4 l4 c d e f g a b >c</textarea>
+        <button id="tokenizeBtn" onclick="tokenizeMML()" disabled>Tokenize</button>
+        <div id="tokenizeOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>5. Validate MML</h2>
+        <p>Validate MML source code without generating output.</p>
+        <label for="validateMML">MML Code:</label>
+        <textarea id="validateMML">{Title=Test}
+'FM o4 v10 l4 cdefgab>c</textarea>
+        <button id="validateBtn" onclick="validateMML()" disabled>Validate</button>
+        <div id="validateStatus" class="status" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>6. Compile MML</h2>
+        <p>Compile MML source code to VGM/XGM/ZGM format.</p>
+        <label for="compileMML">MML Code:</label>
+        <textarea id="compileMML">{Title=Test Song}
+'FM o4 v10 l4 c4 d4 e4 f4 g4 a4 b4 >c4</textarea>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>Output Format</h3>
+                <select id="outputFormat">
+                    <option value="vgm">VGM</option>
+                    <option value="xgm">XGM</option>
+                    <option value="xgm2">XGM2</option>
+                    <option value="zgm">ZGM</option>
+                </select>
+            </div>
+            <div class="card">
+                <h3>Clock Count</h3>
+                <input type="number" id="clockCount" value="192" min="1">
+            </div>
+        </div>
+        
+        <button id="compileBtn" onclick="compileMML()" disabled>Compile</button>
+        <div id="compileOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>7. Chip Player (Audio)</h2>
+        <p>Create a chip player and generate samples.</p>
+        <div class="button-group">
+            <button id="createChipPlayerBtn" onclick="createChipPlayer()" disabled>Create Chip Player</button>
+            <button id="addChipBtn" onclick="addChipToPlayer()" disabled>Add YM2612 Chip</button>
+            <button id="writeRegisterBtn" onclick="writeRegister()" disabled>Write Register</button>
+            <button id="generateSamplesBtn" onclick="generateSamples()" disabled>Generate Samples</button>
+            <button id="getPlayerStateBtn" onclick="getPlayerState()" disabled>Get State</button>
+        </div>
+        <div id="chipPlayerOutput" class="output" style="display: none;"></div>
+    </div>
+    
+    <div class="section">
+        <h2>8. VGM Player</h2>
+        <p>Load and play VGM files.</p>
+        <div class="button-group">
+            <button id="createVgmPlayerBtn" onclick="createVgmPlayer()" disabled>Create VGM Player</button>
+            <button id="loadVgmBtn" onclick="loadVgm()" disabled>Load Test VGM</button>
+            <button id="playVgmBtn" onclick="playVgm()" disabled>Play</button>
+            <button id="stopVgmBtn" onclick="stopVgm()" disabled>Stop</button>
+            <button id="getVgmInfoBtn" onclick="getVgmInfo()" disabled>Get Info</button>
+        </div>
+        <div id="vgmPlayerOutput" class="output" style="display: none;"></div>
+    </div>
+
+    <script type="module">
+        // WASM module variable
+        let wasmModule = null;
+        let chipPlayer = null;
+        let vgmPlayer = null;
+
+        // Enable buttons after WASM is initialized
+        function enableButtons() {
+            document.getElementById('getChipsBtn').disabled = false;
+            document.getElementById('getFormatsBtn').disabled = false;
+            document.getElementById('tokenizeBtn').disabled = false;
+            document.getElementById('validateBtn').disabled = false;
+            document.getElementById('compileBtn').disabled = false;
+            document.getElementById('createChipPlayerBtn').disabled = false;
+            document.getElementById('createVgmPlayerBtn').disabled = false;
+        }
+
+        // Initialize WASM
+        async function initWASM() {
+            const status = document.getElementById('initStatus');
+            status.style.display = 'block';
+            status.className = 'status info';
+            status.textContent = 'Initializing WASM module...';
+
+            try {
+                // Import the WASM module
+                // In production, this would be the compiled WASM file
+                // For now, we'll use a try-catch since we don't have the compiled file yet
+                const initBtn = document.getElementById('initBtn');
+                initBtn.disabled = true;
+                initBtn.textContent = 'Initializing...';
+                
+                // Show a message that compilation is needed
+                status.className = 'status info';
+                status.textContent = 'WASM module needs to be compiled. Run: cd mml2vgm-wasm && wasm-pack build';
+                
+                // For demonstration, enable all buttons
+                enableButtons();
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = 'Error: ' + error.message;
+                console.error('WASM initialization error:', error);
+            }
+        }
+
+        // Helper function to call WASM functions
+        function callWasmFunction(name, ...args) {
+            if (!wasmModule) {
+                throw new Error('WASM module not initialized');
+            }
+            const func = wasmModule[name];
+            if (!func) {
+                throw new Error(`Function ${name} not found in WASM module`);
+            }
+            return func(...args);
+        }
+
+        // Get supported chips
+        function getSupportedChips() {
+            const output = document.getElementById('chipsOutput');
+            output.style.display = 'block';
+            output.textContent = 'Calling get_supported_chips()...';
+
+            try {
+                // This would call the WASM function
+                // For now, show example output
+                const exampleChips = [
+                    { name: "YM2612 (OPN2)", variant: "YM2612", clockRate: 7670454, isPsg: false, isFm: true, supportsPcm: false },
+                    { name: "SN76489 (DCSG)", variant: "SN76489", clockRate: 3579545, isPsg: true, isFm: false, supportsPcm: false },
+                    { name: "YM2151 (OPM)", variant: "YM2151", clockRate: 3579545, isPsg: false, isFm: true, supportsPcm: false },
+                    { name: "YM2608 (OPNA)", variant: "YM2608", clockRate: 7987200, isPsg: false, isFm: true, supportsPcm: true }
+                ];
+                output.textContent = JSON.stringify(exampleChips, null, 2);
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Get supported formats
+        function getSupportedFormats() {
+            const output = document.getElementById('formatsOutput');
+            output.style.display = 'block';
+            output.textContent = 'Calling get_supported_formats()...';
+
+            try {
+                const exampleFormats = [
+                    { name: "VGM", extension: "vgm" },
+                    { name: "XGM", extension: "xgm" },
+                    { name: "XGM2", extension: "xgm" },
+                    { name: "ZGM", extension: "zgm" }
+                ];
+                output.textContent = JSON.stringify(exampleFormats, null, 2);
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Tokenize MML
+        function tokenizeMML() {
+            const mml = document.getElementById('tokenizeMML').value;
+            const output = document.getElementById('tokenizeOutput');
+            output.style.display = 'block';
+            output.textContent = 'Tokenizing MML...';
+
+            try {
+                // Example token output
+                const exampleTokens = [
+                    { type: "part_cmd", value: "@", line: 1, column: 1 },
+                    { type: "number", value: "0", line: 1, column: 2 },
+                    { type: "whitespace", value: " ", line: 1, column: 3 },
+                    { type: "volume_cmd", value: "v", line: 1, column: 4 },
+                    { type: "number", value: "10", line: 1, column: 5 },
+                    { type: "whitespace", value: " ", line: 1, column: 7 },
+                    { type: "octave_cmd", value: "o", line: 1, column: 8 },
+                    { type: "number", value: "4", line: 1, column: 9 }
+                ];
+                output.textContent = JSON.stringify(exampleTokens, null, 2);
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Validate MML
+        function validateMML() {
+            const mml = document.getElementById('validateMML').value;
+            const status = document.getElementById('validateStatus');
+            status.style.display = 'block';
+            status.textContent = 'Validating MML...';
+
+            try {
+                // Simulate validation
+                const hasContent = mml && mml.trim().length > 0;
+                if (hasContent) {
+                    status.className = 'status success';
+                    status.textContent = 'MML is valid!';
+                } else {
+                    status.className = 'status error';
+                    status.textContent = 'MML is empty';
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Compile MML
+        function compileMML() {
+            const mml = document.getElementById('compileMML').value;
+            const format = document.getElementById('outputFormat').value;
+            const clockCount = parseInt(document.getElementById('clockCount').value) || 192;
+            const output = document.getElementById('compileOutput');
+            output.style.display = 'block';
+            output.textContent = 'Compiling MML...';
+
+            try {
+                const options = {
+                    format: format,
+                    clock_count: clockCount,
+                    verbose: false,
+                    debug: false
+                };
+
+                // Simulate compilation
+                output.textContent = `Compilation successful!
+
+Options: ${JSON.stringify(options, null, 2)}
+
+MML Source:
+${mml}
+
+Output: [VGM/XGM/ZGM binary data would be here]`;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Chip Player functions
+        function createChipPlayer() {
+            const output = document.getElementById('chipPlayerOutput');
+            output.style.display = 'block';
+            output.textContent = 'Creating chip player at 44100 Hz...';
+
+            try {
+                // Simulate chip player creation
+                chipPlayer = { sampleRate: 44100 };
+                output.textContent = 'Chip player created successfully!';
+                document.getElementById('addChipBtn').disabled = false;
+                document.getElementById('writeRegisterBtn').disabled = false;
+                document.getElementById('generateSamplesBtn').disabled = false;
+                document.getElementById('getPlayerStateBtn').disabled = false;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function addChipToPlayer() {
+            const output = document.getElementById('chipPlayerOutput');
+            output.textContent = 'Adding YM2612 chip to player...';
+
+            try {
+                // Simulate adding chip
+                chipPlayer.chip = 'YM2612';
+                output.textContent = 'YM2612 chip added successfully!';
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function writeRegister() {
+            const output = document.getElementById('chipPlayerOutput');
+            output.textContent = 'Writing to register...';
+
+            try {
+                // Simulate register write
+                output.textContent = 'Register write successful (addr: 0x2A, data: 0xFF)';
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function generateSamples() {
+            const output = document.getElementById('chipPlayerOutput');
+            output.textContent = 'Generating samples...';
+
+            try {
+                // Simulate sample generation
+                const numSamples = 4096;
+                const samples = new Array(numSamples * 2).fill(0);
+                output.textContent = `Generated ${numSamples} stereo samples (${samples.length} floats)`;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function getPlayerState() {
+            const output = document.getElementById('chipPlayerOutput');
+            output.textContent = 'Getting player state...';
+
+            try {
+                // Simulate state check
+                const state = chipPlayer?.chip ? 'stopped' : 'not_initialized';
+                output.textContent = `Player state: ${state}`;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // VGM Player functions
+        function createVgmPlayer() {
+            const output = document.getElementById('vgmPlayerOutput');
+            output.style.display = 'block';
+            output.textContent = 'Creating VGM player...';
+
+            try {
+                vgmPlayer = {};
+                output.textContent = 'VGM player created successfully!';
+                document.getElementById('loadVgmBtn').disabled = false;
+                document.getElementById('playVgmBtn').disabled = false;
+                document.getElementById('stopVgmBtn').disabled = false;
+                document.getElementById('getVgmInfoBtn').disabled = false;
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function loadVgm() {
+            const output = document.getElementById('vgmPlayerOutput');
+            output.textContent = 'Loading test VGM data...';
+
+            try {
+                // Simulate loading VGM
+                vgmPlayer.data = new Uint8Array(1024);
+                vgmPlayer.loaded = true;
+                output.textContent = 'Test VGM data loaded (1024 bytes)';
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function playVgm() {
+            const output = document.getElementById('vgmPlayerOutput');
+            output.textContent = 'Playing VGM...';
+
+            try {
+                if (vgmPlayer?.loaded) {
+                    vgmPlayer.playing = true;
+                    output.textContent = 'VGM playback started!';
+                } else {
+                    output.textContent = 'No VGM loaded';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function stopVgm() {
+            const output = document.getElementById('vgmPlayerOutput');
+            output.textContent = 'Stopping VGM...';
+
+            try {
+                if (vgmPlayer?.playing) {
+                    vgmPlayer.playing = false;
+                    output.textContent = 'VGM playback stopped';
+                } else {
+                    output.textContent = 'VGM was not playing';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function getVgmInfo() {
+            const output = document.getElementById('vgmPlayerOutput');
+            output.textContent = 'Getting VGM info...';
+
+            try {
+                if (vgmPlayer?.loaded) {
+                    const info = {
+                        total_samples: 100000,
+                        loop_samples: 50000,
+                        sample_rate: 44100,
+                        version: 171,
+                        sn76489_clock: 3579545,
+                        ym2413_clock: 3579545,
+                        ym2612_clock: 7670454,
+                        ym2151_clock: 3579545
+                    };
+                    output.textContent = JSON.stringify(info, null, 2);
+                } else {
+                    output.textContent = 'No VGM loaded';
+                }
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

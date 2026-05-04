@@ -1,0 +1,56 @@
+{
+  "name": "mml2vgm-browser-ide",
+  "version": "0.1.0",
+  "description": "A browser-based IDE for mml2vgm - MML to VGM/XGM/ZGM compiler",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@monaco-editor/react": "^4.6.0",
+    "monaco-editor": "^0.45.0",
+    "zustand": "^4.4.7",
+    "mml2vgm-wasm": "file:../mml2vgm-wasm/pkg"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vite-plugin-wasm": "^3.3.0",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2"
+  },
+  "keywords": [
+    "mml",
+    "vgm",
+    "xgm",
+    "zgm",
+    "chiptune",
+    "music",
+    "ide",
+    "wasm",
+    "react",
+    "monaco-editor"
+  ],
+  "authors": ["mml2vgm Team"],
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/example/mml2vgm-rs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/mml2vgm-rs"
+  },
+  "bugs": {
+    "url": "https://github.com/example/mml2vgm-rs/issues"
+  }
+}

@@ -1,0 +1,20 @@
+; mml2vgm Browser IDE - Chord Progression Sample
+; Demonstrates chord playing with multiple parts
+
+@OPNA
+
+; Part 0: Melody
+@0 v100 l4 o4
+  c e g a2. >c e g a2.
+
+; Part 1: Chords (using tie for sustained notes)
+@1 v80 l2 o3
+  c~g~e~ c~g~e~ f~a~c~ f~a~c~
+
+; Part 2: Bass
+@2 v90 l4 o2
+  c2. g2. f2. c2.
+
+; Part 3: SSG Arpeggio
+@3 v70 l8 o4
+  c e g c e g c2 c e g c e g c2

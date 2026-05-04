@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WASM Test</title>
+</head>
+<body>
+    <h1>WASM Module Test</h1>
+    <p id="status">Loading WASM module...</p>
+    <div id="results"></div>
+    
+    <script type="module">
+        async function testWasm() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                statusEl.textContent = 'Importing WASM module...';
+                
+                // Import the WASM module
+                const wasm = await import('/Users/rjungemann/Projects/mml2vgm/mml2vgm-wasm/pkg/mml2vgm_wasm.js');
+                
+                statusEl.textContent = 'WASM module loaded successfully!';
+                
+                // Test the functions
+                const chips = wasm.get_supported_chips();
+                resultsEl.innerHTML += `<p><strong>Supported Chips:</strong> ${chips}</p>`;
+                
+                const formats = wasm.get_supported_formats();
+                resultsEl.innerHTML += `<p><strong>Supported Formats:</strong> ${formats}</p>`;
+                
+                const options = wasm.default_compile_options();
+                resultsEl.innerHTML += `<p><strong>Default Options:</strong> ${options}</p>`;
+                
+                // Test compilation with a simple MML
+                const mml = `
+@OPNA o4 l4
+C D E F G A B r
+C5 D5 E5 F5 G5 A5 B5 r
+`;
+                
+                try {
+                    statusEl.textContent = 'Testing compilation...';
+                    const result = wasm.compile_mml(mml, options);
+                    resultsEl.innerHTML += `<p><strong>Compilation Result:</strong> Success! (${result.byteLength} bytes)</p>`;
+                } catch (e) {
+                    resultsEl.innerHTML += `<p style="color: red"><strong>Compilation Error:</strong> ${e}</p>`;
+                }
+                
+                // Test tokenization
+                try {
+                    const tokens = wasm.tokenize(mml);
+                    resultsEl.innerHTML += `<p><strong>Tokens:</strong> ${tokens}</p>`;
+                } catch (e) {
+                    resultsEl.innerHTML += `<p style="color: red"><strong>Tokenization Error:</strong> ${e}</p>`;
+                }
+                
+            } catch (error) {
+                statusEl.textContent = 'Error loading WASM module!';
+                resultsEl.innerHTML = `<p style="color: red"><strong>Error:</strong> ${error}</p>`;
+                console.error('WASM error:', error);
+            }
+        }
+        
+        testWasm();
+    </script>
+</body>
+</html>

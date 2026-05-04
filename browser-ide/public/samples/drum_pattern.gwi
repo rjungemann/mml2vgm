@@ -1,0 +1,16 @@
+; mml2vgm Browser IDE - Drum Pattern Sample
+; Demonstrates SSG drum patterns
+
+@OPNA
+
+; Part 0: Kick and Snare
+@0 v100 l16 o5
+  bd4 sn4 bd4 sn4 bd4 bd4 sn8 bd4 sn4 bd4 sn4 bd4 bd4 sn8
+
+; Part 1: Hi-hats
+@1 v80 l16 o6
+  hh4 hh4 hh4 hh4 hh4 hh4 hh4 hh4
+
+; Part 2: Toms
+@2 v90 l8 o4
+  tom4 tom4 tom8 tom4 tom4 tom8

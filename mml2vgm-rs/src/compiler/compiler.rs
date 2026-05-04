@@ -106,6 +106,43 @@ impl MmlCompiler {
         }
     }
 
+    /// Compile MML source code directly from a string
+    ///
+    /// This is useful for WASM/browser integration where file system access
+    /// is not available.
+    pub fn compile_from_source(&self, source: &str) -> MmlResult<CompileResult> {
+        // 1. Tokenize (Lexer)
+        let tokens = self.lex(source)?;
+
+        // 2. Parse (Parser)
+        let ast = self.parse(tokens)?;
+
+        // 3. Semantic Analysis (currently unimplemented, so skip for now)
+        // let mut sema = Sema::new();
+        // sema.analyze(&mut ast)?;
+
+        // 4. Code Generation
+        let output_data = self.generate_code(&ast)?;
+
+        Ok(CompileResult {
+            data: output_data,
+            output_path: None,
+            warnings: Vec::new(),
+            info: crate::CompileInfo::default(),
+        })
+    }
+
+    /// Validate MML source code from a string without generating output
+    pub fn validate_from_source(&self, source: &str) -> MmlResult<()> {
+        // 1. Tokenize
+        let tokens = self.lex(source)?;
+
+        // 2. Parse
+        let _ast = self.parse(tokens)?;
+
+        Ok(())
+    }
+
     /// Determine the output file path
     fn determine_output_path(&self, input_path: &Path) -> std::path::PathBuf {
         let output_ext = match self.options.format {

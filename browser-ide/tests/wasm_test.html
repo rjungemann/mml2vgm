@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Module Test</title>
+</head>
+<body>
+    <h1>WASM Module Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        (async () => {
+            const output = document.getElementById('output');
+            
+            try {
+                output.innerHTML += '<p>Testing WASM module import...</p>';
+                
+                // Test 1: Import the WASM module
+                output.innerHTML += '<p>Test 1: Importing mml2vgm-wasm...</p>';
+                const wasm = await import('mml2vgm-wasm');
+                output.innerHTML += '<p style="color:green">✓ WASM module imported successfully</p>';
+                
+                // Test 2: Check if compile_mml exists
+                if (typeof wasm.compile_mml === 'function') {
+                    output.innerHTML += '<p style="color:green">✓ compile_mml function found</p>';
+                } else {
+                    output.innerHTML += '<p style="color:red">✗ compile_mml function NOT found</p>';
+                    return;
+                }
+                
+                // Test 3: Check other functions
+                const functions = ['validate_mml', 'tokenize', 'create_chip_player', 'get_supported_chips'];
+                for (const fn of functions) {
+                    if (typeof wasm[fn] === 'function') {
+                        output.innerHTML += `<p style="color:green">✓ ${fn} function found</p>`;
+                    } else {
+                        output.innerHTML += `<p style="color:red">✗ ${fn} function NOT found</p>`;
+                    }
+                }
+                
+                // Test 4: Try to compile a simple MML
+                output.innerHTML += '<p>Test 4: Compiling simple MML...</p>';
+                try {
+                    const mml = '@OPNA\n@0 v100 l4 o4 c d e f g a b >c2.';
+                    const options = JSON.stringify({ format: 'vgm', target_chips: ['YM2608'] });
+                    const result = wasm.compile_mml(mml, options);
+                    if (result && result.length > 0) {
+                        output.innerHTML += `<p style="color:green">✓ Compilation successful (${result.length} bytes)</p>`;
+                    } else {
+                        output.innerHTML += '<p style="color:red">✗ Compilation returned empty result</p>';
+                    }
+                } catch (e) {
+                    output.innerHTML += `<p style="color:red">✗ Compilation error: ${e.message}</p>`;
+                }
+                
+                // Test 5: Try tokenization
+                output.innerHTML += '<p>Test 5: Tokenizing MML...</p>';
+                try {
+                    const mml = '@OPNA\n@0 c d e';
+                    const tokensJson = wasm.tokenize(mml);
+                    const tokens = JSON.parse(tokensJson);
+                    if (tokens && tokens.length > 0) {
+                        output.innerHTML += `<p style="color:green">✓ Tokenization successful (${tokens.length} tokens)</p>`;
+                        output.innerHTML += `<p>First token: ${JSON.stringify(tokens[0])}</p>`;
+                    } else {
+                        output.innerHTML += '<p style="color:red">✗ Tokenization returned empty</p>';
+                    }
+                } catch (e) {
+                    output.innerHTML += `<p style="color:red">✗ Tokenization error: ${e.message}</p>`;
+                }
+                
+                // Test 6: Get supported chips
+                output.innerHTML += '<p>Test 6: Getting supported chips...</p>';
+                try {
+                    const chipsJson = wasm.get_supported_chips();
+                    const chips = JSON.parse(chipsJson);
+                    if (chips && chips.length > 0) {
+                        output.innerHTML += `<p style="color:green">✓ Supported chips: ${chips.length} chips</p>`;
+                        output.innerHTML += `<p>First chip: ${chips[0]}</p>`;
+                    } else {
+                        output.innerHTML += '<p style="color:red">✗ No chips returned</p>';
+                    }
+                } catch (e) {
+                    output.innerHTML += `<p style="color:red">✗ Error getting chips: ${e.message}</p>`;
+                }
+                
+                output.innerHTML += '<p style="color:green">All tests completed!</p>';
+                
+            } catch (e) {
+                output.innerHTML += `<p style="color:red">✗ Error: ${e.message}</p>`;
+                output.innerHTML += `<p style="color:red">Stack: ${e.stack}</p>`;
+            }
+        })();
+    </script>
+</body>
+</html>

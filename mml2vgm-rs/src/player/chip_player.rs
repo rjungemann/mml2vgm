@@ -186,6 +186,11 @@ impl ChipPlayer {
         self.position
     }
 
+    /// Get the current player state
+    pub fn state(&self) -> ChipPlayerState {
+        self.state
+    }
+
     /// Generate the next batch of samples
     pub fn generate_samples(&mut self, sample_count: usize) -> MmlResult<Vec<f32>> {
         if self.state != ChipPlayerState::Playing {

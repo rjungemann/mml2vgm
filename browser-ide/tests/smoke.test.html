@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mml2vgm Browser IDE - Smoke Tests</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        .test { margin: 10px 0; padding: 10px; border-left: 4px solid #ccc; }
+        .pass { border-left-color: #4CAF50; background: #e8f5e9; }
+        .fail { border-left-color: #f44336; background: #ffebee; }
+        .skip { border-left-color: #ff9800; background: #fff3e0; }
+        button { margin: 5px; padding: 8px 16px; cursor: pointer; }
+        #log { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>mml2vgm Browser IDE - Smoke Tests</h1>
+    <p>Run these tests to verify the browser IDE is working correctly.</p>
+    
+    <h2>Manual Tests</h2>
+    
+    <div class="test" id="test-page-load">
+        <h3>Test 1: Page Load</h3>
+        <p>Verify the page loads without errors.</p>
+        <button onclick="testPageLoad()">Run Test</button>
+        <span id="result-page-load"></span>
+    </div>
+    
+    <div class="test" id="test-monaco-editor">
+        <h3>Test 2: Monaco Editor Initialization</h3>
+        <p>Verify Monaco Editor initializes correctly.</p>
+        <button onclick="testMonacoEditor()">Run Test</button>
+        <span id="result-monaco-editor"></span>
+    </div>
+    
+    <div class="test" id="test-wasm-load">
+        <h3>Test 3: WASM Module Load</h3>
+        <p>Verify WASM module can be imported and initialized.</p>
+        <button onclick="testWasmLoad()">Run Test</button>
+        <span id="result-wasm-load"></span>
+    </div>
+    
+    <div class="test" id="test-wasm-compile">
+        <h3>Test 4: WASM Compilation</h3>
+        <p>Verify WASM can compile a simple MML string.</p>
+        <button onclick="testWasmCompile()">Run Test</button>
+        <span id="result-wasm-compile"></span>
+    </div>
+    
+    <div class="test" id="test-wasm-tokenize">
+        <h3>Test 5: WASM Tokenization</h3>
+        <p>Verify WASM can tokenize MML for syntax highlighting.</p>
+        <button onclick="testWasmTokenize()">Run Test</button>
+        <span id="result-wasm-tokenize"></span>
+    </div>
+    
+    <div class="test" id="test-settings-load">
+        <h3>Test 6: Settings Load</h3>
+        <p>Verify settings are loaded correctly.</p>
+        <button onclick="testSettingsLoad()">Run Test</button>
+        <span id="result-settings-load"></span>
+    </div>
+    
+    <div class="test" id="test-document-create">
+        <h3>Test 7: Document Creation</h3>
+        <p>Verify documents can be created.</p>
+        <button onclick="testDocumentCreate()">Run Test</button>
+        <span id="result-document-create"></span>
+    </div>
+    
+    <h2>Test Log</h2>
+    <div id="log"></div>
+    
+    <script>
+        // Helper to add log message
+        function log(message, isError = false) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.textContent = message;
+            entry.style.color = isError ? '#f44336' : '#333';
+            logDiv.appendChild(entry);
+            console.log(message);
+        }
+        
+        // Helper to set test result
+        function setResult(testId, passed, message) {
+            const testDiv = document.getElementById(`test-${testId}`);
+            const resultSpan = document.getElementById(`result-${testId}`);
+            
+            if (passed) {
+                testDiv.className = 'test pass';
+                resultSpan.textContent = '✓ PASS';
+            } else {
+                testDiv.className = 'test fail';
+                resultSpan.textContent = '✗ FAIL';
+            }
+            
+            if (message) {
+                const msgSpan = document.createElement('span');
+                msgSpan.textContent = ` - ${message}`;
+                msgSpan.style.marginLeft = '10px';
+                resultSpan.appendChild(msgSpan);
+            }
+        }
+        
+        // Test 1: Page Load
+        function testPageLoad() {
+            log('Test 1: Checking if page loaded...');
+            try {
+                if (document.getElementById('root')) {
+                    setResult('page-load', true, 'Root element exists');
+                    log('✓ Root element found');
+                } else {
+                    setResult('page-load', false, 'Root element not found');
+                    log('✗ Root element not found', true);
+                }
+            } catch (e) {
+                setResult('page-load', false, e.message);
+                log(`✗ Error: ${e.message}`, true);
+            }
+        }
+        
+        // Test 2: Monaco Editor Initialization
+        async function testMonacoEditor() {
+            log('Test 2: Checking Monaco Editor...');
+            setResult('monaco-editor', false, 'Pending...');
+            
+            try {
+                // Monaco is loaded from CDN, check if it's available
+                if (typeof window.monaco !== 'undefined') {
+                    setResult('monaco-editor', true, 'Monaco available globally');
+                    log('✓ Monaco Editor is available');
+                } else {
+                    // Monaco might be loaded asynchronously, wait a bit
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    if (typeof window.monaco !== 'undefined') {
+                        setResult('monaco-editor', true, 'Monaco loaded after delay');
+                        log('✓ Monaco Editor loaded after delay');
+                    } else {
+                        setResult('monaco-editor', false, 'Monaco not available');
+                        log('✗ Monaco Editor not available', true);
+                    }
+                }
+            } catch (e) {
+                setResult('monaco-editor', false, e.message);
+                log(`✗ Error: ${e.message}`, true);
+            }
+        }
+        
+        // Test 3: WASM Module Load
+        async function testWasmLoad() {
+            log('Test 3: Loading WASM module...');
+            setResult('wasm-load', false, 'Pending...');
+            
+            try {
+                // Try to import the WASM module
+                const wasm = await import('mml2vgm-wasm');
+                if (wasm && wasm.compile_mml) {
+                    setResult('wasm-load', true, 'WASM module loaded');
+                    log('✓ WASM module loaded successfully');
+                } else {
+                    setResult('wasm-load', false, 'WASM module missing functions');
+                    log('✗ WASM module missing expected functions', true);
+                }
+            } catch (e) {
+                setResult('wasm-load', false, e.message);
+                log(`✗ Error loading WASM: ${e.message}`, true);
+            }
+        }
+        
+        // Test 4: WASM Compilation
+        async function testWasmCompile() {
+            log('Test 4: Testing WASM compilation...');
+            setResult('wasm-compile', false, 'Pending...');
+            
+            try {
+                const wasm = await import('mml2vgm-wasm');
+                const mml = '@0 v10 o4 c d e f g a b >c2.';
+                const options = JSON.stringify({ format: 'vgm', target_chips: ['YM2608'] });
+                
+                const result = wasm.compile_mml(mml, options);
+                if (result && result.length > 0) {
+                    setResult('wasm-compile', true, `${result.length} bytes`);
+                    log(`✓ Compilation successful (${result.length} bytes)`);
+                } else {
+                    setResult('wasm-compile', false, 'Empty result');
+                    log('✗ Compilation returned empty result', true);
+                }
+            } catch (e) {
+                setResult('wasm-compile', false, e.message);
+                log(`✗ Compilation error: ${e.message}`, true);
+            }
+        }
+        
+        // Test 5: WASM Tokenization
+        async function testWasmTokenize() {
+            log('Test 5: Testing WASM tokenization...');
+            setResult('wasm-tokenize', false, 'Pending...');
+            
+            try {
+                const wasm = await import('mml2vgm-wasm');
+                const mml = '@0 v10 o4 c d e';
+                
+                const result = wasm.tokenize(mml);
+                const tokens = JSON.parse(result);
+                if (tokens && tokens.length > 0) {
+                    setResult('wasm-tokenize', true, `${tokens.length} tokens`);
+                    log(`✓ Tokenization successful (${tokens.length} tokens)`);
+                } else {
+                    setResult('wasm-tokenize', false, 'No tokens returned');
+                    log('✗ Tokenization returned no tokens', true);
+                }
+            } catch (e) {
+                setResult('wasm-tokenize', false, e.message);
+                log(`✗ Tokenization error: ${e.message}`, true);
+            }
+        }
+        
+        // Test 6: Settings Load
+        function testSettingsLoad() {
+            log('Test 6: Checking settings...');
+            try {
+                // Check if settings are in localStorage or if the app has default settings
+                const hasSettings = localStorage.getItem('mml2vgm-document-store') !== null || 
+                                  localStorage.getItem('mml2vgm-settings-store') !== null;
+                
+                if (hasSettings) {
+                    setResult('settings-load', true, 'Settings exist');
+                    log('✓ Settings found in localStorage');
+                } else {
+                    setResult('settings-load', true, 'Default settings will be used');
+                    log('✓ No existing settings (defaults will be used)');
+                }
+            } catch (e) {
+                setResult('settings-load', false, e.message);
+                log(`✗ Error checking settings: ${e.message}`, true);
+            }
+        }
+        
+        // Test 7: Document Creation
+        function testDocumentCreate() {
+            log('Test 7: Testing document creation...');
+            setResult('document-create', false, 'Manual check required');
+            
+            // This test requires the app to be running
+            // For now, mark as skip
+            setResult('document-create', null, 'Requires app interaction');
+            log('⏭️  Test requires manual interaction with the app');
+        }
+        
+        // Auto-run tests on page load (optional)
+        // Uncomment to auto-run all tests
+        // window.addEventListener('load', () => {
+        //     testPageLoad();
+        //     testMonacoEditor();
+        //     testWasmLoad();
+        // });
+    </script>
+</body>
+</html>

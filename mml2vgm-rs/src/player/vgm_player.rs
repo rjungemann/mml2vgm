@@ -232,6 +232,16 @@ impl VgmPlayer {
         self.header.as_ref().map(|h| h.total_samples).unwrap_or(0)
     }
 
+    /// Get the current player state
+    pub fn state(&self) -> PlayerState {
+        self.state
+    }
+
+    /// Get the VGM header (if loaded)
+    pub fn header(&self) -> Option<&VgmHeader> {
+        self.header.as_ref()
+    }
+
     /// Generate the next batch of samples
     pub fn generate_samples(&mut self, buffer: &mut [f32], sample_count: usize) -> MmlResult<()> {
         if self.state != PlayerState::Playing {

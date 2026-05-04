@@ -40,7 +40,8 @@ pub mod audio;
 pub mod player;
 
 /// Supported output formats
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
     /// Standard VGM format
     VGM,
@@ -81,7 +82,8 @@ impl std::str::FromStr for OutputFormat {
 }
 
 /// Supported sound chips
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SoundChip {
     // Mega Drive / Genesis
     YM2612,
@@ -297,7 +299,7 @@ impl std::str::FromStr for SoundChip {
 }
 
 /// Compilation options
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompileOptions {
     /// Output format
     pub format: OutputFormat,
