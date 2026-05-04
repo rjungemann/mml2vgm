@@ -1,32 +1,103 @@
-import React from 'react';
-import type { PartInfo, SoundChip } from '@/types';
+import React, { useState, useEffect } from 'react';
+import { traceService } from '@/services/traceService';
+import { partService } from '@/services/partService';
+import type { PartInfo, PartWithState, SoundChip } from '@/types';
 
-const PartCounterPanel: React.FC = () => {
-  // Mock part data for now
-  // TODO: Connect to actual compile results to extract part info
-  const parts: PartInfo[] = [
-    { index: 0, name: 'FM1', chip: 'YM2608' as SoundChip, channel: 0, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-    { index: 1, name: 'FM2', chip: 'YM2608' as SoundChip, channel: 1, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-    { index: 2, name: 'FM3', chip: 'YM2608' as SoundChip, channel: 2, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-    { index: 3, name: 'SSG1', chip: 'AY8910' as SoundChip, channel: 0, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-    { index: 4, name: 'SSG2', chip: 'AY8910' as SoundChip, channel: 1, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-    { index: 5, name: 'SSG3', chip: 'AY8910' as SoundChip, channel: 2, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false },
-  ];
+interface PartCounterPanelProps {
+  // Can be connected to actual compile results
+  parts?: PartInfo[];
+  documentId?: string;
+}
 
-  // Get stats
-  const totalParts = parts.length;
-  const activeParts = parts.filter(p => !p.isMuted).length;
-  const mutedParts = parts.filter(p => p.isMuted).length;
-  const soloParts = parts.filter(p => p.isSolo).length;
+const PartCounterPanel: React.FC<PartCounterPanelProps> = ({
+  parts: externalParts,
+  documentId,
+}) => {
+  // Get parts from partService
+  const [parts, setParts] = useState<PartWithState[]>([]);
+  
+  // Get active parts from trace service
+  const [activeParts, setActiveParts] = useState<Set<string>>(new Set());
+  
+  // Get part service parts when document changes
+  useEffect(() => {
+    if (documentId) {
+      // Try to get parts from partService
+      const partsFromService = partService.getParts();
+      if (partsFromService.length > 0) {
+        setParts(partsFromService);
+      } else if (externalParts) {
+        setParts(externalParts as PartWithState[]);
+      } else {
+        // Fallback to mock data
+        setParts([
+          { index: 0, name: 'FM1', chip: 'YM2608' as SoundChip, channel: 0, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+          { index: 1, name: 'FM2', chip: 'YM2608' as SoundChip, channel: 1, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+          { index: 2, name: 'FM3', chip: 'YM2608' as SoundChip, channel: 2, volume: 100, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+          { index: 3, name: 'SSG1', chip: 'AY8910' as SoundChip, channel: 0, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+          { index: 4, name: 'SSG2', chip: 'AY8910' as SoundChip, channel: 1, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+          { index: 5, name: 'SSG3', chip: 'AY8910' as SoundChip, channel: 2, volume: 80, pan: 0, isSolo: false, isMuted: false, isKbdAssigned: false, startPosition: { line: 1, column: 1 }, endPosition: { line: 1, column: 1 } },
+        ]);
+      }
+    } else if (externalParts) {
+      setParts(externalParts as PartWithState[]);
+    }
+  }, [documentId, externalParts]);
+  
+  // Listen to partService for part changes
+  useEffect(() => {
+    const handlePartsUpdate = (updatedParts: PartWithState[]) => {
+      setParts(updatedParts);
+    };
+    
+    partService.addListener(handlePartsUpdate);
+    
+    return () => {
+      partService.removeListener(handlePartsUpdate);
+    };
+  }, []);
+
+  // Listen to trace service for active parts
+  useEffect(() => {
+    const handleTraceUpdate = () => {
+      setActiveParts(traceService.getActiveParts());
+    };
+    
+    const listener = {
+      onTraceStart: handleTraceUpdate,
+      onTraceStop: handleTraceUpdate,
+      onPartEvent: handleTraceUpdate,
+    };
+    
+    traceService.addEventListener(listener);
+    
+    // Initial update
+    setActiveParts(traceService.getActiveParts());
+    
+    return () => {
+      traceService.removeEventListener(listener);
+    };
+  }, []);
 
   // Toggle mute for a part
   const handleToggleMute = (index: number) => {
-    console.log(`Toggle mute for part ${index}`);
+    partService.toggleMute(index);
   };
 
   // Toggle solo for a part
   const handleToggleSolo = (index: number) => {
-    console.log(`Toggle solo for part ${index}`);
+    partService.toggleSolo(index);
+  };
+
+  // Get stats
+  const totalParts = parts.length;
+  const activePartCount = parts.filter(p => !p.isMuted).length;
+  const mutedPartCount = parts.filter(p => p.isMuted).length;
+  const soloPartCount = parts.filter(p => p.isSolo).length;
+
+  // Check if a part is currently active (from trace)
+  const isPartActive = (index: number) => {
+    return activeParts.has(`part-${index}`);
   };
 
   return (
@@ -37,14 +108,24 @@ const PartCounterPanel: React.FC = () => {
           Total: {totalParts}
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Active: {activeParts}
+          Active: {activePartCount}
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Muted: {mutedParts}
+          Muted: {mutedPartCount}
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          Solo: {soloParts}
+          Solo: {soloPartCount}
         </div>
+        {traceService.isTracing() && (
+          <div style={{ 
+            fontSize: '11px', 
+            color: 'var(--accent-primary)',
+            marginTop: '4px',
+            fontWeight: 'bold'
+          }}>
+            Tracing: ON
+          </div>
+        )}
       </div>
 
       {/* Part list */}
@@ -59,9 +140,17 @@ const PartCounterPanel: React.FC = () => {
               padding: '0 4px',
               borderRadius: '2px',
               cursor: 'pointer',
-              backgroundColor: part.isMuted ? 'var(--bg-tertiary)' : 'transparent',
+              backgroundColor: isPartActive(part.index) 
+                ? 'rgba(0, 255, 0, 0.15)'
+                : part.isMuted 
+                  ? 'var(--bg-tertiary)'
+                  : 'transparent',
+              borderLeft: isPartActive(part.index) 
+                ? '3px solid var(--accent-primary)'
+                : '3px solid transparent',
             }}
             onClick={() => handleToggleMute(part.index)}
+            title={isPartActive(part.index) ? 'Currently active (playing)' : part.isMuted ? 'Muted' : 'Active'}
           >
             <span style={{ width: '20px', textAlign: 'center', fontSize: '11px' }}>
               {part.index}
@@ -78,10 +167,11 @@ const PartCounterPanel: React.FC = () => {
                   width: '18px',
                   height: '18px',
                   border: 'none',
-                  backgroundColor: part.isMuted ? 'var(--accent-warning)' : 'transparent',
-                  color: part.isMuted ? 'black' : 'var(--text-muted)',
+                  background: part.isMuted ? 'var(--button-active-bg)' : 'var(--button-bg)',
+                  color: part.isMuted ? 'var(--button-active-fg)' : 'var(--button-fg)',
                   cursor: 'pointer',
                   fontSize: '10px',
+                  borderRadius: '2px',
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -90,15 +180,18 @@ const PartCounterPanel: React.FC = () => {
               >
                 M
               </button>
+            </span>
+            <span style={{ marginLeft: '2px' }}>
               <button
                 style={{
                   width: '18px',
                   height: '18px',
                   border: 'none',
-                  backgroundColor: part.isSolo ? 'var(--accent-primary)' : 'transparent',
-                  color: part.isSolo ? 'white' : 'var(--text-muted)',
+                  background: part.isSolo ? 'var(--button-active-bg)' : 'var(--button-bg)',
+                  color: part.isSolo ? 'var(--button-active-fg)' : 'var(--button-fg)',
                   cursor: 'pointer',
                   fontSize: '10px',
+                  borderRadius: '2px',
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -108,30 +201,29 @@ const PartCounterPanel: React.FC = () => {
                 S
               </button>
             </span>
+            <span style={{ marginLeft: '2px' }}>
+              <button
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  border: 'none',
+                  background: part.isKbdAssigned ? 'var(--button-active-bg)' : 'var(--button-bg)',
+                  color: part.isKbdAssigned ? 'var(--button-active-fg)' : 'var(--button-fg)',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  borderRadius: '2px',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Toggle KBD assignment
+                  partService.assignKbd(part.index);
+                }}
+              >
+                K
+              </button>
+            </span>
           </div>
         ))}
-      </div>
-
-      {/* Controls */}
-      <div style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)' }}>
-        <button
-          className="button small"
-          onClick={() => parts.forEach(() => console.log(`Mute all`))}
-        >
-          Mute All
-        </button>
-        <button
-          className="button small"
-          onClick={() => parts.forEach(() => console.log(`Unmute all`))}
-        >
-          Unmute All
-        </button>
-        <button
-          className="button small"
-          onClick={() => parts.forEach(() => console.log(`Solo all`))}
-        >
-          Clear Solo
-        </button>
       </div>
     </div>
   );

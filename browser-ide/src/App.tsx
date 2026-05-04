@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { wasmService } from '@/services/wasmService';
 import { audioService } from '@/services/audioService';
 import { traceService } from '@/services/traceService';
+import { partService } from '@/services/partService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
@@ -41,6 +42,34 @@ export const App: React.FC = () => {
       setSettings: state.setSettings,
     }))
   );
+
+  // Get active document
+  const activeDocument = activeDocumentId ? documents.get(activeDocumentId) || null : null;
+
+  // Helper function to create a basic timing map for trace playback
+  // Maps time in milliseconds to source position (line, column)
+  const createTimingMap = (source: string, durationMs: number): Map<number, Position> => {
+    const timingMap = new Map<number, Position>();
+    const lines = source.split('\n');
+    const totalLines = lines.length;
+    
+    if (totalLines === 0 || durationMs <= 0) {
+      return timingMap;
+    }
+    
+    // Create a simple linear mapping: each line is evenly spaced across the duration
+    const msPerLine = durationMs / totalLines;
+    
+    for (let line = 0; line < totalLines; line++) {
+      const timeMs = Math.round(line * msPerLine);
+      timingMap.set(timeMs, { line: line + 1, column: 1 }); // +1 for 1-indexed lines
+    }
+    
+    // Also add end marker
+    timingMap.set(durationMs, { line: totalLines, column: lines[totalLines - 1]?.length || 1 });
+    
+    return timingMap;
+  };
 
   // Compile store
   const { compile, status, getResult } = useCompileStore(
@@ -96,6 +125,96 @@ export const App: React.FC = () => {
     setActiveDocument(id);
   }, [setActiveDocument]);
 
+  // Handle compile (compile only)
+  const handleCompile = useCallback(async () => {
+    if (!activeDocument || status === 'compiling') return;
+    
+    try {
+      const options: any = {
+        format: 'vgm',
+        target_chips: ['YM2608'],
+        clockRate: 7987200,
+        optimize: true,
+      };
+      
+      await compile(activeDocumentId!, options);
+    } catch (error) {
+      console.error('Compilation error:', error);
+    }
+  }, [activeDocument, activeDocumentId, compile, status]);
+
+  // Handle compile and play (F5 behavior)
+  const handleCompileAndPlay = useCallback(async () => {
+    if (!activeDocument || status === 'compiling') return;
+    
+    try {
+      const options: any = {
+        format: 'vgm',
+        target_chips: ['YM2608'],
+        clockRate: 7987200,
+        optimize: true,
+      };
+      
+      // Compile
+      await compile(activeDocumentId!, options);
+      
+      // After compilation, get the result and auto-play
+      const result = getResult(activeDocumentId!);
+      if (result?.data) {
+        // Parse parts from compile result
+        const chipsUsed = result.chipsUsed && result.chipsUsed.length > 0 
+          ? result.chipsUsed 
+          : ['YM2608', 'SN76489'];
+        
+        partService.parseFromCompileResult(
+          result.partCount || 0,
+          chipsUsed,
+          activeDocumentId
+        );
+        
+        // Create a basic timing map based on duration
+        const durationMs = (result.durationSeconds || 0) * 1000;
+        const timingMap = createTimingMap(
+          activeDocument.content,
+          durationMs
+        );
+        
+        // Initialize trace service with compile result
+        traceService.init({
+          data: result.data,
+          partCount: result.partCount || 0,
+          duration: durationMs,
+          timingMap,
+        });
+        
+        // Start trace playback
+        traceService.start();
+        
+        // Play via audio service with chips from compile result
+        await audioService.playVGM(result.data, {
+          chips: chipsUsed as any[],
+          volume: audioService.getVolume(),
+        });
+      }
+    } catch (error) {
+      console.error('Compile and play error:', error);
+    }
+  }, [activeDocument, activeDocumentId, compile, status, getResult, createTimingMap]);
+
+  // Handle play/pause
+  const handlePlay = useCallback(() => {
+    if (audioService.isPlaying()) {
+      audioService.pause();
+    } else {
+      audioService.resume();
+    }
+  }, []);
+
+  // Handle stop
+  const handleStop = useCallback(() => {
+    audioService.stop();
+  }, []);
+
   // Handle theme toggle
   const handleToggleTheme = useCallback(() => {
     const currentTheme = settings.editor.theme;
@@ -112,11 +231,18 @@ export const App: React.FC = () => {
     });
   }, [settings, setSettings]);
 
-  // Get active document
-  const activeDocument = activeDocumentId ? documents.get(activeDocumentId) || null : null;
-  
   // Trace state
   const [traceStatus, setTraceStatus] = useState(traceService.getStatus());
+
+  // State for navigation and error highlighting
+  const [navigatePosition, setNavigatePosition] = useState<Position | null>(null);
+
+  // Handle error navigation
+  const handleNavigateToError = useCallback((position: Position) => {
+    setNavigatePosition(position);
+    // Clear after a moment to allow the effect to trigger
+    setTimeout(() => setNavigatePosition(null), 500);
+  }, []);
 
   // Listen to trace service events
   useEffect(() => {
@@ -141,31 +267,13 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Handle compile
-  const handleCompile = useCallback(async () => {
-    if (!activeDocument || status === 'compiling') return;
-    
-    try {
-      const options: any = {
-        format: 'vgm',
-        target_chips: ['YM2608'],
-        clockRate: 7987200,
-        optimize: true,
-      };
-      
-      await compile(activeDocumentId!, options);
-    } catch (error) {
-      console.error('Compilation error:', error);
-    }
-  }, [activeDocument, activeDocumentId, compile, status]);
-
   // Render panel based on type
   const renderPanel = useCallback((panelType: PanelType) => {
     switch (panelType) {
       case 'errorList':
-        return <ErrorListPanel />;
+        return <ErrorListPanel onNavigateToPosition={handleNavigateToError} />;
       case 'partCounter':
-        return <PartCounterPanel />;
+        return <PartCounterPanel documentId={activeDocumentId || undefined} />;
       case 'folderTree':
         return <FolderTreePanel />;
       case 'playback':
@@ -177,7 +285,7 @@ export const App: React.FC = () => {
       default:
         return null;
     }
-  }, [compiledData]);
+  }, [compiledData, handleNavigateToError]);
 
   // Get panels for right sidebar (positioned right)
   const allPanelTypes: PanelType[] = [
@@ -235,7 +343,11 @@ export const App: React.FC = () => {
         onNewDocument={handleNewDocument}
         onToggleTheme={handleToggleTheme}
         onCompile={handleCompile}
+        onCompileAndPlay={handleCompileAndPlay}
+        onPlay={handlePlay}
+        onStop={handleStop}
         isCompiling={status === 'compiling'}
+        isPlaying={audioService.isPlaying()}
       />
 
       {/* Tab Bar */}
@@ -259,9 +371,8 @@ export const App: React.FC = () => {
                 useDocumentStore.getState().updateDocumentContent(activeDocumentId!, content);
               }}
               settings={settings.editor}
-              isTracing={traceStatus.isTracing}
               currentPosition={traceStatus.currentPosition}
-              activeParts={traceStatus.activeParts}
+              navigationPosition={navigatePosition}
             />
           )}
         </div>

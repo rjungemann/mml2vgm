@@ -191,19 +191,27 @@ export class WasmService {
         // Convert options to JSON
         const optionsJson = JSON.stringify(options);
         
-        // Call the WASM function
-        const data: Uint8Array = wasm.compile_mml(mml, optionsJson);
+        // Call the WASM function - now returns JsCompileResult with metadata
+        const result: any = wasm.compile_mml(mml, optionsJson);
+        
+        // Extract data and metadata from the result
+        const data: Uint8Array = result.data;
+        const part_count: number = result.part_count || 0;
+        const command_count: number = result.command_count || 0;
+        const duration_samples: number = result.duration_samples || 0;
+        const duration_seconds: number = result.duration_seconds || 0;
+        const chips_used: SoundChip[] = result.chips_used ? JSON.parse(result.chips_used) : [];
         
         return {
             data,
             errors: [],
             warnings: [],
             info: {
-                part_count: 0,
-                command_count: 0,
-                duration_samples: 0,
-                duration_seconds: 0,
-                chips_used: [],
+                part_count,
+                command_count,
+                duration_samples,
+                duration_seconds,
+                chips_used,
                 format_version: '',
             },
         };

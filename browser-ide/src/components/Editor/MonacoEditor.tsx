@@ -4,31 +4,29 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import type { Document, EditorSettings, Position } from '@/types';
 import { registerMmlLanguage } from './mmlLanguage';
 import { registerMmlTheme } from './mmlTheme';
-import { traceService } from '@/services/traceService';
 
 interface MonacoEditorProps {
   document: Document;
   onChange: (content: string) => void;
   settings: EditorSettings;
   // Trace playback props
-  isTracing?: boolean;
   currentPosition?: Position | null;
-  activeParts?: Set<string>;
+  // Navigation
+  navigationPosition?: Position | null;
 }
 
 const MonacoEditor: React.FC<MonacoEditorProps> = ({
   document,
   onChange,
   settings,
-  isTracing = false,
   currentPosition,
-  activeParts,
+  navigationPosition,
 }) => {
   const editorRef = useRef<any>(null);
   const monaco = useMonaco();
   const languageId = 'mml';
   const [currentLineDecorations, setCurrentLineDecorations] = useState<string[]>([]);
-  const [activePartDecorations, setActivePartDecorations] = useState<string[]>([]);
+  const [navDecorations, setNavDecorations] = useState<string[]>([]);
 
   // Register MML language and theme when Monaco is loaded
   useEffect(() => {
@@ -83,6 +81,48 @@ const MonacoEditor: React.FC<MonacoEditorProps> = ({
       editor.revealLineInCenter(lineNumber);
     }
   }, [currentPosition, currentLineDecorations]);
+
+  // Handle navigation to a specific position (from error list click)
+  useEffect(() => {
+    if (!editorRef.current || !navigationPosition) return;
+
+    const editor = editorRef.current;
+    const monacoInstance = editor._monaco;
+
+    // Clear previous navigation decorations
+    if (navDecorations.length > 0) {
+      editor.deltaDecorations(navDecorations, []);
+    }
+
+    // Set cursor position and reveal line
+    const { line, column } = navigationPosition;
+    editor.setPosition({ lineNumber: line, column: column });
+    editor.revealLineInCenter(line);
+    editor.focus();
+
+    // Add temporary highlight for navigation
+    const decorations = editor.deltaDecorations([], [
+      {
+        range: new monacoInstance.Range(line, column, line, column + 1),
+        options: {
+          className: 'navigate-highlight',
+          isWholeLine: false,
+        },
+      },
+    ]);
+
+    setNavDecorations(decorations);
+
+    // Clear navigation after a short delay
+    const timer = setTimeout(() => {
+      if (navDecorations.length > 0) {
+        editor.deltaDecorations(navDecorations, []);
+        setNavDecorations([]);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [navigationPosition, navDecorations]);
 
   // Handle editor mount
   const handleEditorDidMount: OnMount = useCallback((editor, _monaco) => {

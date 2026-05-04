@@ -278,14 +278,38 @@ export class TraceService {
    * Update active parts based on time.
    */
   private updateActiveParts(time: number): void {
-    // TODO: Implement based on part timing information
-    // For now, just simulate based on time
-    const parts = this._lastCompileResult?.partCount || 0;
-    const activePartIndex = Math.floor((time / 1000) % parts);
+    const partCount = this._lastCompileResult?.partCount || 0;
     
-    this._activeParts = new Set([`part-${activePartIndex}`]);
+    if (partCount === 0) {
+      this._activeParts = new Set();
+      return;
+    }
     
-    this.emitPartEvent(activePartIndex, 'note-on');
+    // Cycle through parts based on time
+    // Each part is active for approximately 1 second (1000ms)
+    // This is a simple simulation until we have real part timing data
+    const partsPerSecond = 1; // How many parts to cycle through per second
+    const activePartIndex = Math.floor((time / 1000) * partsPerSecond) % partCount;
+    
+    // Build set of active part IDs
+    const activeParts = new Set<string>();
+    activeParts.add(`part-${activePartIndex}`);
+    
+    // Also include adjacent parts for more visual interest
+    if (partCount > 1) {
+      const prevIndex = (activePartIndex + partCount - 1) % partCount;
+      const nextIndex = (activePartIndex + 1) % partCount;
+      activeParts.add(`part-${prevIndex}`);
+      activeParts.add(`part-${nextIndex}`);
+    }
+    
+    this._activeParts = activeParts;
+    
+    // Emit part events for active parts
+    this._activeParts.forEach(partId => {
+      const index = parseInt(partId.replace('part-', ''));
+      this.emitPartEvent(index, 'note-on');
+    });
   }
   
   // ========================================================================
@@ -459,8 +483,7 @@ export class TraceService {
 // Singleton Export
 // ============================================================================
 
-export const traceService = new TraceService();
-=======
+
   private emitTraceError(error: Error): void {
     this.listeners.forEach(l => l.onTraceError?.(error));
   }
@@ -470,8 +493,4 @@ export const traceService = new TraceService();
 // Singleton Export
 // ============================================================================
 
-export const traceService = new TraceService();============================================================================
-// Singleton Export
-// ============================================================================
-
-export const traceService = new TraceService();
+export const traceService = TraceService.getInstance();

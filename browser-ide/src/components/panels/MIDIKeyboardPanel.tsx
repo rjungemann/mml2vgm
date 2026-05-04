@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { midiService } from '@/services/midiService';
+import { partService } from '@/services/partService';
+import type { MidiNoteEvent } from '@/services/midiService';
 
 interface MIDIKey {
   note: string;
@@ -21,11 +24,95 @@ const BLACK_KEYS: Record<string, number> = {
 };
 
 const MIDIKeyboardPanel: React.FC = () => {
-  const [mode, setMode] = React.useState<'preview' | 'input'>('preview');
-  const [assignedPart, setAssignedPart] = React.useState<string | null>('Part 1');
+  // Get state from midiService
+  const [midiState, setMidiState] = useState(midiService.getState());
   const [activeKeys, setActiveKeys] = React.useState<Set<number>>(new Set());
   const [octaveOffset, setOctaveOffset] = React.useState(3);
-
+  
+  // Get parts from partService for part selection
+  const [parts, setParts] = useState(() => partService.getParts());
+  
+  // Derive mode and assigned part from midiService state
+  const mode = midiState.mode;
+  const assignedPartIndex = midiState.assignedPart;
+  const isSupported = midiState.isSupported;
+  const inputDevices = midiState.inputDevices;
+  
+  // Get assigned part name
+  const getAssignedPartName = (): string => {
+    if (assignedPartIndex === null) return 'None';
+    const part = parts.find(p => p.index === assignedPartIndex);
+    return part ? part.name : `Part ${assignedPartIndex + 1}`;
+  };
+  
+  // Listen to midiService state changes
+  useEffect(() => {
+    const handleStateUpdate = (state: any) => {
+      setMidiState(state);
+    };
+    
+    midiService.addStateListener(handleStateUpdate);
+    
+    return () => {
+      midiService.removeStateListener(handleStateUpdate);
+    };
+  }, []);
+  
+  // Listen to partService changes
+  useEffect(() => {
+    const handlePartsUpdate = (updatedParts: any[]) => {
+      setParts(updatedParts);
+    };
+    
+    partService.addListener(handlePartsUpdate);
+    
+    return () => {
+      partService.removeListener(handlePartsUpdate);
+    };
+  }, []);
+  
+  // Listen to MIDI note events for key highlighting
+  useEffect(() => {
+    const handleNoteEvent = (event: MidiNoteEvent) => {
+      if (event.type === 'noteOn' && event.velocity > 0) {
+        // Highlight the key
+        setActiveKeys(prev => new Set([...prev, event.note]));
+      } else if (event.type === 'noteOff' || (event.type === 'noteOn' && event.velocity === 0)) {
+        // Remove highlight
+        setActiveKeys(prev => {
+          const next = new Set(prev);
+          next.delete(event.note);
+          return next;
+        });
+      }
+    };
+    
+    midiService.addListener(handleNoteEvent);
+    
+    return () => {
+      midiService.removeListener(handleNoteEvent);
+    };
+  }, []);
+  
+  // Initialize MIDI on mount if supported
+  useEffect(() => {
+    if (isSupported && !midiState.isEnabled) {
+      midiService.init().catch(console.error);
+    }
+  }, [isSupported, midiState.isEnabled]);
+  
+  // Cycle through parts for assignment
+  const cycleAssignedPart = () => {
+    if (parts.length === 0) {
+      midiService.setAssignedPart(null);
+      return;
+    }
+    
+    const currentIndex = assignedPartIndex ?? -1;
+    const nextIndex = (currentIndex + 1) % parts.length;
+    midiService.setAssignedPart(parts[nextIndex].index);
+  };
+  
   // Generate keys for 2 octaves
   const generateKeys = (): MIDIKey[] => {
     const keys: MIDIKey[] = [];
@@ -62,41 +149,21 @@ const MIDIKeyboardPanel: React.FC = () => {
   const keys = generateKeys();
 
   const handleKeyClick = (midiNote: number) => {
-    console.log(`Key pressed: MIDI ${midiNote}`);
+    // Highlight the key
+    setActiveKeys(prev => new Set([...prev, midiNote]));
     
-    // Toggle active state
-    setActiveKeys(prev => {
-      const newKeys = new Set(prev);
-      if (newKeys.has(midiNote)) {
-        newKeys.delete(midiNote);
-      } else {
-        newKeys.add(midiNote);
-      }
-      return newKeys;
-    });
-
-    // TODO: In input mode, insert note into editor
-    // TODO: In preview mode, play note via WASM chip player
-    if (mode === 'preview' && assignedPart) {
-      console.log(`Preview: ${midiNote} on ${assignedPart}`);
-      // wasmService.previewNote(assignedPart, midiNote, 100);
-    } else if (mode === 'input') {
-      console.log(`Input: ${midiNote} at cursor position`);
-      // insertNoteAtCursor(midiNote);
+    // Send to midiService for handling
+    if (isSupported) {
+      // For now, just simulate the event through the service
+      // In a real implementation, this would send MIDI messages
+      // to the WASM chip player for preview
+      console.log('[MIDI Keyboard] Note clicked:', midiNote, 'mode:', mode, 'part:', assignedPartIndex);
     }
-  };
-
-  const handleOctaveUp = () => {
-    setOctaveOffset(prev => Math.min(prev + 1, 5));
-  };
-
-  const handleOctaveDown = () => {
-    setOctaveOffset(prev => Math.max(prev - 1, 1));
   };
 
   // Key color based on state
   const getKeyColor = (key: MIDIKey) => {
-    if (key.active) {
+    if (activeKeys.has(key.midiNote)) {
       return key.isBlack ? '#6aa84f' : '#388e3c';
     }
     return key.isBlack ? '#2d2d2d' : '#ffffff';
@@ -125,11 +192,28 @@ const MIDIKeyboardPanel: React.FC = () => {
         borderBottom: '1px solid var(--border-color)',
         fontSize: '11px',
       }}>
-        <span style={{ fontWeight: 'bold' }}>MIDI Keyboard</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontWeight: 'bold' }}>MIDI Keyboard</span>
+          {!isSupported && (
+            <span style={{ color: 'var(--text-warning)' }}>
+              (Web MIDI API not supported)
+            </span>
+          )}
+          {isSupported && !midiState.isEnabled && (
+            <span style={{ color: 'var(--text-muted)' }}>
+              (Not connected)
+            </span>
+          )}
+          {isSupported && midiState.isEnabled && inputDevices.length > 0 && (
+            <span style={{ color: 'var(--accent-primary)' }}>
+              ✓ {inputDevices.length} device(s)
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <select
             value={mode}
-            onChange={(e) => setMode(e.target.value as 'preview' | 'input')}
+            onChange={(e) => midiService.setMode(e.target.value as 'preview' | 'input')}
             style={{
               fontSize: '10px',
               padding: '2px',
@@ -137,26 +221,26 @@ const MIDIKeyboardPanel: React.FC = () => {
               color: 'var(--input-fg)',
               border: '1px solid var(--border-color)',
             }}
+            disabled={!isSupported}
           >
             <option value="preview">Preview</option>
             <option value="input">Input</option>
           </select>
-          <select
-            value={assignedPart || ''}
-            onChange={(e) => setAssignedPart(e.target.value || null)}
+          <button
+            onClick={cycleAssignedPart}
             style={{
               fontSize: '10px',
-              padding: '2px',
-              background: 'var(--input-bg)',
-              color: 'var(--input-fg)',
+              padding: '2px 6px',
+              background: 'var(--button-bg)',
+              color: 'var(--button-fg)',
               border: '1px solid var(--border-color)',
+              cursor: 'pointer',
             }}
+            disabled={!isSupported || parts.length === 0}
+            title="Cycle through parts (click to assign next part)"
           >
-            <option value="">No Part</option>
-            <option value="Part 1">Part 1</option>
-            <option value="Part 2">Part 2</option>
-            <option value="Part 3">Part 3</option>
-          </select>
+            Part: {getAssignedPartName()}
+          </button>
         </div>
       </div>
 
@@ -169,8 +253,8 @@ const MIDIKeyboardPanel: React.FC = () => {
         borderBottom: '1px solid var(--border-color)',
       }}>
         <button
-          onClick={handleOctaveDown}
-          disabled={octaveOffset <= 1}
+          onClick={() => setOctaveOffset(prev => Math.max(0, prev - 1))}
+          disabled={octaveOffset <= 0}
           style={{
             fontSize: '10px',
             padding: '2px 8px',
@@ -186,8 +270,8 @@ const MIDIKeyboardPanel: React.FC = () => {
           Octave {octaveOffset}-{octaveOffset + 1}
         </span>
         <button
-          onClick={handleOctaveUp}
-          disabled={octaveOffset >= 5}
+          onClick={() => setOctaveOffset(prev => Math.min(8, prev + 1))}
+          disabled={octaveOffset >= 8}
           style={{
             fontSize: '10px',
             padding: '2px 8px',
@@ -250,7 +334,7 @@ const MIDIKeyboardPanel: React.FC = () => {
         fontSize: '10px',
         color: 'var(--text-muted)',
       }}>
-        Mode: {mode} | Part: {assignedPart || 'None'} | Active keys: {activeKeys.size}
+        Mode: {mode} | Part: {getAssignedPartName()} | Active keys: {activeKeys.size}
       </div>
     </div>
   );

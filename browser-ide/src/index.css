@@ -1109,3 +1109,16 @@ body {
   background-color: rgba(0, 255, 0, 0.2) !important;
 }
 
+/* Navigation highlight (for error list navigation) */
+.navigate-highlight {
+  background-color: rgba(255, 165, 0, 0.3) !important;
+  border-radius: 2px;
+  animation: navigate-pulse 0.5s ease;
+}
+
+@keyframes navigate-pulse {
+  0% { background-color: rgba(255, 165, 0, 0.5) !important; }
+  50% { background-color: rgba(255, 165, 0, 0.2) !important; }
+  100% { background-color: rgba(255, 165, 0, 0) !important; }
+}
+

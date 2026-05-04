@@ -37,6 +37,32 @@ use wasm_bindgen::prelude::*;
 // Compilation Functions
 // ============================================================================
 
+/// Compile result structure for WASM
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub struct JsCompileResult {
+    data: Vec<u8>,
+    part_count: usize,
+    command_count: usize,
+    duration_samples: u64,
+    duration_seconds: f64,
+    chips_used: String, // JSON array of chip names
+}
+
+// Implement Default for JsCompileResult
+impl Default for JsCompileResult {
+    fn default() -> Self {
+        Self {
+            data: Vec::new(),
+            part_count: 0,
+            command_count: 0,
+            duration_samples: 0,
+            duration_seconds: 0.0,
+            chips_used: String::new(),
+        }
+    }
+}
+
 /// Compile MML source code to a binary format (VGM/XGM/ZGM)
 ///
 /// # Arguments
@@ -44,10 +70,10 @@ use wasm_bindgen::prelude::*;
 /// * `options_json` - JSON string containing CompileOptions
 ///
 /// # Returns
-/// A Result containing the compiled binary data as a Uint8Array on success,
+/// A Result containing the compiled data and metadata on success,
 /// or an error message on failure.
 #[wasm_bindgen(catch)]
-pub fn compile_mml(mml: &str, options_json: &str) -> Result<Vec<u8>, JsValue> {
+pub fn compile_mml(mml: &str, options_json: &str) -> Result<JsCompileResult, JsValue> {
     // Parse options from JSON
     let options: CompileOptions = match serde_json::from_str(options_json) {
         Ok(opts) => opts,
@@ -59,7 +85,19 @@ pub fn compile_mml(mml: &str, options_json: &str) -> Result<Vec<u8>, JsValue> {
     let compiler = MmlCompiler::new(options);
     
     match compiler.compile_from_source(mml) {
-        Ok(result) => Ok(result.data),
+        Ok(result) => {
+            let info = result.info;
+            let chips_json = serde_json::to_string(&info.chips_used).unwrap();
+            
+            Ok(JsCompileResult {
+                data: result.data,
+                part_count: info.part_count,
+                command_count: info.command_count,
+                duration_samples: info.duration_samples,
+                duration_seconds: info.duration_seconds,
+                chips_used: chips_json,
+            })
+        }
         Err(e) => Err(JsValue::from_str(&format!("Compilation error: {}", e))),
     }
 }

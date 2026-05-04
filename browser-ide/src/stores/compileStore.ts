@@ -33,6 +33,12 @@ export interface StoreCompileResult {
     warnings: CompileError[];
     duration: number; // in milliseconds
     timestamp: Date;
+    // Metadata from compilation
+    partCount: number;
+    commandCount: number;
+    durationSamples: number;
+    durationSeconds: number;
+    chipsUsed: string[];
 }
 
 interface CompileState {
@@ -251,7 +257,17 @@ export const useCompileStore = create<CompileStore>()(
                 const result = await wasmService.compile(doc.content, request.options);
                 const duration = Date.now() - startTime;
                 
-                // Create compile result
+                // Extract metadata from compile result
+                const info = result.info || {
+                    part_count: 0,
+                    command_count: 0,
+                    duration_samples: 0,
+                    duration_seconds: 0,
+                    chips_used: [],
+                    format_version: '',
+                };
+                
+                // Create compile result with metadata
                 const compileResult: StoreCompileResult = {
                     documentId: request.documentId,
                     data: result.data,
@@ -259,6 +275,11 @@ export const useCompileStore = create<CompileStore>()(
                     warnings: [],
                     duration,
                     timestamp: new Date(),
+                    partCount: info.part_count || 0,
+                    commandCount: info.command_count || 0,
+                    durationSamples: info.duration_samples || 0,
+                    durationSeconds: info.duration_seconds || 0,
+                    chipsUsed: (info.chips_used || []).map(c => c as string),
                 };
                 
                 // Store result

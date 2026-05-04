@@ -179,6 +179,12 @@ export interface PartInfo {
     isKbdAssigned: boolean;
 }
 
+/** Part with additional state and position information */
+export interface PartWithState extends PartInfo {
+    startPosition: Position;
+    endPosition: Position;
+}
+
 /** Channel information */
 export interface ChannelInfo {
     chip: SoundChip;

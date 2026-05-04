@@ -4,14 +4,22 @@ interface MenuBarProps {
   onNewDocument: () => void;
   onToggleTheme: () => void;
   onCompile: () => void;
+  onCompileAndPlay: () => void;
+  onPlay: () => void;
+  onStop: () => void;
   isCompiling: boolean;
+  isPlaying: boolean;
 }
 
 const MenuBar: React.FC<MenuBarProps> = ({
   onNewDocument,
   onToggleTheme,
   onCompile,
+  onCompileAndPlay,
+  onPlay,
+  onStop,
   isCompiling,
+  isPlaying,
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -125,12 +133,19 @@ const MenuBar: React.FC<MenuBarProps> = ({
             <div 
               className="dropdown-item" 
               onClick={() => handleMenuItemClick(onCompile)}
-              style={{ fontWeight: 'bold' }}
             >
               Compile (F7)
             </div>
-            <div className="dropdown-item disabled">Compile & Play</div>
-            <div className="dropdown-item disabled">Stop Compilation</div>
+            <div 
+              className="dropdown-item" 
+              onClick={() => handleMenuItemClick(onCompileAndPlay)}
+              style={{ fontWeight: 'bold' }}
+            >
+              Compile & Play (F5)
+            </div>
+            <div className="dropdown-item" onClick={() => handleMenuItemClick(() => {})}>
+              Stop Compilation
+            </div>
             <div className="context-menu-separator" />
             <div className="dropdown-item disabled">Compile to VGM</div>
             <div className="dropdown-item disabled">Compile to XGM</div>
@@ -149,9 +164,27 @@ const MenuBar: React.FC<MenuBarProps> = ({
         </button>
         {activeMenu === 'play' && (
           <div className="dropdown-menu show">
-            <div className="dropdown-item disabled">Play (F5)</div>
-            <div className="dropdown-item disabled">Stop</div>
-            <div className="dropdown-item disabled">Pause</div>
+            <div 
+              className="dropdown-item" 
+              onClick={() => handleMenuItemClick(onCompileAndPlay)}
+              style={{ fontWeight: 'bold' }}
+            >
+              Play (F5)
+            </div>
+            <div 
+              className="dropdown-item" 
+              onClick={() => handleMenuItemClick(onStop)}
+              disabled={!isPlaying}
+            >
+              Stop
+            </div>
+            <div 
+              className="dropdown-item" 
+              onClick={() => handleMenuItemClick(onPlay)}
+              disabled={!isPlaying}
+            >
+              Pause
+            </div>
             <div className="context-menu-separator" />
             <div className="dropdown-item disabled">Play from Start</div>
             <div className="dropdown-item disabled">Play Selection</div>
