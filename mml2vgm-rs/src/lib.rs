@@ -306,33 +306,51 @@ impl std::str::FromStr for SoundChip {
 pub struct CompileOptions {
     /// Output format
     pub format: OutputFormat,
-    
+
     /// Target sound chips (None = auto-detect from MML)
+    #[serde(default)]
     pub target_chips: Option<Vec<SoundChip>>,
-    
+
     /// Enable verbose output
+    #[serde(default)]
     pub verbose: bool,
-    
+
     /// Enable debug output
+    #[serde(default)]
     pub debug: bool,
-    
+
     /// Output trace information file
+    #[serde(default)]
     pub output_trace: bool,
-    
+
     /// Output VGM file
+    #[serde(default = "default_output_vgm")]
     pub output_vgm: bool,
-    
+
     /// Compression level (0-9, 0 = no compression)
+    #[serde(default)]
     pub compression: u8,
-    
+
     /// Input file encoding (default: UTF-8 with BOM)
+    #[serde(default = "default_encoding")]
     pub encoding: String,
-    
+
     /// Search paths for include files
+    #[serde(default)]
     pub include_paths: Vec<String>,
-    
+
     /// Clock count override (0 = use default from MML)
+    #[serde(default)]
     pub clock_count: u32,
+}
+
+// Helper functions for default values
+fn default_output_vgm() -> bool {
+    true
+}
+
+fn default_encoding() -> String {
+    "utf-8-bom".to_string()
 }
 
 impl Default for CompileOptions {
