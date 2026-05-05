@@ -1328,20 +1328,13 @@ class MixerManager {
 ```
 
 ### Phase 6 Deliverables
-- [x] Multi-format MML support (formatService.ts with GWI/MUC/MML/MDL/MUS handlers, detection, syntax config)
-- [x] Script integration (Python via Pyodide) (scriptService.ts with Pyodide, templates, execution)
-- [x] Lyrics display and synchronization (LyricsPanel.tsx created)
-- [x] Mixer panel with per-chip volume/pan (MixerPanel.tsx created)
+- [x] Multi-format MML support (formatService.ts with GWI/MUC/MML/MDL/MUS handlers, detection, syntax config, integrated with documentStore)
+- [x] Script integration (Python via Pyodide) (scriptService.ts with Pyodide, templates, ScriptPanel UI, integrated with IDE)
+- [x] Lyrics display and synchronization (LyricsPanel.tsx with \ly command parsing from MML)
+- [x] Mixer panel with per-chip volume/pan (MixerPanel.tsx connected to audioService per-chip volume/mute/solo)
 - [x] Documentation of limitations (docs/Browser_IDE_Limitations.md - comprehensive guide)
 
-### Phase 6 Remaining Work
-The following items are implemented but need integration:
-- formatService needs connection to document loading and compilation
-- scriptService needs UI panel and connection to IDE
-- LyricsPanel needs MML \ly command parsing
-- MixerPanel needs connection to audioService
-
-**see:** [Phase 6 Implementation Details](./Browser_IDE_Implementation.md#phase-6-feature-parity---in-progress-)
+**see:** [Phase 6 Implementation Details](./Browser_IDE_Implementation.md)
 
 ---
 
