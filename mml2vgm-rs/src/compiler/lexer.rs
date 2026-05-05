@@ -109,12 +109,15 @@ impl<'a> Lexer<'a> {
 
     /// Get current character
     fn current_char(&self) -> Option<char> {
-        self.source.chars().nth(self.position)
+        self.source[self.position..].chars().next()
     }
 
     /// Get next character
     fn next_char(&self) -> Option<char> {
-        self.source.chars().nth(self.position + 1)
+        // Skip the current character and get the next one
+        let mut iter = self.source[self.position..].chars();
+        let _current = iter.next()?;  // Get current (might be multi-byte)
+        iter.next()  // Get next
     }
 
     /// Advance to next character

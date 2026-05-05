@@ -170,21 +170,16 @@ export class WorkerManager {
    * Create a new worker using Vite's bundled worker file
    */
   private async createWorker(): Promise<WorkerEntry> {
-    // Use Vite's proper worker import syntax
-    // When you import with ?worker, Vite returns a constructor function
-    // that we can call to create worker instances
+    console.log(`[WorkerManager] Creating worker...`);
 
-    console.log(`[WorkerManager] Importing worker module...`);
+    // Use the standard Web Worker API with Vite's URL resolution
+    // This approach uses import.meta.url to resolve the worker file location
+    const workerUrl = new URL('../worker/compilerWorker.ts', import.meta.url);
+    console.log(`[WorkerManager] Worker URL:`, workerUrl.toString());
 
-    // Import the worker constructor from Vite
-    const workerConstructor = await import('../worker/compilerWorker.ts?worker');
-    console.log(`[WorkerManager] Worker constructor imported`);
-
-    // Create a worker instance using the constructor
-    const workerInstance = workerConstructor.default();
+    // Create a worker instance with module type for ES6 import support
+    const worker = new Worker(workerUrl, { type: 'module' });
     console.log(`[WorkerManager] Worker instance created`);
-
-    const worker = workerInstance;
     
     const entry: WorkerEntry = {
       worker,
@@ -275,11 +270,12 @@ export class WorkerManager {
    */
   private async initializeWorker(entry: WorkerEntry): Promise<void> {
     const requestId = `init-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const timeout = 10000; // 10 second timeout for worker initialization
+    const timeout = 30000; // 30 second timeout for worker initialization (increased for WASM init)
 
     return new Promise((resolve, reject) => {
       const timeoutHandle = setTimeout(() => {
         this.pendingInits.delete(entry.worker.toString());
+        console.error(`[WorkerManager] Worker initialization timeout after ${timeout}ms - worker may not have responded to INIT message`);
         reject(new Error(`Worker initialization timeout after ${timeout}ms`));
       }, timeout);
 

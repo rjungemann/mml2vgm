@@ -94,3 +94,64 @@ fn test_compile_all_examples() {
         failure_count
     );
 }
+
+#[test]
+fn test_simple_compilation() {
+    use std::time::Instant;
+    
+    let mml = "o4 c4 d4 e4 f4 g4";
+    let options = CompileOptions {
+        format: OutputFormat::VGM,
+        ..Default::default()
+    };
+    
+    let compiler = MmlCompiler::new(options);
+    
+    println!("Starting compilation of simple MML...");
+    let start = Instant::now();
+    let result = compiler.compile_from_source(mml);
+    let elapsed = start.elapsed();
+    
+    println!("Compilation took: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+    
+    match result {
+        Ok(result) => {
+            println!("Success! Output: {} bytes", result.data.len());
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            panic!("Compilation failed");
+        }
+    }
+}
+
+#[test]
+fn test_file_compilation() {
+    use std::path::Path;
+    use std::time::Instant;
+    
+    let input_path = Path::new("../browser-ide/public/samples/hello_world.gwi");
+    let options = CompileOptions {
+        format: OutputFormat::VGM,
+        ..Default::default()
+    };
+    
+    let compiler = MmlCompiler::new(options);
+    
+    println!("Starting file-based compilation of {:?}...", input_path);
+    let start = Instant::now();
+    let result = compiler.compile(input_path);
+    let elapsed = start.elapsed();
+    
+    println!("Compilation took: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+    
+    match result {
+        Ok(result) => {
+            println!("Success! Output: {} bytes", result.data.len());
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            panic!("Compilation failed");
+        }
+    }
+}

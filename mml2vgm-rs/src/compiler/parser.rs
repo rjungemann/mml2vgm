@@ -25,6 +25,8 @@ pub struct Parser {
     current_volume: u8,
     /// Current tempo (default: 120)
     current_tempo: u32,
+    /// Whether we're in a definition context (after apostrophe)
+    in_definition_context: bool,
 }
 
 impl Parser {
@@ -37,6 +39,7 @@ impl Parser {
             current_length: 4,
             current_volume: 127,
             current_tempo: 120,
+            in_definition_context: false,
         }
     }
 
@@ -100,22 +103,13 @@ impl Parser {
 
     /// Check if we're in a definition context (after an apostrophe)
     fn is_in_definition_context(&self) -> bool {
-        for i in (0..self.current).rev() {
-            if let Some((token, _)) = self.tokens.get(i) {
-                match token {
-                    Token::Apostrophe => return true,
-                    Token::Whitespace(_) | Token::Comment(_) => continue,
-                    _ => return false,
-                }
-            }
-        }
-        false
+        self.in_definition_context
     }
 
     /// Parse the entire MML source
     pub fn parse(mut self) -> MmlResult<MmlAst> {
         let mut ast = MmlAst::new();
-        
+
         while !self.is_at_end() {
             if let Some(token) = self.current_token() {
                 match token {
@@ -123,8 +117,10 @@ impl Parser {
                         self.parse_song_info(&mut ast)?;
                     }
                     Token::Apostrophe => {
+                        self.in_definition_context = true;
                         self.advance(); // Consume the '
                         self.parse_definition_line(&mut ast)?;
+                        self.in_definition_context = false;
                     }
                     Token::Comment(_) => {
                         self.advance();
@@ -151,7 +147,7 @@ impl Parser {
                 self.advance();
             }
         }
-        
+
         Ok(ast)
     }
 
