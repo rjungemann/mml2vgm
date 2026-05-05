@@ -79,7 +79,7 @@ const CompileOptionsPanel: React.FC = () => {
     try {
       const options: any = {
         format: selectedFormat,
-        target_chips: selectedChips,
+        target_chips: selectedChips.map(chip => chip.toLowerCase()),
         clock_count: clockRate,
         compression,
         optimize,
