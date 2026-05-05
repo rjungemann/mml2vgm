@@ -133,7 +133,7 @@ export const useCompileStore = create<CompileStore>()(
 
         compile: async (documentId: string, options: CompileOptions) => {
             console.log('[compileStore] compile() called with documentId:', documentId);
-            console.log('[compileStore] compile() options:', options);
+            console.log('[compileStore] compile() options:', JSON.stringify(options, null, 2));
 
             // Initialize worker manager if needed
             const state = get();
@@ -143,8 +143,12 @@ export const useCompileStore = create<CompileStore>()(
             // If we don't have a worker manager yet, initialize it
             if (state.useWebWorkers && !state.workerManager) {
                 console.log('[compileStore] Initializing worker manager...');
-                await get().initWorkerManager();
-                console.log('[compileStore] Worker manager initialized');
+                try {
+                    await get().initWorkerManager();
+                    console.log('[compileStore] Worker manager initialized successfully');
+                } catch (err) {
+                    console.error('[compileStore] Failed to initialize worker manager:', err);
+                }
             }
 
             return new Promise<StoreCompileResult>((resolve, reject) => {
@@ -318,15 +322,20 @@ export const useCompileStore = create<CompileStore>()(
                 }
 
                 // Update progress
-                get().setProgress(10, 'Tokenizing...');
+                get().setProgress(10, 'Starting compilation...');
 
                 // Try to use WorkerManager if available, otherwise fall back to wasmService
                 const currentState = get();
                 let result;
                 const startTime = Date.now();
+
+                console.log(`[compileStore] Deciding compilation path: useWebWorkers=${currentState.useWebWorkers}, hasWorkerManager=${!!currentState.workerManager}`);
+
                 if (currentState.useWebWorkers && currentState.workerManager) {
+                    console.log('[compileStore] Using WorkerManager for compilation');
                     result = await currentState.workerManager.compile(doc.content, request.options);
                 } else {
+                    console.log('[compileStore] Using wasmService fallback for compilation');
                     const { wasmService } = await import('@/services/wasmService');
                     result = await wasmService.compile(doc.content, request.options);
                 }

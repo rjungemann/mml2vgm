@@ -150,16 +150,19 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
     };
 
     // Post result
+    console.log(`[Worker] Posting RESULT for request: ${requestId}`);
     postMessageToMain({
       type: 'RESULT',
       requestId,
       result: compileResult
     });
+    console.log(`[Worker] Result posted successfully for request: ${requestId}`);
 
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[Worker] Compilation error:`, errorMsg);
-    console.log(`[Worker] Falling back to main thread compilation due to: ${errorMsg}`);
+    console.error(`[Worker] Error details:`, error);
+    console.log(`[Worker] Posting ERROR message for request: ${requestId}`);
     postMessageToMain({
       type: 'ERROR',
       requestId,
@@ -206,7 +209,13 @@ self.onmessage = async (e: MessageEvent) => {
 
     case 'COMPILE':
       console.log(`[Worker] Received COMPILE request: ${message.requestId}`);
-      await handleCompile(message.requestId, message.mml, message.options);
+      console.log(`[Worker] MML length: ${message.mml.length}, options keys: ${Object.keys(message.options).join(',')}`);
+      try {
+        await handleCompile(message.requestId, message.mml, message.options);
+        console.log(`[Worker] COMPILE request ${message.requestId} completed`);
+      } catch (err) {
+        console.error(`[Worker] COMPILE request ${message.requestId} failed:`, err);
+      }
       break;
 
     case 'CANCEL':
