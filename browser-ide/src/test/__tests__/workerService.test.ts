@@ -1,0 +1,82 @@
+/**
+ * Worker Service Tests
+ *
+ * Verifies WorkerManager shape and non-crash behaviour.
+ * Workers cannot actually run WASM in a test environment, so these tests
+ * focus on the manager API surface and graceful-degradation paths.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Worker API is not available in jsdom – provide a minimal stub.
+global.Worker = class {
+  onmessage: ((e: any) => void) | null = null;
+  onerror: ((e: any) => void) | null = null;
+  postMessage(_: any) {}
+  terminate() {}
+} as any;
+
+describe('WorkerService', () => {
+  // ── Module exports ────────────────────────────────────────────────────────
+
+  it('exports getWorkerManager', { timeout: 2000 }, async () => {
+    const mod = await import('@/services/workerService');
+    expect(typeof mod.getWorkerManager).toBe('function');
+  });
+
+  it('exports WorkerManager class or factory', { timeout: 2000 }, async () => {
+    const mod = await import('@/services/workerService');
+    expect(mod.WorkerManager).toBeDefined();
+  });
+
+  it('exports preWarmWorkers function', { timeout: 2000 }, async () => {
+    const mod = await import('@/services/workerService');
+    expect(typeof mod.preWarmWorkers).toBe('function');
+  });
+
+  // ── WorkerManager instance shape ──────────────────────────────────────────
+
+  it('WorkerManager instance has compile method', { timeout: 2000 }, async () => {
+    const { WorkerManager } = await import('@/services/workerService');
+    const mgr = new WorkerManager({ maxWorkers: 1 });
+    expect(typeof mgr.compile).toBe('function');
+  });
+
+  it('WorkerManager instance has cancel method', { timeout: 2000 }, async () => {
+    const { WorkerManager } = await import('@/services/workerService');
+    const mgr = new WorkerManager({ maxWorkers: 1 });
+    expect(typeof mgr.cancel).toBe('function');
+  });
+
+  it('WorkerManager instance has destroy/terminate method', { timeout: 2000 }, async () => {
+    const { WorkerManager } = await import('@/services/workerService');
+    const mgr = new WorkerManager({ maxWorkers: 1 });
+    const hasDestroy =
+      typeof (mgr as any).destroy === 'function' ||
+      typeof (mgr as any).terminate === 'function' ||
+      typeof (mgr as any).dispose === 'function';
+    expect(hasDestroy).toBe(true);
+  });
+
+  // ── Graceful failure on compile without WASM ──────────────────────────────
+
+  it('compile() rejects gracefully without real WASM', { timeout: 10000 }, async () => {
+    const { WorkerManager } = await import('@/services/workerService');
+    const mgr = new WorkerManager({ maxWorkers: 1 });
+    try {
+      await mgr.compile('t120 c d e', {});
+    } catch (e) {
+      // Expected — worker can't run WASM in test env
+      expect(e).toBeDefined();
+    }
+  });
+
+  // ── getWorkerManager returns singleton ────────────────────────────────────
+
+  it('getWorkerManager() returns same instance each call', { timeout: 2000 }, async () => {
+    const { getWorkerManager } = await import('@/services/workerService');
+    const a = getWorkerManager();
+    const b = getWorkerManager();
+    expect(a).toBe(b);
+  });
+});

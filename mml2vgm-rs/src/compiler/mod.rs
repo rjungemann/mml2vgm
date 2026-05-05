@@ -15,3 +15,6 @@ pub mod compiler;
 pub mod lexer;
 pub mod parser;
 pub mod sema;
+
+#[cfg(test)]
+mod tests;

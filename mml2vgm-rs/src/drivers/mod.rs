@@ -560,3 +560,6 @@ mod tests {
         assert!(tokens.len() > 0);
     }
 }
+
+#[cfg(test)]
+mod driver_tests;

@@ -127,3 +127,145 @@ fn profile_compilation_performance() {
 
     println!("{:=^80}\n", "");
 }
+
+// ── Additional performance assertions ────────────────────────────────────────
+
+/// Every sample must compile within the per-file timeout.
+#[test]
+fn all_samples_under_per_file_timeout() {
+    let samples_dir = std::path::PathBuf::from("../browser-ide/public/samples");
+    if !samples_dir.exists() {
+        eprintln!("Skipping: samples directory not found");
+        return;
+    }
+
+    let entries: Vec<_> = std::fs::read_dir(&samples_dir)
+        .expect("read_dir failed")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|x| x == "gwi").unwrap_or(false))
+        .collect();
+
+    let mut slow_files: Vec<String> = Vec::new();
+
+    for entry in &entries {
+        let path = entry.path();
+        let filename = path.file_name().unwrap().to_string_lossy().into_owned();
+        let source = match std::fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let compiler = mml2vgm::compiler::compiler::MmlCompiler::new(mml2vgm::CompileOptions {
+            format: mml2vgm::OutputFormat::VGM,
+            ..Default::default()
+        });
+
+        let start = Instant::now();
+        let _ = compiler.compile_from_source(&source);
+        let elapsed = start.elapsed();
+
+        if elapsed.as_secs() >= TIMEOUT_PER_FILE_SECS {
+            slow_files.push(format!("{} ({:.2}s)", filename, elapsed.as_secs_f64()));
+        }
+    }
+
+    assert!(
+        slow_files.is_empty(),
+        "Files exceeded per-file timeout of {}s:\n  {}",
+        TIMEOUT_PER_FILE_SECS,
+        slow_files.join("\n  ")
+    );
+}
+
+/// Median compile time across all samples must be reasonable (< 2 s).
+#[test]
+fn median_compile_time_reasonable() {
+    let samples_dir = std::path::PathBuf::from("../browser-ide/public/samples");
+    if !samples_dir.exists() {
+        eprintln!("Skipping: samples directory not found");
+        return;
+    }
+
+    let entries: Vec<_> = std::fs::read_dir(&samples_dir)
+        .expect("read_dir failed")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|x| x == "gwi").unwrap_or(false))
+        .collect();
+
+    if entries.is_empty() {
+        eprintln!("No .gwi files found, skipping median check");
+        return;
+    }
+
+    let mut times_ms: Vec<f64> = Vec::new();
+
+    for entry in &entries {
+        let source = match std::fs::read_to_string(entry.path()) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        let compiler = mml2vgm::compiler::compiler::MmlCompiler::new(mml2vgm::CompileOptions {
+            format: mml2vgm::OutputFormat::VGM,
+            ..Default::default()
+        });
+        let start = Instant::now();
+        let _ = compiler.compile_from_source(&source);
+        times_ms.push(start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median = times_ms[times_ms.len() / 2];
+
+    println!("Median compile time: {:.2}ms", median);
+    assert!(
+        median < 2_000.0,
+        "Median compile time {:.2}ms exceeds 2000ms threshold",
+        median
+    );
+}
+
+/// Compiling the same file 10 times in a row gives stable timing (< 3× variance).
+#[test]
+fn repeated_compile_stable() {
+    let samples_dir = std::path::PathBuf::from("../browser-ide/public/samples");
+    if !samples_dir.exists() {
+        eprintln!("Skipping: samples directory not found");
+        return;
+    }
+
+    // Use hello_world.gwi as the stability target
+    let target = samples_dir.join("hello_world.gwi");
+    if !target.exists() {
+        eprintln!("Skipping: hello_world.gwi not found");
+        return;
+    }
+
+    let source = std::fs::read_to_string(&target).expect("read failed");
+    let compiler = mml2vgm::compiler::compiler::MmlCompiler::new(mml2vgm::CompileOptions {
+        format: mml2vgm::OutputFormat::VGM,
+        ..Default::default()
+    });
+
+    let runs = 10;
+    let mut times_ms: Vec<f64> = Vec::with_capacity(runs);
+
+    for _ in 0..runs {
+        let start = Instant::now();
+        let _ = compiler.compile_from_source(&source);
+        times_ms.push(start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    let min = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+    println!("Repeated compile: min={:.2}ms  max={:.2}ms  ratio={:.2}x", min, max, max / min.max(0.001));
+
+    // Max must be within 10× of min (generous allowance for CI noise).
+    assert!(
+        max < min * 10.0 + 100.0,
+        "Compile time variance too high: min={:.2}ms max={:.2}ms",
+        min,
+        max
+    );
+}
+

@@ -218,6 +218,10 @@ FakesAssemblies/
 # Visual Studio 6 build log
 *.plg
 
+# Rust and test artifacts
+**/target/
+.playwright-mcp/
+
 # Visual Studio 6 workspace options file
 *.opt
 

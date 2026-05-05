@@ -164,6 +164,8 @@ outdated:
 deploy:
     #!/usr/bin/env bash
     set -e
+    echo "Building WASM module..."
+    just wasm-build
     echo "Building browser IDE..."
     (cd browser-ide && npm run build)
     echo "Deploying to Cloudflare Pages..."
