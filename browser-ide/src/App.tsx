@@ -6,6 +6,8 @@ import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
 import { formatService } from '@/services/formatService';
 import { scriptService } from '@/services/scriptService';
+import { storageService, registerServiceWorker } from '@/services/storageService';
+import { i18nService } from '@/services/i18nService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
@@ -90,27 +92,38 @@ export const App: React.FC = () => {
   // Get compiled data for active document
   const compiledData = activeDocumentId ? getResult(activeDocumentId)?.data : undefined;
 
-  // Initialize WASM on mount
+  // Initialize all services on mount
   useEffect(() => {
-    const initializeWasm = async () => {
-      if (wasmInitialized.current) return;
-      
-      try {
-        await wasmService.init();
-        setIsWasmReady(true);
-        wasmInitialized.current = true;
-        
-        // Create initial document if none exists
-        if (documents.size === 0) {
-          createDocument();
+    const initializeServices = async () => {
+      // Initialize WASM
+      if (!wasmInitialized.current) {
+        try {
+          await wasmService.init();
+          setIsWasmReady(true);
+          wasmInitialized.current = true;
+        } catch (error) {
+          setWasmError(`Failed to initialize WASM: ${error}`);
+          console.error('WASM initialization error:', error);
+          return; // Stop if WASM fails
         }
-      } catch (error) {
-        setWasmError(`Failed to initialize WASM: ${error}`);
-        console.error('WASM initialization error:', error);
+      }
+      
+      // Initialize other services (lazy, non-blocking)
+      Promise.all([
+        storageService.init().catch(e => console.warn('Storage init failed:', e)),
+        i18nService.init().catch(e => console.warn('i18n init failed:', e)),
+        registerServiceWorker().catch(e => console.warn('SW registration failed:', e)),
+      ]).then(() => {
+        console.log('Phase 7 services initialized');
+      });
+      
+      // Create initial document if none exists
+      if (documents.size === 0) {
+        createDocument();
       }
     };
 
-    initializeWasm();
+    initializeServices();
 
     return () => {
       // Cleanup if needed
@@ -364,6 +377,14 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container" data-theme={settings.theme}>
+      {/* Skip link for keyboard accessibility (Phase 7) */}
+      <a href="#editor-container" className="skip-link">
+        Skip to editor
+      </a>
+      
+      {/* ARIA live region for announcements */}
+      <div role="status" aria-live="polite" className="aria-live" id="aria-live-announcer"></div>
+      
       {/* Menu Bar */}
       <MenuBar
         onNewDocument={handleNewDocument}
@@ -389,7 +410,7 @@ export const App: React.FC = () => {
       {/* Main Layout */}
       <div className="main-layout">
         {/* Editor Area */}
-        <div className="editor-container">
+        <div className="editor-container" id="editor-container" role="main" aria-label="MML Editor">
           {activeDocument && (
             <MonacoEditor
               document={activeDocument}
