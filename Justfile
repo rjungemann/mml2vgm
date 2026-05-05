@@ -13,12 +13,12 @@ clean:
     #!/usr/bin/env bash
     set -e
     echo "Cleaning browser-ide..."
-    cd browser-ide && rm -rf node_modules dist
+    (cd browser-ide && rm -rf node_modules dist)
     echo "Cleaning tauri-app..."
-    cd tauri-app && rm -rf node_modules dist src-tauri/target
+    (cd tauri-app && rm -rf node_modules dist src-tauri/target)
     echo "Cleaning Rust..."
-    cd mml2vgm-rs && cargo clean
-    cd mml2vgm-wasm && cargo clean
+    (cd mml2vgm-rs && cargo clean)
+    (cd mml2vgm-wasm && cargo clean)
     echo "Cleaning test outputs..."
     rm -rf mml2vgm-rs/target mml2vgm-wasm/target
     echo "Done!"
@@ -155,3 +155,69 @@ outdated:
     echo "Checking npm dependencies..."
     cd browser-ide && npm outdated
     cd tauri-app && npm outdated
+
+# ============ DEPLOY COMMANDS ============
+
+# Deploy browser IDE to Cloudflare Pages via Wrangler
+# Setup: npm install -g wrangler && wrangler login
+# Or set env vars: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+deploy:
+    #!/usr/bin/env bash
+    set -e
+    echo "Building browser IDE..."
+    (cd browser-ide && npm run build)
+    echo "Deploying to Cloudflare Pages..."
+    (cd browser-ide && npx wrangler pages deployment create dist --project-name mml2vgm-browser-ide)
+    echo "Deployment complete!"
+
+# ============ CROSS-PLATFORM BUILD COMMANDS ============
+
+# Build Tauri for Linux
+tauri-build-linux:
+    (cd tauri-app && npm run tauri:build -- --release --target x86_64-unknown-linux-gnu)
+
+# Build Tauri for Windows
+tauri-build-windows:
+    (cd tauri-app && npm run tauri:build -- --release --target x86_64-pc-windows-msvc)
+
+# Build Tauri for macOS
+tauri-build-macos:
+    (cd tauri-app && npm run tauri:build -- --release --target x86_64-apple-darwin)
+
+# Build Tauri for all platforms
+tauri-build-all:
+    #!/usr/bin/env bash
+    set -e
+    echo "Building Tauri for Linux..."
+    just tauri-build-linux
+    echo "Building Tauri for Windows..."
+    just tauri-build-windows
+    echo "Building Tauri for macOS..."
+    just tauri-build-macos
+    echo "Tauri builds complete in tauri-app/src-tauri/target/release/"
+
+# Build Rust CLI for all platforms
+rust-build-all:
+    #!/usr/bin/env bash
+    set -e
+    echo "Building Rust CLI for Linux..."
+    (cd mml2vgm-rs && cargo build --release --target x86_64-unknown-linux-gnu)
+    echo "Building Rust CLI for Windows..."
+    (cd mml2vgm-rs && cargo build --release --target x86_64-pc-windows-msvc)
+    echo "Building Rust CLI for macOS..."
+    (cd mml2vgm-rs && cargo build --release --target x86_64-apple-darwin)
+    echo "Rust CLI builds complete in mml2vgm-rs/target/"
+
+# Build everything for all platforms
+build-all-release:
+    #!/usr/bin/env bash
+    set -e
+    echo "Building Rust CLI..."
+    just rust-build-release
+    echo "Building WASM module..."
+    just wasm-build-release
+    echo "Building browser IDE..."
+    just ide-build
+    echo "Building Tauri desktop app..."
+    just tauri-build-release
+    echo "All builds complete!"

@@ -34,6 +34,9 @@ interface DocumentActions {
     // Close a document
     closeDocument: (id: string) => void;
     
+    // Close all documents
+    closeAllDocuments: () => void;
+    
     // Set active document
     setActiveDocument: (id: string) => void;
     
@@ -163,6 +166,13 @@ export const useDocumentStore = create<DocumentStore>()(
                 set({
                     documents: docs,
                     activeDocumentId: newActiveId,
+                });
+            },
+            
+            closeAllDocuments: () => {
+                set({
+                    documents: new Map(),
+                    activeDocumentId: null,
                 });
             },
             

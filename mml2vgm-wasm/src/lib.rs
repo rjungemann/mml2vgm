@@ -41,7 +41,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct JsCompileResult {
-    data: Vec<u8>,
+    data: Vec<u8>, // Stored as base64 string in JavaScript
     part_count: usize,
     command_count: usize,
     duration_samples: u64,
@@ -60,6 +60,40 @@ impl Default for JsCompileResult {
             duration_seconds: 0.0,
             chips_used: String::new(),
         }
+    }
+}
+
+// Getter methods for JsCompileResult to expose fields to JavaScript
+#[wasm_bindgen]
+impl JsCompileResult {
+    /// Get the compiled data as a byte array
+    pub fn get_data(&self) -> Vec<u8> {
+        self.data.clone()
+    }
+
+    /// Get the part count
+    pub fn part_count(&self) -> usize {
+        self.part_count
+    }
+
+    /// Get the command count
+    pub fn command_count(&self) -> usize {
+        self.command_count
+    }
+
+    /// Get the duration in samples
+    pub fn duration_samples(&self) -> u64 {
+        self.duration_samples
+    }
+
+    /// Get the duration in seconds
+    pub fn duration_seconds(&self) -> f64 {
+        self.duration_seconds
+    }
+
+    /// Get the chips used as a JSON string
+    pub fn chips_used(&self) -> String {
+        self.chips_used.clone()
     }
 }
 
@@ -666,6 +700,48 @@ impl JsDriverRegistry {
     #[wasm_bindgen]
     pub fn has_driver(&self, id: &str) -> bool {
         self.registry.has_driver(id)
+    }
+
+    /// Get detailed information about a specific driver by ID
+    /// Returns JSON with full driver info or null
+    #[wasm_bindgen(catch)]
+    pub fn get_driver_info(&self, id: &str) -> Result<String, JsValue> {
+        match self.registry.get_driver(id) {
+            Some(driver) => {
+                let info = driver.info();
+                Ok(serde_json::json!({
+                    "id": info.id,
+                    "displayName": info.display_name,
+                    "extensions": info.supported_extensions,
+                    "description": info.description,
+                    "version": info.version,
+                    "targetPlatform": info.target_platform,
+                })
+                .to_string())
+            }
+            None => Ok(serde_json::json!(null).to_string()),
+        }
+    }
+
+    /// Get all drivers with their detailed information
+    /// Returns JSON array of driver info objects
+    #[wasm_bindgen(catch)]
+    pub fn get_all_drivers_info(&self) -> Result<String, JsValue> {
+        let drivers = self.registry.get_all_drivers();
+        let infos: Vec<_> = drivers.iter()
+            .map(|d| {
+                let info = d.info();
+                serde_json::json!({
+                    "id": info.id,
+                    "displayName": info.display_name,
+                    "extensions": info.supported_extensions,
+                    "description": info.description,
+                    "version": info.version,
+                    "targetPlatform": info.target_platform,
+                })
+            })
+            .collect();
+        Ok(serde_json::to_string(&infos).unwrap())
     }
 }
 

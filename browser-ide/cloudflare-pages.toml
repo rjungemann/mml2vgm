@@ -21,20 +21,32 @@ root = "browser-ide"
 #   to = "/index.html"
 #   status = 200
 
-# Headers for development (required for SharedArrayBuffer)
+# Headers for all pages (required for SharedArrayBuffer in Web Workers)
+# These headers are required for Chrome/Edge to allow SharedArrayBuffer usage
+# which is needed by WASM in Web Workers
 [[headers]]
-  for = "/"
+  for = "/*"
   [headers.values]
     Cross-Origin-Opener-Policy = "same-origin"
     Cross-Origin-Embedder-Policy = "require-corp"
 
+# WASM file headers
+# Ensure WASM files are served with correct MIME type
 [[headers]]
-  for = "/wasm/*"
+  for = "/assets/*.wasm"
   [headers.values]
     Content-Type = "application/wasm"
 
 # Cache settings for WASM files
 [[headers]]
-  for = "/wasm/*"
+  for = "/assets/*.wasm"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# JS module headers for worker files
+# Workers need the same COOP/COEP headers to load WASM with SharedArrayBuffer
+[[headers]]
+  for = "/assets/compilerWorker-*.js"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"

@@ -10,6 +10,12 @@ This directory contains sample MML files for testing the Browser IDE.
 | `arpeggio.gwi` | Arpeggio patterns | 3 | OPNA |
 | `drum_pattern.gwi` | Drum patterns (BD, SN, HH, Toms) | 3 | OPNA |
 | `chord_progression.gwi` | Chord progression with melody | 4 | OPNA |
+| `c140_test.gwi` | C140 chip test from mml2vgmTest | varies | C140 |
+| `ay8910_test.gwi` | AY-3-8910 chip test from mml2vgmTest | varies | AY8910 |
+| `general_test.gwi` | General test from mml2vgmTest | varies | varies |
+| `pcm_test.gwi` | PCM test case from mml2vgmTest | varies | OPNA/PCM |
+| `pcm_test_2.gwi` | PCM test case 2 from mml2vgmTest | varies | OPNA/PCM |
+| `sega_pcm_test.gwi` | Sega PCM test from mml2vgmTest | varies | Sega PCM |
 
 ## How to Use
 

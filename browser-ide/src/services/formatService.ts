@@ -423,6 +423,13 @@ const mdlHandler: FormatHandler = {
             builtins: [],
         };
     },
+
+    getTokenPatterns(): TokenPattern[] {
+        return [
+            { regex: /@\d+/g, tokenType: 'keyword.part' },
+            { regex: /#\w+/g, tokenType: 'keyword.directive' },
+        ];
+    },
 };
 
 /**
@@ -484,8 +491,13 @@ const musHandler: FormatHandler = {
             builtins: [],
         };
     },
-// Format Registry
-// ============================================================================
+
+    getTokenPatterns(): TokenPattern[] {
+        return [
+            { regex: /@\w+/g, tokenType: 'keyword.directive' },
+            { regex: /@@/g, tokenType: 'keyword.part_end' },
+        ];
+    },
 };
 
 /**
@@ -550,6 +562,13 @@ const m98Handler: FormatHandler = {
             builtins: [],
         };
     },
+
+    getTokenPatterns(): TokenPattern[] {
+        return [
+            { regex: /@\d+/g, tokenType: 'keyword.part' },
+            { regex: /#\w+/g, tokenType: 'keyword.directive' },
+        ];
+    },
 };
 
 /**
@@ -611,11 +630,15 @@ const muapHandler: FormatHandler = {
             builtins: [],
         };
     },
+
+    getTokenPatterns(): TokenPattern[] {
+        return [
+            { regex: /@\w\d*/g, tokenType: 'keyword.section' },
+        ];
+    },
 };
 
 // ============================================================================
-// Format Registry
-// ========================================================================================================================================================
 // Format Registry
 // ============================================================================
 

@@ -49,8 +49,21 @@ export default defineConfig({
     exclude: ['mml2vgm-wasm'],
   },
   
-  // Worker configuration for AudioWorklet
+  // Worker configuration - Vite 5 uses a function for plugins
   worker: {
     format: 'es',
+    plugins: () => [wasm()],
+    // Ensure workers inherit the same resolve aliases as the main bundle
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@/components': path.resolve(__dirname, './src/components'),
+        '@/services': path.resolve(__dirname, './src/services'),
+        '@/stores': path.resolve(__dirname, './src/stores'),
+        '@/types': path.resolve(__dirname, './src/types'),
+        '@/utils': path.resolve(__dirname, './src/utils'),
+        'mml2vgm-wasm': path.resolve(__dirname, '../mml2vgm-wasm/pkg'),
+      },
+    },
   },
 });

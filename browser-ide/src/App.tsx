@@ -8,6 +8,7 @@ import { formatService } from '@/services/formatService';
 import { scriptService } from '@/services/scriptService';
 import { storageService, registerServiceWorker } from '@/services/storageService';
 import { i18nService } from '@/services/i18nService';
+import { fileService } from '@/services/fileService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
@@ -31,16 +32,18 @@ import { TabBar } from '@/components/TabBar';
 export const App: React.FC = () => {
   const [isWasmReady, setIsWasmReady] = useState(false);
   const [wasmError, setWasmError] = useState<string | null>(null);
+  const [defaultCompileOptions, setDefaultCompileOptions] = useState<any>(null);
   const wasmInitialized = useRef(false);
 
   // Document store
-  const { documents, activeDocumentId, createDocument, setActiveDocument, closeDocument } = useDocumentStore(
+  const { documents, activeDocumentId, createDocument, setActiveDocument, closeDocument, closeAllDocuments } = useDocumentStore(
     useShallow((state) => ({
       documents: state.documents,
       activeDocumentId: state.activeDocumentId,
       createDocument: state.createDocument,
       setActiveDocument: state.setActiveDocument,
       closeDocument: state.closeDocument,
+      closeAllDocuments: state.closeAllDocuments,
     }))
   );
 
@@ -113,9 +116,20 @@ export const App: React.FC = () => {
         storageService.init().catch(e => console.warn('Storage init failed:', e)),
         i18nService.init().catch(e => console.warn('i18n init failed:', e)),
         registerServiceWorker().catch(e => console.warn('SW registration failed:', e)),
+        wasmService.getDefaultCompileOptions().then(opts => setDefaultCompileOptions(opts)).catch(e => console.warn('Failed to get default compile options:', e)),
+        // Pre-warm workers for better UX (compilation won't block UI)
+        (async () => {
+          try {
+            const { preWarmWorkers } = await import('@/services/workerService');
+            await preWarmWorkers();
+            console.log('[Worker] Pre-warming complete');
+          } catch (e) {
+            console.warn('[Worker] Pre-warming failed (will use fallback):', e);
+          }
+        })(),
       ]).then(() => {
         console.log('Phase 7 services initialized');
-      });
+      }).catch(e => console.warn('Phase 7 services initialization had an error:', e));
       
       // Create initial document if none exists
       if (documents.size === 0) {
@@ -135,10 +149,93 @@ export const App: React.FC = () => {
     createDocument();
   }, [createDocument]);
 
-  // Handle document close
+  // Get document store setters for file operations
+  const { updateDocumentContent, updateDocumentFilename, updateDocumentLanguage } = useDocumentStore(
+    useShallow((state) => ({
+      updateDocumentContent: state.updateDocumentContent,
+      updateDocumentFilename: state.updateDocumentFilename,
+      updateDocumentLanguage: state.updateDocumentLanguage,
+    }))
+  );
+
+  // Handle file open - must call showOpenFilePicker synchronously for user gesture
+  const handleOpenFile = useCallback(() => {
+    // Check if API is supported
+    if (!('showOpenFilePicker' in window)) {
+      console.error('File System Access API not supported in this browser');
+      return;
+    }
+    
+    // Call showOpenFilePicker directly to maintain user gesture context
+    (window as any).showOpenFilePicker({
+      types: [
+        {
+          description: 'MML Files',
+          accept: {
+            'text/plain': ['.gwi', '.mml', '.muc', '.mdl', '.mus', '.txt'],
+          },
+        },
+      ],
+      multiple: false,
+    }).then((handles: any[]) => {
+      if (!handles || handles.length === 0) {
+        return; // User cancelled
+      }
+      
+      const handle = handles[0];
+      return handle.getFile();
+    }).then((file: File) => {
+      if (!file) return;
+      
+      return file.text().then((content) => {
+        // Detect format from filename
+        const detectedFormat = formatService.detectFromExtension(file.name);
+        const docId = createDocument(detectedFormat || 'gwi');
+        updateDocumentContent(docId, content);
+        updateDocumentFilename(docId, file.name);
+        setActiveDocument(docId);
+      });
+    }).catch((error: any) => {
+      console.error('Failed to open file:', error);
+    });
+  }, [createDocument, updateDocumentContent, updateDocumentFilename, setActiveDocument]);
+
+  // Handle loading an example file
+  const handleLoadExample = useCallback(async (filename: string) => {
+    try {
+      const response = await fetch(`/samples/${filename}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load example: ${response.status}`);
+      }
+      const content = await response.text();
+      
+      // Detect format from filename
+      const detectedFormat = formatService.detectFromExtension(filename);
+      const doc = createDocument(detectedFormat || 'gwi');
+      updateDocumentContent(doc.id, content);
+      updateDocumentFilename(doc.id, filename);
+      setActiveDocument(doc.id);
+    } catch (error) {
+      console.error('Failed to load example:', error);
+    }
+  }, [createDocument, updateDocumentContent, updateDocumentFilename, setActiveDocument]);
+
+  // Handle document close (from tab)
   const handleCloseDocument = useCallback((id: string) => {
     closeDocument(id);
   }, [closeDocument]);
+
+  // Handle close active document (from menu)
+  const handleCloseActiveDocument = useCallback(() => {
+    if (activeDocumentId) {
+      closeDocument(activeDocumentId);
+    }
+  }, [activeDocumentId, closeDocument]);
+
+  // Handle close all documents (from menu)
+  const handleCloseAllDocuments = useCallback(() => {
+    closeAllDocuments();
+  }, [closeAllDocuments]);
 
   // Handle tab selection
   const handleSelectTab = useCallback((id: string) => {
@@ -147,32 +244,38 @@ export const App: React.FC = () => {
 
   // Handle compile (compile only)
   const handleCompile = useCallback(async () => {
-    if (!activeDocument || status === 'compiling') return;
-    
+    console.log('[App] handleCompile called');
+    console.log('[App] activeDocument:', !!activeDocument, 'status:', status, 'defaultCompileOptions:', !!defaultCompileOptions);
+    if (!activeDocument || status === 'compiling' || !defaultCompileOptions) {
+      console.log('[App] handleCompile returning early - condition check failed');
+      return;
+    }
+
     try {
       const options: any = {
+        ...defaultCompileOptions,
         format: 'vgm',
-        target_chips: ['YM2608'],
-        clockRate: 7987200,
-        optimize: true,
+        target_chips: ['ym2608'],
+        clock_count: 7987200,
       };
-      
+
+      console.log('[App] Calling compile with activeDocumentId:', activeDocumentId);
       await compile(activeDocumentId!, options);
     } catch (error) {
       console.error('Compilation error:', error);
     }
-  }, [activeDocument, activeDocumentId, compile, status]);
+  }, [activeDocument, activeDocumentId, compile, status, defaultCompileOptions]);
 
   // Handle compile and play (F5 behavior)
   const handleCompileAndPlay = useCallback(async () => {
-    if (!activeDocument || status === 'compiling') return;
+    if (!activeDocument || status === 'compiling' || !defaultCompileOptions) return;
     
     try {
       const options: any = {
+        ...defaultCompileOptions,
         format: 'vgm',
-        target_chips: ['YM2608'],
-        clockRate: 7987200,
-        optimize: true,
+        target_chips: ['ym2608'],
+        clock_count: 7987200,
       };
       
       // Compile
@@ -184,7 +287,7 @@ export const App: React.FC = () => {
         // Parse parts from compile result
         const chipsUsed = result.chipsUsed && result.chipsUsed.length > 0 
           ? result.chipsUsed 
-          : ['YM2608', 'SN76489'];
+          : ['ym2608', 'sn76489'];
         
         partService.parseFromCompileResult(
           result.partCount || 0,
@@ -370,7 +473,9 @@ export const App: React.FC = () => {
   }
 
   // Right sidebar panels
-  const rightSidebarPanels = rightSidebarPanelTypes.map((p) => renderPanel(p));
+  const rightSidebarPanels = rightSidebarPanelTypes.map((p) => (
+    <React.Fragment key={p}>{renderPanel(p)}</React.Fragment>
+  ));
 
   // Bottom panel
   const bottomPanel = bottomPanelType ? renderPanel(bottomPanelType) : null;
@@ -388,11 +493,17 @@ export const App: React.FC = () => {
       {/* Menu Bar */}
       <MenuBar
         onNewDocument={handleNewDocument}
+        onOpenFile={handleOpenFile}
+        onCloseDocument={handleCloseActiveDocument}
+        onCloseAllDocuments={handleCloseAllDocuments}
         onToggleTheme={handleToggleTheme}
         onCompile={handleCompile}
         onCompileAndPlay={handleCompileAndPlay}
         onPlay={handlePlay}
         onStop={handleStop}
+        onLoadExample={handleLoadExample}
+        hasActiveDocument={!!activeDocumentId}
+        hasMultipleDocuments={documents.size > 1}
         isCompiling={status === 'compiling'}
         isPlaying={audioService.isPlaying()}
       />

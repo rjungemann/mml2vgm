@@ -2,26 +2,52 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 interface MenuBarProps {
   onNewDocument: () => void;
+  onOpenFile: () => void;
+  onCloseDocument: () => void;
+  onCloseAllDocuments: () => void;
   onToggleTheme: () => void;
   onCompile: () => void;
   onCompileAndPlay: () => void;
   onPlay: () => void;
   onStop: () => void;
+  onLoadExample: (filename: string) => void;
+  hasActiveDocument: boolean;
+  hasMultipleDocuments: boolean;
   isCompiling: boolean;
   isPlaying: boolean;
 }
 
 // Menu definitions for keyboard navigation
-const MENUS = ['file', 'edit', 'view', 'compile', 'play', 'tools', 'help'] as const;
+const MENUS = ['file', 'edit', 'view', 'compile', 'play', 'tools', 'examples', 'help'] as const;
 type MenuName = typeof MENUS[number];
+
+// List of example files in public/samples/
+const EXAMPLE_FILES = [
+  { filename: 'hello_world.gwi', label: 'Hello World' },
+  { filename: 'arpeggio.gwi', label: 'Arpeggio' },
+  { filename: 'chord_progression.gwi', label: 'Chord Progression' },
+  { filename: 'drum_pattern.gwi', label: 'Drum Pattern' },
+  { filename: 'c140_test.gwi', label: 'C140 Test' },
+  { filename: 'ay8910_test.gwi', label: 'AY-3-8910 Test' },
+  { filename: 'general_test.gwi', label: 'General Test' },
+  { filename: 'pcm_test.gwi', label: 'PCM Test' },
+  { filename: 'pcm_test_2.gwi', label: 'PCM Test 2' },
+  { filename: 'sega_pcm_test.gwi', label: 'Sega PCM Test' },
+] as const;
 
 const MenuBar: React.FC<MenuBarProps> = ({
   onNewDocument,
+  onOpenFile,
+  onCloseDocument,
+  onCloseAllDocuments,
   onToggleTheme,
   onCompile,
   onCompileAndPlay,
   onPlay,
   onStop,
+  onLoadExample,
+  hasActiveDocument,
+  hasMultipleDocuments,
   isCompiling,
   isPlaying,
 }) => {
@@ -135,15 +161,15 @@ const MenuBar: React.FC<MenuBarProps> = ({
     switch (menu) {
       case 'file':
         items.push({ label: 'New', onClick: onNewDocument, disabled: false });
-        items.push({ label: 'Open...', disabled: true });
+        items.push({ label: 'Open...', onClick: onOpenFile, disabled: false });
         items.push({ label: 'Save', disabled: true });
         items.push({ label: 'Save As...', disabled: true });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Export...', disabled: true });
         items.push({ label: 'Import...', disabled: true });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Close', disabled: true });
-        items.push({ label: 'Close All', disabled: true });
+        items.push({ label: 'Close', onClick: onCloseDocument, disabled: !hasActiveDocument });
+        items.push({ label: 'Close All', onClick: onCloseAllDocuments, disabled: !hasMultipleDocuments });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Exit', disabled: true });
         break;
@@ -201,6 +227,11 @@ const MenuBar: React.FC<MenuBarProps> = ({
         items.push({ label: 'Key Bindings...', disabled: true });
         items.push({ label: 'Preferences...', disabled: true });
         break;
+      case 'examples':
+        EXAMPLE_FILES.forEach((example) => {
+          items.push({ label: example.label, onClick: () => onLoadExample(example.filename), disabled: false });
+        });
+        break;
       case 'help':
         items.push({ label: 'Help Topics', disabled: true });
         items.push({ label: 'MML Reference', disabled: true });
@@ -210,7 +241,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
         break;
     }
     return items;
-  }, [onNewDocument, onToggleTheme, onCompile, onCompileAndPlay, onPlay, onStop, isPlaying]);
+  }, [onNewDocument, onToggleTheme, onCompile, onCompileAndPlay, onPlay, onStop, isPlaying, onLoadExample]);
 
   const toggleMenu = useCallback((menu: string) => {
     setActiveMenu((prev) => (prev === menu ? null : menu));
@@ -293,6 +324,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
       {renderMenu('compile', 'Compile')}
       {renderMenu('play', 'Play')}
       {renderMenu('tools', 'Tools')}
+      {renderMenu('examples', 'Examples')}
       {renderMenu('help', 'Help')}
 
       {/* Quick Actions */}

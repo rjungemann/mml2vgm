@@ -1,35 +1,19 @@
-# Cloudflare Pages configuration for mml2vgm Browser IDE
-# This file is used when deploying via Wrangler CLI
-# For Cloudflare Pages dashboard deployment, only the build settings matter
-
+# Cloudflare Pages project configuration
+# Name of the project in Cloudflare Pages dashboard
 name = "mml2vgm-browser-ide"
-pages_build_output_dir = "dist"
 
-# For Pages, the build command is configured in the Cloudflare dashboard
-# or via the Pages API. This wrangler.toml is for reference.
-
-[build]
-command = "npm run build"
-watch = { pattern = "src/**/*", command = "npm run dev" }
-
-[build.upload]
-format = "service-worker"
-main = "./dist/_worker.js"
-
-# For static hosting (Pages default)
-[[rules]]
-type = "Text"
-patterns = ["*"].globs = ["**/*"]
+# For Pages deployments via Wrangler CLI
+# Build is handled by the dashboard or cloudflare-pages.toml
 
 # Required headers for WASM SharedArrayBuffer support
 [[headers]]
-for = "/"
-[headers.values]
-Cross-Origin-Opener-Policy = "same-origin"
-Cross-Origin-Embedder-Policy = "require-corp"
+  for = "/"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
 
 [[headers]]
-for = "/wasm/*"
-[headers.values]
-Content-Type = "application/wasm"
-Cache-Control = "public, max-age=31536000, immutable"
+  for = "/wasm/*"
+  [headers.values]
+    Content-Type = "application/wasm"
+    Cache-Control = "public, max-age=31536000, immutable"

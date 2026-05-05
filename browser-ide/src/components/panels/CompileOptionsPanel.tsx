@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { OutputFormat, SoundChip } from '@/types';
+import { useCompileStore } from '@/stores/compileStore';
+import { useDocumentStore } from '@/stores/documentStore';
 
 const CompileOptionsPanel: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('vgm');
@@ -9,6 +11,15 @@ const CompileOptionsPanel: React.FC = () => {
   const [optimize, setOptimize] = useState(true);
   const [verbose, setVerbose] = useState(false);
   const [debug, setDebug] = useState(false);
+
+  // Get compile function and active document from stores
+  const { compile, status } = useCompileStore((state) => ({
+    compile: state.compile,
+    status: state.status,
+  }));
+  const { activeDocumentId } = useDocumentStore((state) => ({
+    activeDocumentId: state.activeDocumentId,
+  }));
 
   // Available formats
   const formats: { value: OutputFormat; label: string }[] = [
@@ -62,17 +73,26 @@ const CompileOptionsPanel: React.FC = () => {
   };
 
   // Handle compile
-  const handleCompile = async () => {
-    console.log('Compiling with options:', {
-      format: selectedFormat,
-      chips: selectedChips,
-      clockRate,
-      compression,
-      optimize,
-      verbose,
-      debug,
-    });
-  };
+  const handleCompile = useCallback(async () => {
+    if (!activeDocumentId || status === 'compiling') return;
+
+    try {
+      const options: any = {
+        format: selectedFormat,
+        target_chips: selectedChips,
+        clock_count: clockRate,
+        compression,
+        optimize,
+        verbose,
+        debug,
+      };
+
+      console.log('Compiling with options:', options);
+      await compile(activeDocumentId, options);
+    } catch (error) {
+      console.error('Compilation error:', error);
+    }
+  }, [activeDocumentId, compile, status, selectedFormat, selectedChips, clockRate, compression, optimize, verbose, debug]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '4px' }}>
