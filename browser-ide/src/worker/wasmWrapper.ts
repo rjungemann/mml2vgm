@@ -41,11 +41,29 @@ export function compileMml(mml: string, optionsJson: string): any {
     throw new Error('WASM module not initialized');
   }
 
-  console.log('[WasmWrapper] Calling compile_mml...');
-  const result = wasmModule.compile_mml(mml, optionsJson);
-  console.log('[WasmWrapper] compile_mml returned');
+  console.log('[WasmWrapper] About to call compile_mml with:', {
+    mmlLength: mml.length,
+    optionsLength: optionsJson.length,
+  });
 
-  return result;
+  try {
+    const startTime = performance.now();
+    console.log('[WasmWrapper] Calling compile_mml...');
+    const result = wasmModule.compile_mml(mml, optionsJson);
+    const duration = performance.now() - startTime;
+    console.log(`[WasmWrapper] compile_mml returned after ${duration.toFixed(2)}ms`);
+    console.log('[WasmWrapper] Result type:', typeof result);
+    console.log('[WasmWrapper] Result constructor:', result?.constructor?.name);
+
+    return result;
+  } catch (error) {
+    console.error('[WasmWrapper] compile_mml threw an error:', error);
+    console.error('[WasmWrapper] Error details:', {
+      message: (error as Error)?.message,
+      stack: (error as Error)?.stack,
+    });
+    throw error;
+  }
 }
 
 /**

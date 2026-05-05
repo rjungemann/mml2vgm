@@ -109,21 +109,29 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
       console.log(`[Worker] Starting synchronous compile_mml call...`);
       const startTime = performance.now();
       try {
+        console.log(`[Worker] About to invoke compileMml...`);
         const result: any = compileMml(mml, optionsJson);
         const endTime = performance.now();
-        console.log(`[Worker] compile_mml returned after ${endTime - startTime}ms`);
+        console.log(`[Worker] compileMml returned after ${endTime - startTime}ms`);
+        console.log(`[Worker] Result is:`, result ? 'defined' : 'undefined');
         return result;
       } catch (e) {
-        console.error(`[Worker] compile_mml threw error:`, e);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        console.error(`[Worker] compileMml threw error:`, errorMsg);
+        console.error(`[Worker] Full error:`, e);
         throw e;
       }
     });
 
     // Add a timeout to compilation
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Compilation timeout (60s)')), 60000);
+      setTimeout(() => {
+        console.error(`[Worker] Compilation timed out after 60 seconds`);
+        reject(new Error('Compilation timeout (60s)'));
+      }, 60000);
     });
 
+    console.log(`[Worker] Waiting for compilation to complete (with 60s timeout)...`);
     const result: any = await Promise.race([compilationPromise, timeoutPromise]);
     console.log(`[Worker] Compilation completed successfully`);
 
