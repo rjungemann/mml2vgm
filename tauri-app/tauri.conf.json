@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json.schemastore.org/tauri2",
+  "productName": "mml2vgm",
+  "version": "0.1.0",
+  "description": "A desktop IDE for MML to VGM/XGM/ZGM compilation and playback",
+  "authors": ["mml2vgm Team"],
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/example/mml2vgm",
+  "repository": "https://github.com/example/mml2vgm",
+
+  "build": {
+    "frontends": [
+      {
+        "name": "mml2vgm-ide",
+        "label": "mml2vgm Desktop",
+        "distDir": "dist",
+        "devCommand": "vite dev",
+        "devPath": "http://localhost:5173",
+        "buildCommand": "vite build"
+      }
+    ],
+    "withGlobalTauri": true
+  },
+
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "identifier": "com.mml2vgm.desktop",
+    "icon": [
+      {
+        "file": "icons/32x32.png",
+        "sizes": [32]
+      },
+      {
+        "file": "icons/128x128.png",
+        "sizes": [128]
+      },
+      {
+        "file": "icons/128x128@2x.png",
+        "sizes": [256]
+      }
+    ],
+    "longDescription": "mml2vgm is a complete MML (Music Macro Language) to VGM/XGM/ZGM compiler with a built-in IDE. This desktop app provides the full browser IDE experience as a native application with additional desktop integration features.",
+    "shortDescription": "MML to VGM compiler IDE",
+    "categories": ["Utility", "Development", "Audio", "Music"],
+    "copyright": "Copyright © 2026 mml2vgm Team"
+  },
+
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "scope": []
+      },
+      "dialog": {
+        "all": true,
+        "scope": []
+      },
+      "fs": {
+        "all": false,
+        "scope": [
+          {
+            "name": "Read MML Files",
+            "matches": {
+              "path": {
+                "all": false,
+                "read": true,
+                "write": false,
+                "execute": false
+              },
+              "patterns": ["**/*.gwi", "**/*.mml", "**/*.muc", "**/*.mdl", "**/*.mus", "**/*.txt"]
+            }
+          },
+          {
+            "name": "Write VGM Files",
+            "matches": {
+              "path": {
+                "all": false,
+                "read": false,
+                "write": true,
+                "execute": false
+              },
+              "patterns": ["**/*.vgm", "**/*.xgm", "**/*.zgm", "**/*.wav"]
+            }
+          }
+        ]
+      },
+      "path": {
+        "all": false,
+        "scope": []
+      },
+      "clipboard": {
+        "all": true,
+        "scope": []
+      },
+      "http": {
+        "all": false,
+        "scope": []
+      },
+      "os": {
+        "all": false,
+        "scope": []
+      },
+      "process": {
+        "all": false,
+        "scope": []
+      },
+      "notify": {
+        "all": true,
+        "scope": []
+      }
+    },
+    "windows": [
+      {
+        "title": "mml2vgm",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "visible": true,
+        "resizable": true,
+        "maximizable": true,
+        "closable": true,
+        "decorations": true,
+        "center": true,
+        "fileDropEnabled": true
+      }
+    ],
+    "updater": {
+      "active": false
+    },
+    "singleInstance": true
+  }
+}

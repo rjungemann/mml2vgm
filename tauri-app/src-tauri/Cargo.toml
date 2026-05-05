@@ -1,0 +1,20 @@
+[package]
+name = "mml2vgm-desktop"
+version = "0.1.0"
+description = "A desktop IDE for MML to VGM/XGM/ZGM compilation"
+authors = ["mml2vgm Team"]
+license = "GPL-3.0"
+repository = "https://github.com/example/mml2vgm"
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["macos-private-api", "shell-open", "dialog-all", "fs-all", "path-all", "clipboard-all", "notification-all"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="mml2vgm Desktop - MML to VGM/XGM/ZGM compiler IDE" />
+  
+  <!-- Required for WASM SharedArrayBuffer -->
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+  
+  <!-- Tauri -->
+  <script src="https://api.tauri.apps/2.0.0/js/tauri.js"></script>
+  <script src="https://api.tauri.apps/2.0.0/js/tauri-ipc.js"></script>
+  
+  <title>mml2vgm Desktop</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>
