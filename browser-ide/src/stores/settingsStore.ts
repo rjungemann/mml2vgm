@@ -55,6 +55,7 @@ const defaultPanelVisibility: Record<PanelType, boolean> = {
     playback: true,
     compileOptions: true,
     info: true,
+    script: false,
 };
 
 const defaultPanelPositions: Record<PanelType, PanelPosition> = {
@@ -66,6 +67,7 @@ const defaultPanelPositions: Record<PanelType, PanelPosition> = {
     lyrics: 'right',
     mixer: 'right',
     midiKeyboard: 'floating',
+    script: 'right',
     debug: 'floating',
     playback: 'bottom',
     compileOptions: 'right',

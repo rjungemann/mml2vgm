@@ -239,7 +239,8 @@ export type PanelType =
     | 'playback'
     | 'compileOptions'
     | 'info'
-    | 'folderTree';
+    | 'folderTree'
+    | 'script';
 
 /** Panel position */
 export type PanelPosition = 
