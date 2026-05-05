@@ -39,12 +39,12 @@ export async function initializeWasm(): Promise<void> {
 /**
  * Compile MML source code using WASM
  */
-export function compileMml(mml: string, optionsJson: string): any {
+export function compileMml(mml: string, optionsJson: string, requestId: string = 'unknown'): any {
   if (!wasmModule) {
     throw new Error('WASM module not initialized');
   }
 
-  console.log('[WasmWrapper] About to call compile_mml with:', {
+  console.log(`[WasmWrapper][${requestId}] About to call compile_mml with:`, {
     mmlLength: mml.length,
     optionsLength: optionsJson.length,
   });
@@ -53,28 +53,28 @@ export function compileMml(mml: string, optionsJson: string): any {
     throw new Error('compile_mml function not found in WASM module');
   }
 
-  console.log('[WasmWrapper] compile_mml function exists, calling it...');
-  console.log('[WasmWrapper] MML preview:', mml.substring(0, 100));
-  console.log('[WasmWrapper] Options preview:', optionsJson.substring(0, 100));
+  console.log(`[WasmWrapper][${requestId}] compile_mml function exists, calling it...`);
+  console.log(`[WasmWrapper][${requestId}] MML preview:`, mml.substring(0, 100));
+  console.log(`[WasmWrapper][${requestId}] Options preview:`, optionsJson.substring(0, 100));
 
   try {
     const startTime = performance.now();
-    console.log('[WasmWrapper] Calling compile_mml at', new Date().toISOString());
+    console.log(`[WasmWrapper][${requestId}] Calling compile_mml at`, new Date().toISOString());
 
     // Call the function with error handling
     let result;
     try {
       result = wasmModule.compile_mml(mml, optionsJson);
     } catch (wasmError) {
-      console.error('[WasmWrapper] WASM function threw exception:', wasmError);
+      console.error(`[WasmWrapper][${requestId}] WASM function threw exception:`, wasmError);
       throw new Error(`WASM compile_mml exception: ${wasmError}`);
     }
 
     const duration = performance.now() - startTime;
-    console.log(`[WasmWrapper] compile_mml returned after ${duration.toFixed(2)}ms at ${new Date().toISOString()}`);
-    console.log('[WasmWrapper] Result type:', typeof result);
-    console.log('[WasmWrapper] Result constructor:', result?.constructor?.name);
-    console.log('[WasmWrapper] Result is null/undefined:', result == null);
+    console.log(`[WasmWrapper][${requestId}] compile_mml returned after ${duration.toFixed(2)}ms at ${new Date().toISOString()}`);
+    console.log(`[WasmWrapper][${requestId}] Result type:`, typeof result);
+    console.log(`[WasmWrapper][${requestId}] Result constructor:`, result?.constructor?.name);
+    console.log(`[WasmWrapper][${requestId}] Result is null/undefined:`, result == null);
 
     if (!result) {
       throw new Error('WASM compile_mml returned null or undefined');
@@ -82,8 +82,8 @@ export function compileMml(mml: string, optionsJson: string): any {
 
     return result;
   } catch (error) {
-    console.error('[WasmWrapper] compile_mml threw an error:', error);
-    console.error('[WasmWrapper] Error details:', {
+    console.error(`[WasmWrapper][${requestId}] compile_mml threw an error:`, error);
+    console.error(`[WasmWrapper][${requestId}] Error details:`, {
       message: (error as Error)?.message,
       stack: (error as Error)?.stack,
     });

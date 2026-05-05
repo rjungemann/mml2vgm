@@ -225,6 +225,11 @@ export const useCompileStore = create<CompileStore>()(
                 current.status = 'error';
                 current.reject(new Error('Compilation cancelled'));
 
+                // Cancel active worker compile task if running in worker mode.
+                if (state.workerManager) {
+                    void state.workerManager.cancelActiveCompilation('Compilation cancelled');
+                }
+
                 set({
                     status: 'idle',
                     currentDocumentId: null,
@@ -405,9 +410,12 @@ export const useCompileStore = create<CompileStore>()(
                 get().processQueue();
 
             } catch (error) {
+                const errorMessage = (error as Error).message || 'Unknown compilation error';
+                const isCancelled = /cancel/i.test(errorMessage);
+
                 // Update status
                 set({
-                    status: 'error',
+                    status: isCancelled ? 'idle' : 'error',
                     currentDocumentId: null,
                     queue: state.queue.slice(1),
                     progress: 0,
@@ -415,7 +423,7 @@ export const useCompileStore = create<CompileStore>()(
                 });
 
                 // Update document store with error
-                if (request.documentId) {
+                if (!isCancelled && request.documentId) {
                     const { useDocumentStore } = await import('@/stores/documentStore');
                     const documentStore = useDocumentStore.getState();
                     documentStore.setCompileResults(
@@ -423,7 +431,7 @@ export const useCompileStore = create<CompileStore>()(
                         false,
                         [{ 
                             type: 'error',
-                            message: (error as Error).message,
+                            message: errorMessage,
                             line: 0,
                             column: 0,
                             length: 0,

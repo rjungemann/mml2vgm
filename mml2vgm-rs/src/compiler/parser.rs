@@ -132,6 +132,8 @@ impl Parser {
                         } else {
                             if let Some(node) = self.parse_instrument_selection()? {
                                 self.add_node_to_current_part(&mut ast, node);
+                            } else {
+                                self.advance(); // Ensure we advance if parse returns None
                             }
                         }
                     }
@@ -231,7 +233,8 @@ impl Parser {
                     }
                 }
                 _ => {
-                    // Skip unknown definition
+                    // Skip unknown definition token to avoid infinite loops
+                    self.advance();
                 }
             }
         }
@@ -313,6 +316,10 @@ impl Parser {
                 return Ok(());
             }
         } else {
+            // Not an identifier after @, advance past whatever is there to avoid infinite loop
+            if self.current_token().is_some() {
+                self.advance();
+            }
             return Ok(());
         };
         

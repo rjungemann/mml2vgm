@@ -84,11 +84,14 @@ export const App: React.FC = () => {
   };
 
   // Compile store
-  const { compile, status, getResult } = useCompileStore(
+  const { compile, cancel, status, getResult, progress, progressMessage } = useCompileStore(
     useShallow((state) => ({
       compile: state.compile,
+      cancel: state.cancel,
       status: state.status,
       getResult: state.getResult,
+      progress: state.progress,
+      progressMessage: state.progressMessage,
     }))
   );
 
@@ -533,6 +536,27 @@ export const App: React.FC = () => {
               navigationPosition={navigatePosition}
             />
           )}
+
+          {status === 'compiling' && (
+            <div className="compile-overlay" role="status" aria-live="polite" aria-label="Compiling">
+              <div className="compile-spinner" aria-hidden="true" />
+              <div className="compile-overlay-text">
+                <strong>Compiling...</strong>
+                <span>
+                  {progressMessage || 'Processing MML in background worker'}
+                  {typeof progress === 'number' && progress > 0 ? ` (${Math.round(progress)}%)` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="button small danger"
+                onClick={() => cancel()}
+                aria-label="Cancel compilation"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar */}
@@ -565,8 +589,8 @@ export const App: React.FC = () => {
       <StatusBar
         document={activeDocument}
         compileStatus={status}
-        progress={0}
-        progressMessage={''}
+        progress={progress}
+        progressMessage={progressMessage}
       />
     </div>
   );

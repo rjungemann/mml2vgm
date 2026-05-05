@@ -46,6 +46,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
     return statuses[compileStatus] || 'Ready';
   };
 
+  const normalizedProgress = progress <= 1 ? progress * 100 : progress;
+
   // Format line and column count
   const formatLineColumnCount = (content: string): string => {
     const lines = content.split('\n');
@@ -95,7 +97,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         >
           <span>{getStatusText()}</span>
           {compileStatus === 'compiling' && progress > 0 && (
-            <span> ({Math.round(progress * 100)}%)</span>
+            <span> ({Math.round(normalizedProgress)}%)</span>
           )}
           {progressMessage && compileStatus === 'compiling' && (
             <span>: {progressMessage}</span>

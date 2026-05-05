@@ -88,7 +88,13 @@ async function initWasm(): Promise<void> {
  */
 async function handleCompile(requestId: string, mml: string, options: any): Promise<void> {
   try {
-    console.log(`[Worker] Starting compile for request: ${requestId}`);
+    const compileStart = performance.now();
+    const phase = (label: string) => {
+      const elapsed = (performance.now() - compileStart).toFixed(1);
+      console.log(`[Worker][${requestId}] ${label} (+${elapsed}ms)`);
+    };
+
+    phase('Starting compile');
 
     // Post progress update
     postMessageToMain({
@@ -97,28 +103,29 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
       progress: 10,
       message: 'Starting compilation...'
     });
+    phase('Progress 10% posted');
 
     // Convert options to JSON string
     const optionsJson = JSON.stringify(options);
-    console.log(`[Worker] Options JSON: ${optionsJson.substring(0, 100)}...`);
+    phase(`Options prepared (length=${optionsJson.length})`);
 
     // Call the WASM compile function
     // Wrap in Promise to allow timeout
-    console.log(`[Worker] Calling compileMml...`);
+    phase('Preparing synchronous WASM compile call');
     const compilationPromise = Promise.resolve().then(() => {
-      console.log(`[Worker] Starting synchronous compile_mml call...`);
+      phase('Starting synchronous compile_mml call');
       const startTime = performance.now();
       try {
-        console.log(`[Worker] About to invoke compileMml...`);
-        const result: any = compileMml(mml, optionsJson);
+        phase('Invoking compileMml');
+        const result: any = compileMml(mml, optionsJson, requestId);
         const endTime = performance.now();
-        console.log(`[Worker] compileMml returned after ${endTime - startTime}ms`);
-        console.log(`[Worker] Result is:`, result ? 'defined' : 'undefined');
+        phase(`compileMml returned after ${(endTime - startTime).toFixed(1)}ms`);
+        console.log(`[Worker][${requestId}] Result is:`, result ? 'defined' : 'undefined');
         return result;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
-        console.error(`[Worker] compileMml threw error:`, errorMsg);
-        console.error(`[Worker] Full error:`, e);
+        console.error(`[Worker][${requestId}] compileMml threw error:`, errorMsg);
+        console.error(`[Worker][${requestId}] Full error:`, e);
         throw e;
       }
     });
@@ -126,21 +133,29 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
     // Add a timeout to compilation
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        console.error(`[Worker] Compilation timed out after 60 seconds`);
+        console.error(`[Worker][${requestId}] Compilation timed out after 60 seconds`);
         reject(new Error('Compilation timeout (60s)'));
       }, 60000);
     });
 
-    console.log(`[Worker] Waiting for compilation to complete (with 60s timeout)...`);
+    phase('Waiting for compilation completion (60s timeout)');
     const result: any = await Promise.race([compilationPromise, timeoutPromise]);
-    console.log(`[Worker] Compilation completed successfully`);
+    phase('Compilation completed successfully');
+
+    postMessageToMain({
+      type: 'PROGRESS',
+      requestId,
+      progress: 70,
+      message: 'Extracting compile result...'
+    });
+    phase('Progress 70% posted');
 
     // Extract data from result using the wrapper
     const resultData = extractResultData(result);
-    console.log(`[Worker] Result data extraction completed`);
-    console.log(`[Worker] Result data length:`, resultData.data.length);
-    console.log(`[Worker] Result part_count:`, resultData.partCount);
-    console.log(`[Worker] Result command_count:`, resultData.commandCount);
+    phase('Result data extraction completed');
+    console.log(`[Worker][${requestId}] Result data length:`, resultData.data.length);
+    console.log(`[Worker][${requestId}] Result part_count:`, resultData.partCount);
+    console.log(`[Worker][${requestId}] Result command_count:`, resultData.commandCount);
 
     // Extract data from result
     const compileResult: any = {
@@ -157,14 +172,22 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
       },
     };
 
+    postMessageToMain({
+      type: 'PROGRESS',
+      requestId,
+      progress: 95,
+      message: 'Finalizing output...'
+    });
+    phase('Progress 95% posted');
+
     // Post result
-    console.log(`[Worker] Posting RESULT for request: ${requestId}`);
+    phase('Posting RESULT to main thread');
     postMessageToMain({
       type: 'RESULT',
       requestId,
       result: compileResult
     });
-    console.log(`[Worker] Result posted successfully for request: ${requestId}`);
+    phase('Result posted successfully');
 
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

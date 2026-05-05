@@ -95,6 +95,7 @@ export class I18nService {
     private _language: SupportedLanguage;
     private _isReady: boolean = false;
     private _error: string | null = null;
+    private _initPromise: Promise<void> | null = null;
     
     // Event listeners
     private stateListeners: Array<(state: I18nServiceState) => void> = [];
@@ -125,7 +126,19 @@ export class I18nService {
         if (this._isReady) {
             return;
         }
-        
+
+        if (this._initPromise) {
+            return this._initPromise;
+        }
+
+        if (i18n.isInitialized) {
+            this._isReady = true;
+            this._error = null;
+            this.notifyListeners();
+            return;
+        }
+
+        this._initPromise = (async () => {
         try {
             // Initialize i18next
             await i18n.use(initReactI18next).init({
@@ -145,6 +158,13 @@ export class I18nService {
             this._error = `Failed to initialize i18n: ${error}`;
             this.notifyListeners();
             console.error('[i18n] Initialization error:', error);
+        }
+        })();
+
+        try {
+            await this._initPromise;
+        } finally {
+            this._initPromise = null;
         }
     }
     

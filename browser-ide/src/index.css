@@ -143,6 +143,56 @@ body {
   position: relative;
 }
 
+.compile-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-tertiary) 92%, black 8%);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.compile-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent-primary) 25%, transparent 75%);
+  border-top-color: var(--accent-primary);
+  animation: compile-spin 0.75s linear infinite;
+}
+
+.compile-overlay-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.compile-overlay-text strong {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.compile-overlay-text span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.compile-overlay .button {
+  margin-left: 4px;
+}
+
+@keyframes compile-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Monaco Editor overrides */
 .monaco-editor {
   height: 100% !important;

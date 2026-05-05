@@ -75,6 +75,11 @@ interface CompileRequest {
   timestamp: number;
 }
 
+interface RequestTiming {
+  createdAt: number;
+  startedAt?: number;
+}
+
 /**
  * Worker with its state
  */
@@ -83,6 +88,7 @@ interface WorkerEntry {
   isBusy: boolean;
   isInitialized: boolean;
   currentRequestId: string | null;
+  activeTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -103,6 +109,8 @@ export interface WorkerManagerConfig {
  * Manages a pool of workers and distributes compile requests
  */
 export class WorkerManager {
+  private static readonly COMPILE_TIMEOUT_MS = 60000;
+
   private workers: WorkerEntry[] = [];
   private queue: CompileRequest[] = [];
   private maxWorkers: number;
@@ -112,6 +120,7 @@ export class WorkerManager {
   
   // Map of requestId to request for tracking
   private activeRequests: Map<string, CompileRequest> = new Map();
+  private requestTimings: Map<string, RequestTiming> = new Map();
   
   // Track pending initialization
   private pendingInits: Map<string, { resolve: () => void; reject: (e: Error) => void }> = new Map();
@@ -186,6 +195,7 @@ export class WorkerManager {
       isBusy: false,
       isInitialized: false,
       currentRequestId: null,
+      activeTimeoutId: null,
     };
     
     this.setupWorkerHandlers(entry);
@@ -232,6 +242,7 @@ export class WorkerManager {
           
         case 'RESULT':
           console.log(`[WorkerManager] Received RESULT for request: ${message.requestId}`);
+          this.clearWorkerTimeout(entry);
           entry.isBusy = false;
           entry.currentRequestId = null;
           this.handleResult(message.requestId, message.result);
@@ -240,6 +251,7 @@ export class WorkerManager {
           
         case 'ERROR':
           console.error(`[WorkerManager] Received ERROR from worker: ${message.error} for request: ${message.requestId}`);
+          this.clearWorkerTimeout(entry);
           // Check if this is an initialization error
           const initPending = this.pendingInits.get(entry.worker.toString());
           if (initPending) {
@@ -259,10 +271,58 @@ export class WorkerManager {
     
     entry.worker.onerror = (error: ErrorEvent) => {
       console.error('[WorkerManager] Worker error:', error);
+      this.clearWorkerTimeout(entry);
       entry.isBusy = false;
       entry.currentRequestId = null;
       this.processQueue();
     };
+  }
+
+  /**
+   * Clear active compile timeout for a worker, if any.
+   */
+  private clearWorkerTimeout(entry: WorkerEntry): void {
+    if (entry.activeTimeoutId) {
+      clearTimeout(entry.activeTimeoutId);
+      entry.activeTimeoutId = null;
+    }
+  }
+
+  /**
+   * Handle compile timeout from the main thread to recover from a stuck worker.
+   */
+  private async handleCompileTimeout(entry: WorkerEntry, requestId: string): Promise<void> {
+    console.error(`[WorkerManager] Compile timed out after ${WorkerManager.COMPILE_TIMEOUT_MS}ms for request: ${requestId}`);
+
+    this.clearWorkerTimeout(entry);
+    this.handleError(
+      requestId,
+      `Compilation timeout (${Math.floor(WorkerManager.COMPILE_TIMEOUT_MS / 1000)}s)`,
+      'timeout'
+    );
+
+    this.workers = this.workers.filter(w => w !== entry);
+
+    try {
+      entry.worker.terminate();
+    } catch (e) {
+      console.warn('[WorkerManager] Failed to terminate timed-out worker:', e);
+    }
+
+    entry.isBusy = false;
+    entry.isInitialized = false;
+    entry.currentRequestId = null;
+
+    if (!this.isTerminated) {
+      try {
+        await this.createWorker();
+      } catch (e) {
+        console.warn('[WorkerManager] Failed to recreate worker after timeout:', e);
+      }
+    }
+
+    this.workersActive = this.workers.some(w => w.isInitialized);
+    this.processQueue();
   }
   
   /**
@@ -336,6 +396,7 @@ export class WorkerManager {
         };
         
         this.activeRequests.set(requestId, request);
+        this.requestTimings.set(requestId, { createdAt: Date.now() });
         this.queue.push(request);
         
         this.processQueue();
@@ -350,6 +411,47 @@ export class WorkerManager {
     
     // No fallback available - throw error
     throw new Error('No workers available and no fallback configured');
+  }
+
+  /**
+   * Cancel the currently active compile request, if any.
+   * Returns true when an active request was cancelled.
+   */
+  async cancelActiveCompilation(reason: string = 'Compilation cancelled'): Promise<boolean> {
+    const activeWorker = this.workers.find(w => w.isBusy && w.currentRequestId);
+    if (!activeWorker || !activeWorker.currentRequestId) {
+      return false;
+    }
+
+    const activeRequestId = activeWorker.currentRequestId;
+    console.warn(`[WorkerManager] Cancelling active request: ${activeRequestId}`);
+
+    this.clearWorkerTimeout(activeWorker);
+    this.handleError(activeRequestId, reason, 'cancelled');
+
+    this.workers = this.workers.filter(w => w !== activeWorker);
+
+    try {
+      activeWorker.worker.terminate();
+    } catch (e) {
+      console.warn('[WorkerManager] Failed to terminate worker during cancellation:', e);
+    }
+
+    activeWorker.isBusy = false;
+    activeWorker.isInitialized = false;
+    activeWorker.currentRequestId = null;
+
+    if (!this.isTerminated) {
+      try {
+        await this.createWorker();
+      } catch (e) {
+        console.warn('[WorkerManager] Failed to recreate worker after cancellation:', e);
+      }
+    }
+
+    this.workersActive = this.workers.some(w => w.isInitialized);
+    this.processQueue();
+    return true;
   }
   
   /**
@@ -375,6 +477,11 @@ export class WorkerManager {
 
     // Get the next request
     const request = this.queue.shift()!;
+    const timing = this.requestTimings.get(request.requestId);
+    if (timing) {
+      timing.startedAt = Date.now();
+      this.requestTimings.set(request.requestId, timing);
+    }
 
     console.log(`[WorkerManager] Processing request ${request.requestId} on worker`);
     console.log(`[WorkerManager] MML length: ${request.mml.length}, Options: ${JSON.stringify(request.options)}`);
@@ -382,6 +489,10 @@ export class WorkerManager {
     // Mark worker as busy
     availableWorker.isBusy = true;
     availableWorker.currentRequestId = request.requestId;
+    this.clearWorkerTimeout(availableWorker);
+    availableWorker.activeTimeoutId = setTimeout(() => {
+      void this.handleCompileTimeout(availableWorker, request.requestId);
+    }, WorkerManager.COMPILE_TIMEOUT_MS);
 
     // Send the compile request
     console.log(`[WorkerManager] Sending COMPILE message to worker for request ${request.requestId}`);
@@ -394,6 +505,7 @@ export class WorkerManager {
       } as WorkerCompileMessage);
       console.log(`[WorkerManager] COMPILE message sent successfully`);
     } catch (e) {
+      this.clearWorkerTimeout(availableWorker);
       console.error(`[WorkerManager] Failed to send COMPILE message:`, e);
     }
   }
@@ -404,20 +516,51 @@ export class WorkerManager {
   private handleResult(requestId: string, result: CompileResult): void {
     const request = this.activeRequests.get(requestId);
     if (request) {
+      this.logRequestSummary(requestId, 'success');
       request.resolve(result);
       this.activeRequests.delete(requestId);
+      this.requestTimings.delete(requestId);
     }
   }
   
   /**
    * Handle a compile error
    */
-  private handleError(requestId: string, error: string): void {
+  private handleError(requestId: string, error: string, outcome: 'error' | 'timeout' | 'cancelled' = 'error'): void {
     const request = this.activeRequests.get(requestId);
     if (request) {
+      this.logRequestSummary(requestId, outcome, error);
       request.reject(new Error(error));
       this.activeRequests.delete(requestId);
+      this.requestTimings.delete(requestId);
     }
+  }
+
+  /**
+   * Emit a compact one-line summary for compile requests to help performance triage.
+   */
+  private logRequestSummary(
+    requestId: string,
+    outcome: 'success' | 'error' | 'timeout' | 'cancelled',
+    detail?: string
+  ): void {
+    const timing = this.requestTimings.get(requestId);
+    const now = Date.now();
+
+    const queuedMs = timing?.startedAt && timing?.createdAt
+      ? Math.max(0, timing.startedAt - timing.createdAt)
+      : 0;
+    const runMs = timing?.startedAt
+      ? Math.max(0, now - timing.startedAt)
+      : 0;
+    const totalMs = timing?.createdAt
+      ? Math.max(0, now - timing.createdAt)
+      : 0;
+
+    const detailSuffix = detail ? ` detail="${detail}"` : '';
+    console.log(
+      `[WorkerManager] CompileSummary id=${requestId} outcome=${outcome} queuedMs=${queuedMs} runMs=${runMs} totalMs=${totalMs}${detailSuffix}`
+    );
   }
   
   /**
@@ -437,6 +580,7 @@ export class WorkerManager {
     this.workersActive = false;
     
     for (const workerEntry of this.workers) {
+      this.clearWorkerTimeout(workerEntry);
       workerEntry.worker.postMessage({ type: 'TERMINATE' } as WorkerTerminateMessage);
       workerEntry.worker.terminate();
     }
