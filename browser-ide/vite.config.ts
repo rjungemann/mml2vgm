@@ -10,6 +10,9 @@ export default defineConfig({
     wasm(),
   ],
   
+  // Base path for Cloudflare Pages (empty for root deployment)
+  base: process.env.BASE_PATH || '/',
+  
   // Resolve path aliases
   resolve: {
     alias: {

@@ -1,0 +1,40 @@
+# Cloudflare Pages configuration for mml2vgm Browser IDE
+# https://developers.cloudflare.com/pages/configuration/
+
+# Build configuration
+[build]
+# Command to run to build the project
+command = "npm run build"
+
+# Directory to output the build result
+publish = "dist"
+
+# The root directory of your project (where package.json is)
+root = "browser-ide"
+
+# Environment variables (optional)
+# [build.env]
+# NODE_VERSION = "18"
+
+# [[redirects]]
+#   from = "/*"
+#   to = "/index.html"
+#   status = 200
+
+# Headers for development (required for SharedArrayBuffer)
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+
+[[headers]]
+  for = "/wasm/*"
+  [headers.values]
+    Content-Type = "application/wasm"
+
+# Cache settings for WASM files
+[[headers]]
+  for = "/wasm/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
