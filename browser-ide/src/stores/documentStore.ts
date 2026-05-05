@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Document, MMLLanguage, CompileError } from '@/types';
+import { formatService, getFormatFromExtension } from '@/services/formatService';
 
 // ============================================================================
 // Types
@@ -118,20 +119,22 @@ export const useDocumentStore = create<DocumentStore>()(
                 const content = await file.text();
                 const id = `doc-${state.nextDocumentId++}`;
                 
-                // Determine language from file extension
-                const extension = file.name.split('.').pop()?.toLowerCase();
-                const language: MMLLanguage = 
-                    extension === 'muc' ? 'muc' :
-                    extension === 'mml' ? 'mml' :
-                    extension === 'mdl' ? 'mdl' :
-                    extension === 'mus' ? 'mus' :
-                    'gwi';
+                // Use formatService for format detection
+                // Try extension first, then content-based detection
+                const detectedFormat = formatService.detectFormat(content, file.name);
+                const language: MMLLanguage = detectedFormat.format;
+                
+                // Fallback to extension-based detection if formatService returns default
+                const fallbackLanguage = getLanguageFromExtension(file.name);
+                const finalLanguage = language !== 'gwi' || detectedFormat.confidence > 0 
+                    ? language 
+                    : fallbackLanguage;
                 
                 const doc: Document = {
                     id,
                     filename: file.name,
                     content,
-                    language,
+                    language: finalLanguage,
                     encoding: 'UTF-8',
                     isDirty: false,
                     lastCompileTime: null,

@@ -84,6 +84,11 @@ export class AudioService {
   private chipPlayerId: string | null = null;
   private chips: SoundChip[] = [];
   
+  // Per-chip volume settings (0.0 to 1.0)
+  private chipVolumes: Map<SoundChip, number> = new Map();
+  private chipMuteStates: Map<SoundChip, boolean> = new Map();
+  private chipSoloStates: Map<SoundChip, boolean> = new Map();
+  
   // Playback options
   private _volume = 1.0;
   private _loop = false;
@@ -672,6 +677,9 @@ export class AudioService {
     return this._isPlaying;
   }
   
+  // Event Handling
+  // ========================================================================
+=======
   /**
    * Check if currently paused.
    */
@@ -680,6 +688,92 @@ export class AudioService {
   }
   
   // ========================================================================
+  // Per-Chip Volume Control
+  // ========================================================================
+  
+  /**
+   * Set volume for a specific chip (0.0 to 1.0).
+   */
+  public setChipVolume(chip: SoundChip, volume: number): void {
+    this.chipVolumes.set(chip, Math.max(0, Math.min(1, volume)));
+    console.log(`[AudioService] Chip volume set: ${chip}=${volume}`);
+  }
+  
+  /**
+   * Get volume for a specific chip.
+   */
+  public getChipVolume(chip: SoundChip): number {
+    return this.chipVolumes.get(chip) || 1.0;
+  }
+  
+  /**
+   * Set mute state for a specific chip.
+   */
+  public setChipMuted(chip: SoundChip, muted: boolean): void {
+    this.chipMuteStates.set(chip, muted);
+    console.log(`[AudioService] Chip muted: ${chip}=${muted}`);
+  }
+  
+  /**
+   * Get mute state for a specific chip.
+   */
+  public isChipMuted(chip: SoundChip): boolean {
+    return this.chipMuteStates.get(chip) || false;
+  }
+  
+  /**
+   * Set solo state for a specific chip.
+   */
+  public setChipSolo(chip: SoundChip, solo: boolean): void {
+    this.chipSoloStates.set(chip, solo);
+    console.log(`[AudioService] Chip solo: ${chip}=${solo}`);
+  }
+  
+  /**
+   * Get solo state for a specific chip.
+   */
+  public isChipSolo(chip: SoundChip): boolean {
+    return this.chipSoloStates.get(chip) || false;
+  }
+  
+  /**
+   * Check if any chip is soloed.
+   */
+  public hasSoloChips(): boolean {
+    return Array.from(this.chipSoloStates.values()).some(s => s);
+  }
+  
+  /**
+   * Get effective volume for a chip considering solo/mute.
+   */
+  public getEffectiveChipVolume(chip: SoundChip): number {
+    const muted = this.isChipMuted(chip);
+    const solo = this.isChipSolo(chip);
+    const hasSolo = this.hasSoloChips();
+    const volume = this.getChipVolume(chip);
+    
+    // If muted, volume is 0
+    if (muted) return 0;
+    
+    // If there are soloed chips and this chip is not soloed, volume is 0
+    if (hasSolo && !solo) return 0;
+    
+    // Otherwise, use the chip's volume
+    return volume;
+  }
+  
+  /**
+   * Reset all chip volume/mute/solo states.
+   */
+  public resetChipStates(): void {
+    this.chipVolumes.clear();
+    this.chipMuteStates.clear();
+    this.chipSoloStates.clear();
+  }
+  
+  // ========================================================================
+  // Event Handling
+  // ================================================================================================================================================
   // Event Handling
   // ========================================================================
   

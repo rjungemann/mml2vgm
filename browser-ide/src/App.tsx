@@ -4,10 +4,12 @@ import { wasmService } from '@/services/wasmService';
 import { audioService } from '@/services/audioService';
 import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
+import { formatService } from '@/services/formatService';
+import { scriptService } from '@/services/scriptService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
-import type { PanelType, Position } from '@/types';
+import type { PanelType, Position, MMLLanguage } from '@/types';
 import MonacoEditor from '@/components/Editor/MonacoEditor';
 import StatusBar from '@/components/StatusBar';
 import MenuBar from '@/components/MenuBar';
@@ -17,6 +19,11 @@ import FolderTreePanel from '@/components/panels/FolderTreePanel';
 import PlaybackPanel from '@/components/panels/PlaybackPanel';
 import CompileOptionsPanel from '@/components/panels/CompileOptionsPanel';
 import InfoPanel from '@/components/panels/InfoPanel';
+import ScriptPanel from '@/components/panels/ScriptPanel';
+import LyricsPanel from '@/components/panels/LyricsPanel';
+import MixerPanel from '@/components/panels/MixerPanel';
+import MIDIKeyboardPanel from '@/components/panels/MIDIKeyboardPanel';
+import DebugPanel from '@/components/panels/DebugPanel';
 import { TabBar } from '@/components/TabBar';
 
 export const App: React.FC = () => {
@@ -267,6 +274,9 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Get active document for panel props
+  const activeDoc = activeDocument;
+  
   // Render panel based on type
   const renderPanel = useCallback((panelType: PanelType) => {
     switch (panelType) {
@@ -282,15 +292,31 @@ export const App: React.FC = () => {
         return <CompileOptionsPanel />;
       case 'info':
         return <InfoPanel />;
+      case 'lyrics':
+        return <LyricsPanel />;
+      case 'mixer':
+        return <MixerPanel />;
+      case 'midiKeyboard':
+        return <MIDIKeyboardPanel />;
+      case 'debug':
+        return <DebugPanel />;
+      case 'script':
+        return (
+          <ScriptPanel
+            documentId={activeDocumentId || undefined}
+            documentContent={activeDoc?.content || ''}
+            documentLanguage={activeDoc?.language || 'gwi'}
+          />
+        );
       default:
         return null;
     }
-  }, [compiledData, handleNavigateToError]);
+  }, [compiledData, handleNavigateToError, activeDocumentId, activeDoc]);
 
   // Get panels for right sidebar (positioned right)
   const allPanelTypes: PanelType[] = [
     'folder', 'folderTree', 'partCounter', 'errorList', 'log', 'lyrics', 
-    'mixer', 'midiKeyboard', 'debug', 'playback', 'compileOptions', 'info'
+    'mixer', 'midiKeyboard', 'debug', 'playback', 'compileOptions', 'info', 'script'
   ];
   
   const rightSidebarPanelTypes: PanelType[] = allPanelTypes.filter(

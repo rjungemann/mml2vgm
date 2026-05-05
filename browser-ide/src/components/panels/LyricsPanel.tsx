@@ -1,38 +1,146 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 
 interface LyricLine {
   text: string;
   time: number; // Time in seconds
   active: boolean;
+  type?: 'section' | 'line' | 'empty';
 }
 
-const LyricsPanel: React.FC = () => {
-  // Mock lyrics data - TODO: Parse from MML \ly commands
-  const [lyrics, setLyrics] = React.useState<LyricLine[]>([
-    { text: '[Verse 1]', time: 0, active: false },
-    { text: 'This is the first line of lyrics', time: 2, active: false },
-    { text: 'Second line of the verse', time: 4, active: false },
-    { text: '', time: 6, active: false },
-    { text: '[Chorus]', time: 8, active: false },
-    { text: 'This is the chorus line one', time: 10, active: false },
-    { text: 'Chorus line two goes here', time: 12, active: false },
-  ]);
+interface LyricsPanelProps {
+  documentId?: string;
+  documentContent?: string;
+  currentTime?: number; // Current playback time in seconds
+}
 
-  const [currentTime, setCurrentTime] = React.useState(0);
+const LyricsPanel: React.FC<LyricsPanelProps> = ({
+  documentId,
+  documentContent = '',
+  currentTime = 0,
+}) => {
+  // Parse lyrics from MML \ly commands
+  const parseLyricsFromMML = useCallback((content: string): LyricLine[] => {
+    const lines: LyricLine[] = [];
+    const lyricPattern = /\\ly\s+([\d.]+)\s+(.+?)\s*$/gm;
+    const sectionPattern = /^\[(.+?)\]\s*$/gm;
+    
+    let match;
+    let currentSection: string | null = null;
+    let lastTime = 0;
+    
+    // First, find all \ly commands and parse them
+    const lyMatches: { time: number; text: string }[] = [];
+    while ((match = lyricPattern.exec(content)) !== null) {
+      const time = parseFloat(match[1]);
+      const text = match[2].trim();
+      lyMatches.push({ time, text });
+    }
+    
+    // Also check for section markers in the content
+    const contentLines = content.split('\n');
+    
+    // If we found \ly commands, use them
+    if (lyMatches.length > 0) {
+      for (const ly of lyMatches) {
+        // Check if this looks like a section marker
+        if (ly.text.startsWith('[') && ly.text.endsWith(']')) {
+          lines.push({
+            text: ly.text,
+            time: ly.time,
+            active: false,
+            type: 'section',
+          });
+          currentSection = ly.text;
+        } else {
+          lines.push({
+            text: ly.text,
+            time: ly.time,
+            active: false,
+            type: 'line',
+          });
+        }
+        lastTime = ly.time;
+      }
+    } else {
+      // Fallback: try to parse section markers from content
+      // Look for [Verse], [Chorus], etc.
+      for (const line of contentLines) {
+        const trimmed = line.trim();
+        
+        // Skip empty lines and MML commands
+        if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('@') || 
+            trimmed.startsWith('v') || trimmed.startsWith('o') || 
+            trimmed.startsWith('l') || trimmed.startsWith('t') ||
+            trimmed.startsWith('q')) {
+          continue;
+        }
+        
+        // Check for section markers
+        const sectionMatch = trimmed.match(/^\[(.+?)\]\s*$/);
+        if (sectionMatch) {
+          lines.push({
+            text: trimmed,
+            time: lastTime,
+            active: false,
+            type: 'section',
+          });
+          currentSection = trimmed;
+          lastTime += 2; // Add some time for sections
+          continue;
+        }
+        
+        // If we're in a section that looks like lyrics, add the line
+        if (currentSection && trimmed.length > 0 && trimmed.length < 100) {
+          lines.push({
+            text: trimmed,
+            time: lastTime,
+            active: false,
+            type: 'line',
+          });
+          lastTime += 2;
+        }
+      }
+    }
+    
+    // If we have no lyrics, return mock data
+    if (lines.length === 0 && documentContent.includes('\\ly')) {
+      // Try one more time with different pattern
+      const altPattern = /\\ly\s+"([^"]+)"/g;
+      let altMatch;
+      while ((altMatch = altPattern.exec(content)) !== null) {
+        lines.push({
+          text: altMatch[1],
+          time: lastTime,
+          active: false,
+          type: 'line',
+        });
+        lastTime += 2;
+      }
+    }
+    
+    return lines.length > 0 ? lines : [
+      { text: '[No lyrics found]', time: 0, active: false, type: 'section' },
+      { text: 'Add \\ly commands to your MML', time: 0, active: false, type: 'line' },
+    ];
+  }, []);
+
+  // Parse lyrics from document content
+  const [lyrics, setLyrics] = React.useState<LyricLine[]>(() => {
+    return parseLyricsFromMML(documentContent);
+  });
+
+  // Update lyrics when document content changes
+  useEffect(() => {
+    setLyrics(parseLyricsFromMML(documentContent));
+  }, [documentContent, parseLyricsFromMML]);
+
+  // Use the provided currentTime, or fall back to internal state
+  const [internalCurrentTime, setInternalCurrentTime] = React.useState(0);
+  const displayTime = currentTime ?? internalCurrentTime;
   const [fontSize, setFontSize] = React.useState(14);
   const [isAutoScroll, setIsAutoScroll] = React.useState(true);
 
-  // Simulate playback position updates
-  React.useEffect(() => {
-    // TODO: Connect to actual audio player position
-    // This is a mock simulation
-    const interval = setInterval(() => {
-      // Just demo - in real implementation, this would come from audio player
-      // setCurrentTime(prev => prev + 0.1);
-    }, 100);
-    
-    return () => clearInterval(interval);
-  }, []);
+  // No need for internal simulation when connected to audio player
 
   // Update active lyric based on current time
   React.useEffect(() => {

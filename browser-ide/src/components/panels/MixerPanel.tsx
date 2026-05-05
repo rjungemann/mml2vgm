@@ -1,51 +1,130 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { SoundChip } from '@/types';
+import { audioService } from '@/services/audioService';
 
-interface ChipVolume {
+interface ChipVolumeState {
   chip: SoundChip;
-  volume: number;
-  pan: number;
+  volume: number; // 0-127 for UI, converted to 0-1 for audio
+  pan: number; // 0-127
   muted: boolean;
   solo: boolean;
 }
 
 const MixerPanel: React.FC = () => {
-  // Mock mixer data - TODO: Connect to audio player state
-  const [chips, setChips] = React.useState<ChipVolume[]>([
-    { chip: 'YM2608', volume: 100, pan: 50, muted: false, solo: false },
-    { chip: 'SN76489', volume: 100, pan: 50, muted: false, solo: false },
-  ]);
+  // Get all supported chips for the mixer
+  const allChips: SoundChip[] = [
+    'YM2608', 'SN76489', 'YM2612', 'YM2151', 'YM2203', 'YM3526', 'YM3812', 'YMF262',
+    'YM2413', 'RF5C164', 'SegaPCM', 'AY8910', 'HuC6280'
+  ];
+  
+  // Initialize mixer state from audioService
+  const [chips, setChips] = useState<ChipVolumeState[]>(() => {
+    return allChips.map(chip => ({
+      chip,
+      volume: 100, // Default to 100 (full volume)
+      pan: 50, // Default to center
+      muted: false,
+      solo: false,
+    }));
+  });
 
-  const handleVolumeChange = (index: number, value: number) => {
-    const newChips = [...chips];
-    newChips[index].volume = value;
-    setChips(newChips);
-    console.log(`Volume change for ${newChips[index].chip}: ${value}`);
-  };
+  // Subscribe to audio service changes
+  useEffect(() => {
+    // Update chip list based on currently active chips
+    const status = audioService.getStatus();
+    if (status.chips.length > 0) {
+      // Add any new chips that aren't in our list
+      setChips(prev => {
+        const existingChipNames = new Set(prev.map(c => c.chip));
+        const newChips: ChipVolumeState[] = [];
+        
+        // Keep existing chips
+        for (const chipState of prev) {
+          newChips.push(chipState);
+        }
+        
+        // Add new chips from audio service
+        for (const chip of status.chips) {
+          if (!existingChipNames.has(chip)) {
+            newChips.push({
+              chip,
+              volume: 100,
+              pan: 50,
+              muted: false,
+              solo: false,
+            });
+          }
+        }
+        
+        return newChips;
+      });
+    }
+  }, []);
 
-  const handlePanChange = (index: number, value: number) => {
-    const newChips = [...chips];
-    newChips[index].pan = value;
-    setChips(newChips);
-    console.log(`Pan change for ${newChips[index].chip}: ${value}`);
-  };
-
-  const handleToggleMute = (index: number) => {
-    const newChips = [...chips];
-    newChips[index].muted = !newChips[index].muted;
-    setChips(newChips);
-    console.log(`Toggle mute for ${newChips[index].chip}`);
-  };
-
-  const handleToggleSolo = (index: number) => {
-    const newChips = [...chips];
-    // Clear other solos if not ctrl-click (simplified for now)
-    newChips.forEach((_, i) => {
-      newChips[i].solo = (i === index) && !newChips[i].solo;
+  // Handle volume change
+  const handleVolumeChange = useCallback((index: number, value: number) => {
+    setChips(prev => {
+      const newChips = [...prev];
+      newChips[index].volume = value;
+      
+      // Update audioService
+      const chip = newChips[index].chip;
+      audioService.setChipVolume(chip, value / 127);
+      
+      return newChips;
     });
-    setChips(newChips);
-    console.log(`Toggle solo for ${newChips[index].chip}`);
-  };
+  }, []);
+
+  // Handle pan change
+  const handlePanChange = useCallback((index: number, value: number) => {
+    setChips(prev => {
+      const newChips = [...prev];
+      newChips[index].pan = value;
+      // TODO: Implement pan in audioService
+      console.log(`Pan change for ${newChips[index].chip}: ${value}`);
+      return newChips;
+    });
+  }, []);
+
+  // Handle toggle mute
+  const handleToggleMute = useCallback((index: number) => {
+    setChips(prev => {
+      const newChips = [...prev];
+      newChips[index].muted = !newChips[index].muted;
+      
+      // Update audioService
+      const chip = newChips[index].chip;
+      audioService.setChipMuted(chip, newChips[index].muted);
+      
+      return newChips;
+    });
+  }, []);
+
+  // Handle toggle solo
+  const handleToggleSolo = useCallback((index: number, ctrlKey: boolean = false) => {
+    setChips(prev => {
+      const newChips = [...prev];
+      
+      if (!ctrlKey) {
+        // Clear all solos first
+        newChips.forEach(c => c.solo = false);
+      }
+      
+      // Toggle the clicked chip
+      newChips[index].solo = !newChips[index].solo;
+      
+      // Update audioService
+      const chip = newChips[index].chip;
+      audioService.setChipSolo(chip, newChips[index].solo);
+      
+      return newChips;
+    });
+  }, []);
+
+  // Handle master volume change
+  const handleMasterVolumeChange = useCallback((value: number) => {
+    audioService.setVolume(value / 127);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '4px' }}>
@@ -118,7 +197,7 @@ const MixerPanel: React.FC = () => {
                 M
               </button>
               <button
-                onClick={() => handleToggleSolo(index)}
+                onClick={(e) => handleToggleSolo(index, e.ctrlKey || e.metaKey)}
                 style={{
                   fontSize: '10px',
                   padding: '2px 4px',
@@ -127,6 +206,7 @@ const MixerPanel: React.FC = () => {
                   border: '1px solid var(--border-color)',
                   cursor: 'pointer',
                 }}
+                title="Hold Ctrl to toggle multiple solos"
               >
                 S
               </button>
@@ -143,11 +223,13 @@ const MixerPanel: React.FC = () => {
             type="range"
             min="0"
             max="127"
-            value={100}
-            onChange={(e) => console.log(`Master volume: ${e.target.value}`)}
+            value={Math.round(audioService.getVolume() * 127)}
+            onChange={(e) => handleMasterVolumeChange(parseInt(e.target.value))}
             style={{ flex: 1, height: '4px' }}
           />
-          <span style={{ width: '30px', fontSize: '10px', textAlign: 'right' }}>100</span>
+          <span style={{ width: '30px', fontSize: '10px', textAlign: 'right' }}>
+            {Math.round(audioService.getVolume() * 127)}
+          </span>
         </div>
       </div>
     </div>
