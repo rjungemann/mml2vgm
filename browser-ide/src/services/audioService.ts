@@ -679,7 +679,6 @@ export class AudioService {
   
   // Event Handling
   // ========================================================================
-=======
   /**
    * Check if currently paused.
    */

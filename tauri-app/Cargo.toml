@@ -12,9 +12,14 @@ rust-version = "1.70"
 tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0", features = ["macos-private-api", "shell-open", "dialog-all", "fs-all", "path-all", "clipboard-all", "notification-all"] }
+tauri = { version = "2.0", features = [] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
+[[bin]]
+name = "mml2vgm-desktop"
+path = "src-tauri/src/main.rs"
+
 [features]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

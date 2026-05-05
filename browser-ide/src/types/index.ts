@@ -108,7 +108,7 @@ export interface ErrorContext {
 // ============================================================================
 
 /** Supported MML file types */
-export type MMLLanguage = 'gwi' | 'mml' | 'muc' | 'mdl' | 'mus';
+export type MMLLanguage = 'gwi' | 'mml' | 'muc' | 'mdl' | 'mus' | 'm98' | 'muap';
 
 /** A document in the editor */
 export interface Document {

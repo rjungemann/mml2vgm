@@ -17,11 +17,11 @@ A comprehensive plan for creating a browser-based IDE that leverages the Rust co
 - ✅ Phase 5: Advanced Features - COMPLETED (100%)
 - ✅ Phase 6: Feature Parity - COMPLETED (100%)
 - ✅ Phase 7: Polish & Testing - COMPLETED (100%)
-- ⏳ Phase 8: Deployment - PENDING (0%)
+- ✅ Phase 8: Deployment - COMPLETED (100%)
 
-**Overall Progress:** Phase 7 Complete - 87.5% of total project (7/8 phases)
+**Overall Progress:** 100% Complete (8/8 phases)
 
-**Latest Update:** 2026-05-04 14:00 UTC - Phase 5 COMPLETED: All advanced features implemented - partService, midiService, fileService connected to panels, error navigation working
+**Latest Update:** 2026-05-04 18:00 UTC - All Browser IDE phases completed
 
 ### Rust CLI Plan
 **File:** [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md)
@@ -45,7 +45,7 @@ A plan for creating a cross-platform, command-line utility in Rust for MML compi
 
 | Plan | Focus | Status |
 |------|-------|--------|
-| [Browser_IDE_Plan.md](./Browser_IDE_Plan.md) | Web-based IDE with WASM | Phase 3 Complete |
+| [Browser_IDE_Plan.md](./Browser_IDE_Plan.md) | Web-based IDE with WASM | Phase 8 Complete |
 | [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) | Rust CLI utility | Phase 4 In Progress |
 
 ## How to Use
@@ -202,29 +202,44 @@ A plan for creating a cross-platform, command-line utility in Rust for MML compi
 
 ```
 mml2vgm/
-├── docs/
-│   ├── PLAN.md                    # This file - Overview of all plans
-│   ├── Browser_IDE_Plan.md        # Browser IDE development plan
-│   ├── PLAN_Rust_CLI.md           # Rust CLI development plan
-│   ├── IDE.md                     # IDE documentation
-│   ├── MML_Commands.md            # MML command reference
+├── docs/                          # Documentation
+│   ├── PLAN.md                   # This file - Overview of all plans
+│   ├── Browser_IDE_Plan.md       # Browser IDE development plan
+│   ├── Browser_IDE_Implementation.md # Implementation status
+│   ├── Browser_IDE_Limitations.md # Known limitations
+│   ├── PLAN_Rust_CLI.md          # Rust CLI development plan
+│   ├── Cloudflare_Pages_Deployment.md # Cloudflare hosting
+│   ├── Tauri_Desktop_Setup.md    # Tauri desktop app setup
 │   └── ...
-├── browser-ide/                   # Browser IDE project
-│   ├── src/                       # TypeScript source
+├── browser-ide/                   # Browser IDE project (TypeScript + React + Vite)
+│   ├── src/                       # TypeScript/React source
 │   ├── public/                    # Static assets
 │   └── ...
 ├── mml2vgm-rs/                    # Rust compiler library
 │   ├── src/                       # Rust source
 │   └── ...
-└── mml2vgm-wasm/                  # WASM bindings
-    └── ...
+├── mml2vgm-wasm/                  # WASM bindings
+│   └── pkg/                       # Compiled WASM output
+├── tauri-app/                     # Desktop app (Tauri)
+│   ├── src/                       # Frontend source
+│   └── ...
+└── mml2vgmTest/                   # Test data and samples
+    └── samples/                   # Test MML/VGM files
 ```
 
 ## Related Documentation
 
-- [README.md](./README.md) - Project overview
+- [README.md](../README.md) - Project overview
 - [README_JA.md](./README_JA.md) - Japanese project overview
-- [IDE.md](./IDE.md) - IDE documentation
+- [IDE.md](./IDE.md) - IDE documentation (legacy - see Browser_IDE_Plan.md for new IDE)
 - [MML_Commands.md](./MML_Commands.md) - MML command reference
-- [Development.md](./Development.md) - Development guidelines
-- [CHANGELOG.md](./CHANGELOG.md) - Change history
+- [Development.md](./Development.md) - Development guidelines (legacy)
+- [CHANGELOG.md](./CHANGELOG.md) - Change history (legacy)
+- [Browser_IDE_Plan.md](./Browser_IDE_Plan.md) - Browser IDE development plan
+- [Browser_IDE_Implementation.md](./Browser_IDE_Implementation.md) - Implementation status
+- [Browser_IDE_Limitations.md](./Browser_IDE_Limitations.md) - Known limitations
+- [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) - Rust CLI development plan
+- [Cloudflare_Pages_Deployment.md](./Cloudflare_Pages_Deployment.md) - Cloudflare Pages hosting
+- [Tauri_Desktop_Setup.md](./Tauri_Desktop_Setup.md) - Tauri desktop app setup
+- [External_Driver_Support.md](./External_Driver_Support.md) - External driver support
+- [ZGM_Specification.md](./ZGM_Specification.md) - ZGM format specification

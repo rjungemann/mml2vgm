@@ -225,7 +225,7 @@ const mucHandler: FormatHandler = {
     defaultChips: ['YM2612', 'SN76489'],
     defaultOutputFormat: 'vgm',
     isNative: false,
-    driverAvailable: false, // TODO: Implement Rust driver
+    driverAvailable: true, // Implemented in Rust
     
     detectFromContent(content: string): number {
         // Check for mucom88-specific patterns
@@ -365,6 +365,7 @@ const mmlHandler: FormatHandler = {
 /**
  * MDL Format Handler (MoonDriver format)
  * This format is used by MoonDriver for various platforms.
+ * Note: .mdl extension is also used by PMD, but MoonDriver has higher priority for non-PMD content.
  */
 const mdlHandler: FormatHandler = {
     id: 'mdl',
@@ -376,7 +377,7 @@ const mdlHandler: FormatHandler = {
     defaultChips: ['YM2608'],
     defaultOutputFormat: 'vgm',
     isNative: false,
-    driverAvailable: false,
+    driverAvailable: true,
     
     detectFromContent(content: string): number {
         // Check for MoonDriver-specific patterns
@@ -438,7 +439,7 @@ const musHandler: FormatHandler = {
     defaultChips: ['YM2608'],
     defaultOutputFormat: 'vgm',
     isNative: false,
-    driverAvailable: false,
+    driverAvailable: true,
     
     detectFromContent(content: string): number {
         // Check for PMD-specific patterns
@@ -483,9 +484,138 @@ const musHandler: FormatHandler = {
             builtins: [],
         };
     },
+// Format Registry
+// ============================================================================
+};
+
+/**
+ * M98 Format Handler (M98 format for NEC PC-9801)
+ * Simplified MML format for PC-9801.
+ */
+const m98Handler: FormatHandler = {
+    id: 'm98',
+    displayName: 'M98 (PC-9801)',
+    extensions: ['.m98'],
+    defaultExtension: '.m98',
+    description: 'M98 MML format for NEC PC-9801',
+    targetPlatform: 'NEC PC-9801 (YM2203/YM2608)',
+    defaultChips: ['YM2608'],
+    defaultOutputFormat: 'vgm',
+    isNative: false,
+    driverAvailable: true,
+
+    detectFromContent(content: string): number {
+        const lines = content.split('\n');
+        const hasM98Directive = lines.some(line =>
+            line.trim().toLowerCase().startsWith('m98')
+        );
+        const hasPc98Pattern = content.toLowerCase().includes('pc-98');
+
+        if (hasM98Directive) return 95;
+        if (hasPc98Pattern) return 70;
+        return 0;
+    },
+
+    async getCompileOptions(): Promise<CompileOptions> {
+        const options = await wasmService.compileOptionsForFormat('vgm');
+        return {
+            ...options,
+            target_chips: [...this.defaultChips],
+        };
+    },
+
+    getSyntaxConfig(): MonacoSyntaxConfig {
+        return {
+            languageId: 'm98',
+            tokens: {
+                directive: {
+                    pattern: /#[A-Za-z]+/,
+                    type: 'keyword.directive',
+                },
+                note: {
+                    pattern: /[A-G][+#-]?\d*/i,
+                    type: 'string.note',
+                },
+                rest: {
+                    pattern: /R\d*/i,
+                    type: 'keyword.rest',
+                },
+                comment: {
+                    pattern: /;.*$/,
+                    type: 'comment',
+                },
+            },
+            keywords: ['M98', 'YM2203', 'YM2608', 'OPNA'],
+            operators: ['+', '-', '=', '*', '/'],
+            builtins: [],
+        };
+    },
+};
+
+/**
+ * Muap Format Handler (Muap format for YM2608/OPNA)
+ */
+const muapHandler: FormatHandler = {
+    id: 'muap',
+    displayName: 'Muap (OPNA)',
+    extensions: ['.muap'],
+    defaultExtension: '.muap',
+    description: 'Muap MML format for YM2608 (OPNA)',
+    targetPlatform: 'YM2608 (OPNA) with FM, SSG, Rhythm, and ADPCM',
+    defaultChips: ['YM2608'],
+    defaultOutputFormat: 'vgm',
+    isNative: false,
+    driverAvailable: true,
+
+    detectFromContent(content: string): number {
+        const hasMuap = content.toLowerCase().includes('muap');
+        const hasOpna = content.toLowerCase().includes('opna');
+        const hasYm2608 = content.toLowerCase().includes('ym2608');
+
+        if (hasMuap) return 90;
+        if (hasOpna || hasYm2608) return 75;
+        return 0;
+    },
+
+    async getCompileOptions(): Promise<CompileOptions> {
+        const options = await wasmService.compileOptionsForFormat('vgm');
+        return {
+            ...options,
+            target_chips: [...this.defaultChips],
+        };
+    },
+
+    getSyntaxConfig(): MonacoSyntaxConfig {
+        return {
+            languageId: 'muap',
+            tokens: {
+                directive: {
+                    pattern: /@\w+/,
+                    type: 'keyword.directive',
+                },
+                note: {
+                    pattern: /[A-G][+#-]?\d*/i,
+                    type: 'string.note',
+                },
+                rest: {
+                    pattern: /R\d*/i,
+                    type: 'keyword.rest',
+                },
+                comment: {
+                    pattern: /;.*$/,
+                    type: 'comment',
+                },
+            },
+            keywords: ['@FM', '@SSG', '@RHYTHM', '@ADPCM', '@OPNA'],
+            operators: ['+', '-', '=', '*', '/'],
+            builtins: [],
+        };
+    },
 };
 
 // ============================================================================
+// Format Registry
+// ========================================================================================================================================================
 // Format Registry
 // ============================================================================
 
@@ -503,6 +633,8 @@ class FormatRegistry {
         this.registerHandler(mmlHandler);
         this.registerHandler(mdlHandler);
         this.registerHandler(musHandler);
+        this.registerHandler(m98Handler);
+        this.registerHandler(muapHandler);
     }
     
     /**

@@ -39,6 +39,9 @@ pub mod audio;
 // Player module (will be implemented in Phase 5)
 pub mod player;
 
+// Drivers module (external driver support)
+pub mod drivers;
+
 /// Supported output formats
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]

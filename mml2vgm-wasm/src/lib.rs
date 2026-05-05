@@ -554,3 +554,295 @@ pub fn vgm_player_get_info(player: &JsVgmPlayer) -> Result<String, JsValue> {
         "ym2151_clock": ym2151_clock,
     }).to_string())
 }
+
+// ============================================================================
+// External Driver Support
+// ============================================================================
+
+use mml2vgm::drivers::{
+    DriverCompileOptions, DriverCompileResult, DriverDiagnostic, DriverInfo, DriverRegistry,
+    DriverOutputFormat, DriverToken, ExternalDriver,
+};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// WASM-compatible driver registry
+#[wasm_bindgen]
+pub struct JsDriverRegistry {
+    registry: DriverRegistry,
+}
+
+#[wasm_bindgen]
+impl JsDriverRegistry {
+    /// Create a new driver registry
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        let mut registry = DriverRegistry::new();
+
+        // Register the native GWI driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::GwiDriver));
+
+        // Register the M98 driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::m98::M98Driver));
+
+        // Register the Mucom driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::mucom::MucomDriver));
+
+        // Register the MoonDriver driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::moondriver::MoonDriver));
+
+        // Register the PMD driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::pmd::PMDDriver));
+
+        // Register the Muap driver
+        registry.register_driver(Arc::new(mml2vgm::drivers::muap::MuapDriver));
+
+        JsDriverRegistry { registry }
+    }
+
+    /// List all registered drivers as JSON
+    #[wasm_bindgen(catch)]
+    pub fn list_drivers(&self) -> Result<String, JsValue> {
+        let infos = self.registry.get_driver_infos();
+        let json: Vec<_> = infos
+            .iter()
+            .map(|info| {
+                serde_json::json!({
+                    "id": info.id,
+                    "displayName": info.display_name,
+                    "extensions": info.supported_extensions,
+                    "description": info.description,
+                    "version": info.version,
+                    "targetPlatform": info.target_platform,
+                })
+            })
+            .collect();
+        Ok(serde_json::to_string(&json).unwrap())
+    }
+
+    /// Detect the format of the given content
+    /// Returns JSON with driverId and confidence
+    #[wasm_bindgen(catch)]
+    pub fn detect_format(&self, content: &str, filename: Option<String>) -> Result<String, JsValue> {
+        let file_ref = filename.as_deref();
+        match self.registry.detect_format(content, file_ref) {
+            Some((driver_id, confidence)) => {
+                Ok(serde_json::json!({
+                    "driverId": driver_id,
+                    "confidence": confidence,
+                })
+                .to_string())
+            }
+            None => Ok(serde_json::json!({
+                "driverId": null,
+                "confidence": 0,
+            })
+            .to_string()),
+        }
+    }
+
+    /// Get driver by file extension
+    /// Returns JSON with driver info or null
+    #[wasm_bindgen(catch)]
+    pub fn get_driver_by_extension(&self, extension: &str) -> Result<String, JsValue> {
+        match self.registry.get_driver_by_extension(extension) {
+            Some(driver) => {
+                let info = driver.info();
+                Ok(serde_json::json!({
+                    "id": info.id,
+                    "displayName": info.display_name,
+                    "extensions": info.supported_extensions,
+                    "description": info.description,
+                    "version": info.version,
+                    "targetPlatform": info.target_platform,
+                })
+                .to_string())
+            }
+            None => Ok(serde_json::json!(null).to_string()),
+        }
+    }
+
+    /// Check if a driver is available
+    #[wasm_bindgen]
+    pub fn has_driver(&self, id: &str) -> bool {
+        self.registry.has_driver(id)
+    }
+}
+
+/// WASM-compatible compile options
+#[wasm_bindgen]
+pub struct JsDriverCompileOptions {
+    output_format: String,
+    sample_rate: u32,
+    verbose: bool,
+    debug: bool,
+    extra: HashMap<String, String>,
+}
+
+#[wasm_bindgen]
+impl JsDriverCompileOptions {
+    /// Create new compile options with defaults
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            output_format: "vgm".to_string(),
+            sample_rate: 44100,
+            verbose: false,
+            debug: false,
+            extra: HashMap::new(),
+        }
+    }
+
+    /// Set output format
+    #[wasm_bindgen]
+    pub fn set_output_format(&mut self, format: &str) {
+        self.output_format = format.to_string();
+    }
+
+    /// Set sample rate
+    #[wasm_bindgen]
+    pub fn set_sample_rate(&mut self, rate: u32) {
+        self.sample_rate = rate;
+    }
+
+    /// Set verbose mode
+    #[wasm_bindgen]
+    pub fn set_verbose(&mut self, verbose: bool) {
+        self.verbose = verbose;
+    }
+
+    /// Set debug mode
+    #[wasm_bindgen]
+    pub fn set_debug(&mut self, debug: bool) {
+        self.debug = debug;
+    }
+
+    /// Add extra option
+    #[wasm_bindgen]
+    pub fn add_extra(&mut self, key: &str, value: &str) {
+        self.extra.insert(key.to_string(), value.to_string());
+    }
+}
+
+/// Convert JS compile options to Rust compile options
+fn js_to_driver_compile_options(js_options: &JsDriverCompileOptions) -> DriverCompileOptions {
+    let output_format: DriverOutputFormat = js_options
+        .output_format
+        .parse()
+        .unwrap_or(DriverOutputFormat::VGM);
+
+    DriverCompileOptions {
+        output_format,
+        sample_rate: js_options.sample_rate,
+        verbose: js_options.verbose,
+        debug: js_options.debug,
+        extra: js_options.extra.clone(),
+    }
+}
+
+/// Compile MML using a specific driver
+#[wasm_bindgen(catch)]
+pub fn driver_compile(
+    registry: &JsDriverRegistry,
+    driver_id: &str,
+    content: &str,
+    options: &JsDriverCompileOptions,
+) -> Result<Vec<u8>, JsValue> {
+    let driver = registry
+        .registry
+        .get_driver(driver_id)
+        .ok_or_else(|| JsValue::from_str(&format!("Driver '{}' not found", driver_id)))?;
+
+    let compile_options = js_to_driver_compile_options(options);
+
+    match driver.compile(content, &compile_options) {
+        Ok(result) => {
+            // Create a JSON result with data and metadata
+            let metadata = serde_json::json!({
+                "partCount": result.part_count,
+                "commandCount": result.command_count,
+                "durationSamples": result.duration_samples,
+                "durationSeconds": result.duration_seconds,
+                "chipsUsed": result.chips_used,
+            });
+
+            // Combine data and metadata
+            let mut combined = Vec::new();
+            combined.extend_from_slice(&metadata.to_string().into_bytes());
+            combined.push(0); // null separator
+            combined.extend(result.data);
+
+            Ok(combined)
+        }
+        Err(e) => Err(JsValue::from_str(&format!("Compilation error: {}", e))),
+    }
+}
+
+/// Validate MML using a specific driver
+#[wasm_bindgen(catch)]
+pub fn driver_validate(
+    registry: &JsDriverRegistry,
+    driver_id: &str,
+    content: &str,
+) -> Result<String, JsValue> {
+    let driver = registry
+        .registry
+        .get_driver(driver_id)
+        .ok_or_else(|| JsValue::from_str(&format!("Driver '{}' not found", driver_id)))?;
+
+    match driver.validate(content) {
+        Ok(diagnostics) => {
+            let json: Vec<_> = diagnostics
+                .iter()
+                .map(|d| {
+                    serde_json::json!({
+                        "message": d.message,
+                        "severity": match d.severity {
+                            mml2vgm::drivers::DiagnosticSeverity::Error => "error",
+                            mml2vgm::drivers::DiagnosticSeverity::Warning => "warning",
+                            mml2vgm::drivers::DiagnosticSeverity::Info => "info",
+                            mml2vgm::drivers::DiagnosticSeverity::Hint => "hint",
+                        },
+                        "line": d.line,
+                        "column": d.column,
+                        "length": d.length,
+                    })
+                })
+                .collect();
+            Ok(serde_json::to_string(&json).unwrap())
+        }
+        Err(e) => Err(JsValue::from_str(&format!("Validation error: {}", e))),
+    }
+}
+
+/// Tokenize MML using a specific driver
+#[wasm_bindgen(catch)]
+pub fn driver_tokenize(
+    registry: &JsDriverRegistry,
+    driver_id: &str,
+    content: &str,
+) -> Result<String, JsValue> {
+    let driver = registry
+        .registry
+        .get_driver(driver_id)
+        .ok_or_else(|| JsValue::from_str(&format!("Driver '{}' not found", driver_id)))?;
+
+    match driver.tokenize(content) {
+        Ok(tokens) => {
+            let json: Vec<_> = tokens
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": t.token_type,
+                        "value": t.value,
+                        "line": t.line,
+                        "column": t.column,
+                        "length": t.length,
+                    })
+                })
+                .collect();
+            Ok(serde_json::to_string(&json).unwrap())
+        }
+        Err(e) => Err(JsValue::from_str(&format!("Tokenization error: {}", e))),
+    }
+}
