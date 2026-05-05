@@ -24,7 +24,10 @@ export async function initializeWasm(): Promise<void> {
     wasmModule = imported;
 
     console.log('[WasmWrapper] WASM module initialized');
-    console.log('[WasmWrapper] Available exports:', Object.keys(imported).slice(0, 10));
+    const allKeys = Object.keys(imported);
+    console.log('[WasmWrapper] Total exports:', allKeys.length);
+    console.log('[WasmWrapper] All exports:', allKeys);
+    console.log('[WasmWrapper] Has compile_mml:', 'compile_mml' in imported);
 
     isInitialized = true;
   } catch (error) {
@@ -46,12 +49,21 @@ export function compileMml(mml: string, optionsJson: string): any {
     optionsLength: optionsJson.length,
   });
 
+  if (!wasmModule.compile_mml) {
+    throw new Error('compile_mml function not found in WASM module');
+  }
+
+  console.log('[WasmWrapper] compile_mml function exists, calling it...');
+
   try {
     const startTime = performance.now();
-    console.log('[WasmWrapper] Calling compile_mml...');
+    console.log('[WasmWrapper] Calling compile_mml at', new Date().toISOString());
+
+    // Call the function
     const result = wasmModule.compile_mml(mml, optionsJson);
+
     const duration = performance.now() - startTime;
-    console.log(`[WasmWrapper] compile_mml returned after ${duration.toFixed(2)}ms`);
+    console.log(`[WasmWrapper] compile_mml returned after ${duration.toFixed(2)}ms at ${new Date().toISOString()}`);
     console.log('[WasmWrapper] Result type:', typeof result);
     console.log('[WasmWrapper] Result constructor:', result?.constructor?.name);
 
