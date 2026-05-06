@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { scriptService, SCRIPT_TEMPLATES, type Script, type ScriptFunction } from '@/services/scriptService';
 import type { MMLLanguage } from '@/types';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 interface ScriptPanelProps {
     documentId?: string;
@@ -26,7 +27,7 @@ const ScriptPanel: React.FC<ScriptPanelProps> = ({
     } | null>(null);
     const [isPyodideReady, setIsPyodideReady] = useState(false);
     const [isPyodideSupported, setIsPyodideSupported] = useState(true);
-    const [showTemplates, setShowTemplates] = useState(false);
+    const [showTemplates, setShowTemplates] = useSessionStorageState<boolean>('mml2vgm:script:showTemplates', false);
     
     // Load scripts on mount
     useEffect(() => {

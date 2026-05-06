@@ -138,6 +138,82 @@ ci:
     just wasm-build-release
     echo "All checks passed!"
 
+# ============ GOLDEN MASTER PARITY COMMANDS ============
+#
+# Compares the Rust compiler's VGM output against the reference C# compiler.
+# The Rust compiler now handles the C# MML format (Phases 3–3c complete).
+# See docs/Golden_Master_Comparison_Plan.md for full status.
+#
+# One-time setup for the C# reference compiler:
+#   git worktree prune
+#   git worktree add /tmp/mml2vgm-csharp bc285ab
+#   cd /tmp/mml2vgm-csharp/mml2vgm/Core && dotnet build Core.sdk.csproj
+#   cd /tmp/mml2vgm-csharp/mml2vgm/mvc  && dotnet build mvc.sdk.csproj
+
+# One-time: generate reference VGMs from the C# compiler.
+# Requires the C# worktree built at /tmp/mml2vgm-csharp (see above).
+test-parity-generate-reference:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ref_mvc="/tmp/mml2vgm-csharp/mml2vgm/mvc/bin/Debug/net10.0/mvc.dll"
+    if [[ ! -f "$ref_mvc" ]]; then
+        echo "Missing C# reference compiler: $ref_mvc"
+        echo "Restore and build the C# worktree first:"
+        echo "  git worktree prune"
+        echo "  git worktree add /tmp/mml2vgm-csharp bc285ab"
+        echo "  cd /tmp/mml2vgm-csharp/mml2vgm/Core && dotnet build Core.sdk.csproj"
+        echo "  cd /tmp/mml2vgm-csharp/mml2vgm/mvc  && dotnet build mvc.sdk.csproj"
+        exit 1
+    fi
+
+    mkdir -p tests/parity/reference
+    # C# format test fixtures (non-PCM, no external WAV dependencies).
+    # Update this list as more fixtures are validated.
+    samples=(
+        T0000_SongInfoDef
+        T0001_SongInfoDef2
+        T0100_YM2612_Ch
+    )
+    for base in "${samples[@]}"; do
+        gwi="/tmp/mml2vgm-csharp/mml2vgm/samples/test/${base}.gwi"
+        echo "Compiling (C# reference): $base"
+        dotnet "$ref_mvc" "$gwi" "tests/parity/reference/${base}.vgm"
+        echo "  -> tests/parity/reference/${base}.vgm"
+    done
+
+# Generate current VGMs from the Rust compiler (current build).
+# Requires: just rust-build-release
+test-parity-generate-current:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    current_bin="mml2vgm-rs/target/release/mml2vgm-rs"
+    if [[ ! -x "$current_bin" ]]; then
+        echo "Missing Rust release binary: $current_bin"
+        echo "Build it first with: just rust-build-release"
+        exit 1
+    fi
+
+    mkdir -p tests/parity/current
+    # Must match the fixture list in test-parity-generate-reference.
+    samples=(
+        T0000_SongInfoDef
+        T0001_SongInfoDef2
+        T0100_YM2612_Ch
+    )
+    for base in "${samples[@]}"; do
+        gwi="/tmp/mml2vgm-csharp/mml2vgm/samples/test/${base}.gwi"
+        echo "Compiling (Rust current): $base"
+        "$current_bin" "$gwi" -o "tests/parity/current/${base}.vgm"
+        echo "  -> tests/parity/current/${base}.vgm"
+    done
+
+# Compare reference vs current VGM command sequences
+test-parity-compare:
+    node scripts/compare_vgm.mjs tests/parity/reference tests/parity/current
+
+# Full parity pass (assumes reference already exists)
+test-parity: test-parity-generate-current test-parity-compare
+
 # ============ UTILITY COMMANDS ============
 
 # Format all code

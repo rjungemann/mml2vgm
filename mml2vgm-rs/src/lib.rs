@@ -42,6 +42,28 @@ pub mod player;
 // Drivers module (external driver support)
 pub mod drivers;
 
+/// Declared implementation maturity for a chip or output format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SupportTier {
+    /// Implemented and intended to be usable today.
+    Full,
+    /// Implemented only on part of the pipeline or still missing behavior.
+    Partial,
+    /// Declared in APIs/docs but not implemented enough to rely on.
+    Declared,
+}
+
+impl std::fmt::Display for SupportTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SupportTier::Full => write!(f, "full"),
+            SupportTier::Partial => write!(f, "partial"),
+            SupportTier::Declared => write!(f, "declared"),
+        }
+    }
+}
+
 /// Supported output formats
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -56,14 +78,36 @@ pub enum OutputFormat {
     ZGM,
 }
 
+/// All output formats exposed by the public API.
+pub const ALL_OUTPUT_FORMATS: [OutputFormat; 4] = [
+    OutputFormat::VGM,
+    OutputFormat::XGM,
+    OutputFormat::XGM2,
+    OutputFormat::ZGM,
+];
+
+impl OutputFormat {
+    /// Get the file extension used for this format.
+    pub fn extension(&self) -> &'static str {
+        match self {
+            OutputFormat::VGM => "vgm",
+            OutputFormat::XGM => "xgm",
+            OutputFormat::XGM2 => "xgm2",
+            OutputFormat::ZGM => "zgm",
+        }
+    }
+
+    /// Get the current implementation maturity for this format.
+    pub fn support_tier(&self) -> SupportTier {
+        match self {
+            OutputFormat::VGM | OutputFormat::XGM | OutputFormat::XGM2 | OutputFormat::ZGM => SupportTier::Partial,
+        }
+    }
+}
+
 impl std::fmt::Display for OutputFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OutputFormat::VGM => write!(f, "vgm"),
-            OutputFormat::XGM => write!(f, "xgm"),
-            OutputFormat::XGM2 => write!(f, "xgm2"),
-            OutputFormat::ZGM => write!(f, "zgm"),
-        }
+        write!(f, "{}", self.extension())
     }
 }
 
@@ -149,6 +193,41 @@ pub enum SoundChip {
     // Special
     CONDUCTOR,
 }
+
+/// All sound chips exposed by the public API.
+pub const ALL_SOUND_CHIPS: [SoundChip; 31] = [
+    SoundChip::YM2612,
+    SoundChip::YM2612X,
+    SoundChip::YM2612X2,
+    SoundChip::SN76489,
+    SoundChip::SN76489X2,
+    SoundChip::YM2608,
+    SoundChip::YM2609,
+    SoundChip::YM2610B,
+    SoundChip::YM2151,
+    SoundChip::YM3526,
+    SoundChip::Y8950,
+    SoundChip::YM3812,
+    SoundChip::YMF262,
+    SoundChip::YM2413,
+    SoundChip::YM2203,
+    SoundChip::RF5C164,
+    SoundChip::SegaPCM,
+    SoundChip::HuC6280,
+    SoundChip::C140,
+    SoundChip::C352,
+    SoundChip::AY8910,
+    SoundChip::K051649,
+    SoundChip::K053260,
+    SoundChip::K054539,
+    SoundChip::QSound,
+    SoundChip::NES,
+    SoundChip::DMG,
+    SoundChip::VRC6,
+    SoundChip::POKEY,
+    SoundChip::MIDI,
+    SoundChip::CONDUCTOR,
+];
 
 impl SoundChip {
     /// Get the chip name as a string
@@ -254,6 +333,30 @@ impl SoundChip {
                 | SoundChip::QSound | SoundChip::Y8950
         )
     }
+
+    /// Get the current implementation maturity for this chip.
+    pub fn support_tier(&self) -> SupportTier {
+        match self {
+            SoundChip::YM2612 | SoundChip::SN76489 => SupportTier::Full,
+            SoundChip::YM2608
+            | SoundChip::YM2151
+            | SoundChip::RF5C164
+            | SoundChip::YM2203
+            | SoundChip::YM3526
+            | SoundChip::Y8950
+            | SoundChip::YM3812
+            | SoundChip::YMF262
+            | SoundChip::SegaPCM
+            | SoundChip::C140
+            | SoundChip::C352 => SupportTier::Partial,
+            _ => SupportTier::Declared,
+        }
+    }
+
+    /// Whether this chip is currently safe as a Browser IDE default compile target.
+    pub fn browser_compile_default(&self) -> bool {
+        matches!(self, SoundChip::YM2608 | SoundChip::SN76489)
+    }
 }
 
 impl std::fmt::Display for SoundChip {
@@ -271,8 +374,14 @@ impl std::str::FromStr for SoundChip {
         // Try to match by various name formats
         if s_upper == "YM2612" || s_upper == "OPN2" {
             Ok(SoundChip::YM2612)
+        } else if s_upper == "YM2612X" {
+            Ok(SoundChip::YM2612X)
+        } else if s_upper == "YM2612X2" {
+            Ok(SoundChip::YM2612X2)
         } else if s_upper == "SN76489" || s_upper == "DCSG" {
             Ok(SoundChip::SN76489)
+        } else if s_upper == "SN76489X2" {
+            Ok(SoundChip::SN76489X2)
         } else if s_upper == "YM2608" || s_upper == "OPNA" {
             Ok(SoundChip::YM2608)
         } else if s_upper == "YM2609" || s_upper == "OPNA2" {
@@ -283,6 +392,8 @@ impl std::str::FromStr for SoundChip {
             Ok(SoundChip::YM2151)
         } else if s_upper == "YM3526" || s_upper == "OPL" {
             Ok(SoundChip::YM3526)
+        } else if s_upper == "Y8950" {
+            Ok(SoundChip::Y8950)
         } else if s_upper == "YM3812" || s_upper == "OPL2" {
             Ok(SoundChip::YM3812)
         } else if s_upper == "YMF262" || s_upper == "OPL3" {
@@ -295,6 +406,34 @@ impl std::str::FromStr for SoundChip {
             Ok(SoundChip::RF5C164)
         } else if s_upper == "SEGAPCM" {
             Ok(SoundChip::SegaPCM)
+        } else if s_upper == "HUC6280" {
+            Ok(SoundChip::HuC6280)
+        } else if s_upper == "C140" {
+            Ok(SoundChip::C140)
+        } else if s_upper == "C352" {
+            Ok(SoundChip::C352)
+        } else if s_upper == "AY8910" {
+            Ok(SoundChip::AY8910)
+        } else if s_upper == "K051649" {
+            Ok(SoundChip::K051649)
+        } else if s_upper == "K053260" {
+            Ok(SoundChip::K053260)
+        } else if s_upper == "K054539" {
+            Ok(SoundChip::K054539)
+        } else if s_upper == "QSOUND" {
+            Ok(SoundChip::QSound)
+        } else if s_upper == "NES" || s_upper == "NESAPU" {
+            Ok(SoundChip::NES)
+        } else if s_upper == "DMG" {
+            Ok(SoundChip::DMG)
+        } else if s_upper == "VRC6" {
+            Ok(SoundChip::VRC6)
+        } else if s_upper == "POKEY" {
+            Ok(SoundChip::POKEY)
+        } else if s_upper == "MIDI" {
+            Ok(SoundChip::MIDI)
+        } else if s_upper == "CONDUCTOR" {
+            Ok(SoundChip::CONDUCTOR)
         } else {
             Err(MmlError::UnsupportedChip(s.to_string()))
         }
@@ -577,6 +716,8 @@ mod tests {
         assert_eq!("OPN2".parse::<SoundChip>().unwrap(), SoundChip::YM2612);
         assert_eq!("SN76489".parse::<SoundChip>().unwrap(), SoundChip::SN76489);
         assert_eq!("DCSG".parse::<SoundChip>().unwrap(), SoundChip::SN76489);
+        assert_eq!("AY8910".parse::<SoundChip>().unwrap(), SoundChip::AY8910);
+        assert_eq!("CONDUCTOR".parse::<SoundChip>().unwrap(), SoundChip::CONDUCTOR);
     }
 
     #[test]
@@ -597,6 +738,15 @@ mod tests {
         assert_eq!("xgm".parse::<OutputFormat>().unwrap(), OutputFormat::XGM);
         assert_eq!("xgm2".parse::<OutputFormat>().unwrap(), OutputFormat::XGM2);
         assert_eq!("zgm".parse::<OutputFormat>().unwrap(), OutputFormat::ZGM);
+    }
+
+    #[test]
+    fn test_support_tiers() {
+        assert_eq!(OutputFormat::VGM.support_tier(), SupportTier::Partial);
+        assert_eq!(OutputFormat::XGM2.support_tier(), SupportTier::Partial);
+        assert_eq!(SoundChip::YM2612.support_tier(), SupportTier::Full);
+        assert_eq!(SoundChip::YM2608.support_tier(), SupportTier::Partial);
+        assert_eq!(SoundChip::AY8910.support_tier(), SupportTier::Declared);
     }
 
     #[test]

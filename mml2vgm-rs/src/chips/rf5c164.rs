@@ -184,6 +184,13 @@ impl SoundChipEmulator for RF5C164 {
         self.regs[addr as usize]
     }
 
+    fn load_pcm_data(&mut self, block_type: u8, data: &[u8]) {
+        if block_type == 0x02 {
+            let len = data.len().min(self.pcm_memory.len());
+            self.pcm_memory[..len].copy_from_slice(&data[..len]);
+        }
+    }
+
     fn clock(&mut self) {
         // Update all channels
         for ch in &mut self.channels {

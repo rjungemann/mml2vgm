@@ -5,14 +5,12 @@ import { audioService, type AudioRuntimeDebugInfo } from '@/services/audioServic
 import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
 import { formatService } from '@/services/formatService';
-import { scriptService } from '@/services/scriptService';
 import { storageService, registerServiceWorker } from '@/services/storageService';
 import { i18nService } from '@/services/i18nService';
-import { fileService } from '@/services/fileService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
-import type { PanelType, Position, MMLLanguage } from '@/types';
+import type { ChipInfo, PanelType, Position } from '@/types';
 import MonacoEditor from '@/components/Editor/MonacoEditor';
 import StatusBar from '@/components/StatusBar';
 import MenuBar from '@/components/MenuBar';
@@ -27,20 +25,36 @@ import LyricsPanel from '@/components/panels/LyricsPanel';
 import MixerPanel from '@/components/panels/MixerPanel';
 import MIDIKeyboardPanel from '@/components/panels/MIDIKeyboardPanel';
 import DebugPanel from '@/components/panels/DebugPanel';
-import AudioWaveformView from '@/components/AudioWaveformView';
+import RuntimePanel from '@/components/panels/RuntimePanel';
+import CompilationPanel from '@/components/panels/CompilationPanel';
+import WaveformPanel from '@/components/panels/WaveformPanel';
 import { TabBar } from '@/components/TabBar';
+import BottomTabs, { type BottomTab } from '@/components/BottomTabs';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 export const App: React.FC = () => {
+  const MIN_SIDEBAR_WIDTH = 180;
+  const MAX_SIDEBAR_WIDTH = 640;
+  const MIN_BOTTOM_PANE_HEIGHT = 120;
   const [isWasmReady, setIsWasmReady] = useState(false);
   const [wasmError, setWasmError] = useState<string | null>(null);
   const [runtimeFeedback, setRuntimeFeedback] = useState<string | null>(null);
   const [defaultCompileOptions, setDefaultCompileOptions] = useState<any>(null);
-  const [showRuntimeDebug, setShowRuntimeDebug] = useState(false);
+  const [supportedChipInfo, setSupportedChipInfo] = useState<ChipInfo[]>([]);
   const [audioRuntimeDebug, setAudioRuntimeDebug] = useState<AudioRuntimeDebugInfo>(
     audioService.getRuntimeDebugInfo()
   );
   const [waveformSamples, setWaveformSamples] = useState<number[]>(() => Array.from(audioService.getWaveformSnapshot(512)));
+  const [activeBottomTab, setActiveBottomTab] = useSessionStorageState<string>('mml2vgm:activeBottomTab', 'output');
+  const [bottomPaneMinimized, setBottomPaneMinimized] = useSessionStorageState<boolean>('mml2vgm:bottomPaneMinimized', false);
+  const [bottomPaneHeight, setBottomPaneHeight] = useSessionStorageState<number>('mml2vgm:bottomPaneHeight', 200);
+  const [isSidebarVisible, setIsSidebarVisible] = useSessionStorageState<boolean>('mml2vgm:isSidebarVisible', true);
+  const [sidebarWidth, setSidebarWidth] = useSessionStorageState<number>('mml2vgm:sidebarWidth', 250);
   const wasmInitialized = useRef(false);
+  const sidebarContainerRef = useRef<HTMLDivElement | null>(null);
+  const bottomPanelRef = useRef<HTMLDivElement | null>(null);
+  const suppressSidebarToggleClickRef = useRef(false);
+  const suppressBottomToggleClickRef = useRef(false);
 
   // Document store
   const { documents, activeDocumentId, createDocument, setActiveDocument, closeDocument, closeAllDocuments } = useDocumentStore(
@@ -99,9 +113,13 @@ export const App: React.FC = () => {
   };
 
   const getBrowserTargetChips = useCallback(() => {
-    // Current VGM codegen path still relies on PSG writes for many browser samples.
-    return ['ym2608', 'sn76489'];
-  }, []);
+    const browserDefaultTargets = supportedChipInfo
+      .filter((chip) => chip.browserCompileDefault)
+      .map((chip) => chip.variant.toLowerCase());
+
+    // Fall back to the known-safe pair until support metadata has loaded.
+    return browserDefaultTargets.length > 0 ? browserDefaultTargets : ['ym2608', 'sn76489'];
+  }, [supportedChipInfo]);
 
   // Compile store
   const { compile, cancel, status, getResult, progress, progressMessage, lastCompileTimingSummary } = useCompileStore(
@@ -153,6 +171,7 @@ export const App: React.FC = () => {
         i18nService.init().catch(e => console.warn('i18n init failed:', e)),
         registerServiceWorker().catch(e => console.warn('SW registration failed:', e)),
         wasmService.getDefaultCompileOptions().then(opts => setDefaultCompileOptions(opts)).catch(e => console.warn('Failed to get default compile options:', e)),
+        wasmService.getSupportedChips().then(chips => setSupportedChipInfo(chips)).catch(e => console.warn('Failed to get supported chips:', e)),
         // Pre-warm workers for better UX (compilation won't block UI)
         (async () => {
           try {
@@ -200,11 +219,10 @@ export const App: React.FC = () => {
   }, [createDocument]);
 
   // Get document store setters for file operations
-  const { updateDocumentContent, updateDocumentFilename, updateDocumentLanguage } = useDocumentStore(
+  const { updateDocumentContent, updateDocumentFilename } = useDocumentStore(
     useShallow((state) => ({
       updateDocumentContent: state.updateDocumentContent,
       updateDocumentFilename: state.updateDocumentFilename,
-      updateDocumentLanguage: state.updateDocumentLanguage,
     }))
   );
 
@@ -240,10 +258,10 @@ export const App: React.FC = () => {
       return file.text().then((content) => {
         // Detect format from filename
         const detectedFormat = formatService.detectFromExtension(file.name);
-        const docId = createDocument(detectedFormat || 'gwi');
-        updateDocumentContent(docId, content);
-        updateDocumentFilename(docId, file.name);
-        setActiveDocument(docId);
+        const doc = createDocument(detectedFormat || 'gwi');
+        updateDocumentContent(doc.id, content);
+        updateDocumentFilename(doc.id, file.name);
+        setActiveDocument(doc.id);
       });
     }).catch((error: any) => {
       console.error('Failed to open file:', error);
@@ -432,6 +450,98 @@ export const App: React.FC = () => {
     });
   }, [settings, setSettings]);
 
+  const handleToggleSidebar = useCallback(() => {
+    if (suppressSidebarToggleClickRef.current) {
+      suppressSidebarToggleClickRef.current = false;
+      return;
+    }
+    setIsSidebarVisible((prev) => !prev);
+  }, [setIsSidebarVisible]);
+
+  const handleSidebarResizeStart = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+
+    const containerRight = sidebarContainerRef.current?.getBoundingClientRect().right ?? window.innerWidth;
+    const startX = event.clientX;
+    let moved = false;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const dragDistance = Math.abs(moveEvent.clientX - startX);
+      if (dragDistance > 3) {
+        moved = true;
+      }
+
+      const nextWidth = Math.round(containerRight - moveEvent.clientX);
+      const clamped = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, nextWidth));
+      setSidebarWidth(clamped);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      if (moved) {
+        suppressSidebarToggleClickRef.current = true;
+      }
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [setSidebarWidth]);
+
+  const handleBottomPaneToggle = useCallback(() => {
+    if (suppressBottomToggleClickRef.current) {
+      suppressBottomToggleClickRef.current = false;
+      return;
+    }
+
+    setBottomPaneMinimized((prev) => !prev);
+  }, [setBottomPaneMinimized]);
+
+  const handleBottomPaneResizeStart = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+
+    if (bottomPaneMinimized) {
+      setBottomPaneMinimized(false);
+    }
+
+    const panelBottom = bottomPanelRef.current?.getBoundingClientRect().bottom ?? window.innerHeight;
+    const startY = event.clientY;
+    let moved = false;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const dragDistance = Math.abs(moveEvent.clientY - startY);
+      if (dragDistance > 3) {
+        moved = true;
+      }
+
+      const maxBottomPaneHeight = Math.max(MIN_BOTTOM_PANE_HEIGHT + 40, Math.floor(window.innerHeight * 0.7));
+      const nextHeight = Math.round(panelBottom - moveEvent.clientY);
+      const clamped = Math.max(MIN_BOTTOM_PANE_HEIGHT, Math.min(maxBottomPaneHeight, nextHeight));
+      setBottomPaneHeight(clamped);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      if (moved) {
+        suppressBottomToggleClickRef.current = true;
+      }
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [bottomPaneMinimized, setBottomPaneHeight, setBottomPaneMinimized]);
+
   // Trace state
   const [traceStatus, setTraceStatus] = useState(traceService.getStatus());
 
@@ -494,6 +604,12 @@ export const App: React.FC = () => {
         return <MIDIKeyboardPanel />;
       case 'debug':
         return <DebugPanel />;
+      case 'runtime':
+        return <RuntimePanel audioRuntimeDebug={audioRuntimeDebug} />;
+      case 'compilation':
+        return <CompilationPanel />;
+      case 'waveform':
+        return <WaveformPanel waveformSamples={waveformSamples} />;
       case 'script':
         return (
           <ScriptPanel
@@ -505,22 +621,18 @@ export const App: React.FC = () => {
       default:
         return null;
     }
-  }, [compiledData, handleNavigateToError, activeDocumentId, activeDoc]);
+  }, [compiledData, handleNavigateToError, activeDocumentId, activeDoc, audioRuntimeDebug, waveformSamples]);
 
   // Get panels for right sidebar (positioned right)
   const allPanelTypes: PanelType[] = [
     'folder', 'folderTree', 'partCounter', 'errorList', 'log', 'lyrics', 
-    'mixer', 'midiKeyboard', 'debug', 'playback', 'compileOptions', 'info', 'script'
+    'mixer', 'midiKeyboard', 'debug', 'playback', 'compileOptions', 'info', 'script',
+    'runtime', 'compilation', 'waveform'
   ];
   
   const rightSidebarPanelTypes: PanelType[] = allPanelTypes.filter(
     (p) => settings.panelPositions[p] === 'right' && settings.panelVisibility[p]
   );
-
-  // Get panel for bottom (positioned bottom)
-  const bottomPanelType: PanelType | null = allPanelTypes.find(
-    (p) => settings.panelPositions[p] === 'bottom' && settings.panelVisibility[p]
-  ) || null;
 
   // Loading state
   if (!isWasmReady && !wasmError) {
@@ -555,8 +667,34 @@ export const App: React.FC = () => {
     <React.Fragment key={p}>{renderPanel(p)}</React.Fragment>
   ));
 
-  // Bottom panel
-  const bottomPanel = bottomPanelType ? renderPanel(bottomPanelType) : null;
+  // Bottom tabs
+  const bottomTabs: BottomTab[] = [
+    {
+      id: 'output',
+      label: 'Output',
+      content: <ErrorListPanel onNavigateToPosition={handleNavigateToError} />,
+    },
+    {
+      id: 'runtime',
+      label: 'Runtime',
+      content: <RuntimePanel audioRuntimeDebug={audioRuntimeDebug} />,
+    },
+    {
+      id: 'compilation',
+      label: 'Info',
+      content: (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+          <CompilationPanel />
+          <InfoPanel />
+        </div>
+      ),
+    },
+    {
+      id: 'waveform',
+      label: 'Waveform',
+      content: <WaveformPanel waveformSamples={waveformSamples} />,
+    },
+  ];
 
   return (
     <div className="app-container" data-theme={settings.theme}>
@@ -575,6 +713,8 @@ export const App: React.FC = () => {
         onCloseDocument={handleCloseActiveDocument}
         onCloseAllDocuments={handleCloseAllDocuments}
         onToggleTheme={handleToggleTheme}
+        onToggleSidebar={handleToggleSidebar}
+        isSidebarVisible={isSidebarVisible}
         onCompile={handleCompile}
         onCompileAndPlay={handleCompileAndPlay}
         onPlay={handlePlay}
@@ -612,70 +752,6 @@ export const App: React.FC = () => {
           {runtimeFeedback}
         </div>
       )}
-
-      <div
-        style={{
-          margin: '0 8px 8px',
-          border: '1px solid var(--border-color)',
-          borderRadius: '4px',
-          background: 'var(--bg-tertiary)',
-          fontSize: '12px',
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setShowRuntimeDebug((v) => !v)}
-          style={{
-            width: '100%',
-            textAlign: 'left',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            padding: '8px 10px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 600,
-          }}
-        >
-          Runtime Debug {showRuntimeDebug ? '▼' : '▶'}
-        </button>
-
-        {showRuntimeDebug && (
-          <div
-            style={{
-              padding: '8px 10px 10px',
-              borderTop: '1px solid var(--border-color)',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '6px 12px',
-              color: 'var(--text-primary)',
-            }}
-          >
-            <div>Compile bytes: {activeCompileResult?.data?.length || 0}</div>
-            <div>Compile parts: {activeCompileResult?.partCount || 0}</div>
-            <div>Compile commands: {activeCompileResult?.commandCount || 0}</div>
-            <div>Compile chips: {(activeCompileResult?.chipsUsed || []).join(', ') || '(none)'}</div>
-
-            <div>Audio playing: {audioRuntimeDebug.isPlaying ? 'yes' : 'no'}</div>
-            <div>Audio paused: {audioRuntimeDebug.isPaused ? 'yes' : 'no'}</div>
-            <div>VGM bytes loaded: {audioRuntimeDebug.vgmDataLength}</div>
-            <div>Parsed VGM commands: {audioRuntimeDebug.parsedCommandCount}</div>
-            <div>Commands applied: {audioRuntimeDebug.appliedWriteCount}</div>
-            <div>Commands skipped: {audioRuntimeDebug.skippedWriteCount}</div>
-            <div>Pending commands: {audioRuntimeDebug.pendingCommandCount}</div>
-            <div>Buffers generated: {audioRuntimeDebug.generatedBufferCount}</div>
-            <div>Silent buffer streak: {audioRuntimeDebug.silentBufferCount}</div>
-            <div>Last peak: {audioRuntimeDebug.lastPeak.toExponential(3)}</div>
-            <div>Silence warning emitted: {audioRuntimeDebug.emittedSilenceWarning ? 'yes' : 'no'}</div>
-            <div>Playback chips: {audioRuntimeDebug.chips.join(', ') || '(none)'}</div>
-
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ marginBottom: 6, fontWeight: 600 }}>Waveform</div>
-              <AudioWaveformView samples={waveformSamples} />
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Main Layout */}
       <div className="main-layout">
@@ -717,29 +793,53 @@ export const App: React.FC = () => {
           </div>
 
           {/* Bottom Panel (left/editor side) */}
-          {bottomPanel && (
-            <div className="bottom-panel">
-              <div className="bottom-panel-header">
-                <span className="panel-title">
-                  {bottomPanelType === 'errorList' ? 'Errors' :
-                   bottomPanelType === 'info' ? 'Information' :
-                   bottomPanelType === 'log' ? 'Output Log' :
-                   'Output'}
-                </span>
-              </div>
-              <div className="bottom-panel-content">
-                {bottomPanel}
-              </div>
-              <div className="bottom-panel-resizer" />
-            </div>
-          )}
+          <div
+            className={`bottom-panel-wrapper ${bottomPaneMinimized ? 'minimized' : ''}`}
+            ref={bottomPanelRef}
+            style={{ height: bottomPaneMinimized ? '28px' : `${bottomPaneHeight}px` }}
+          >
+            <button
+              type="button"
+              className="bottom-panel-resizer"
+              onMouseDown={handleBottomPaneResizeStart}
+              onClick={handleBottomPaneToggle}
+              aria-label={bottomPaneMinimized ? 'Expand bottom panel' : 'Collapse bottom panel'}
+              title={bottomPaneMinimized ? 'Drag to resize, click to expand' : 'Drag to resize, click to collapse'}
+            />
+            <BottomTabs
+              tabs={bottomTabs}
+              activeTabId={activeBottomTab}
+              onTabClick={setActiveBottomTab}
+              isMinimized={bottomPaneMinimized}
+              onMinimize={() => setBottomPaneMinimized(true)}
+              onMaximize={() => setBottomPaneMinimized(false)}
+            />
+          </div>
         </div>
 
         {/* Right Sidebar */}
-        {rightSidebarPanels.length > 0 && (
-          <div className="panel-container">
+        {isSidebarVisible && rightSidebarPanels.length > 0 && (
+          <div className="panel-container" ref={sidebarContainerRef} style={{ width: `${sidebarWidth}px` }}>
+            <button
+              type="button"
+              className="sidebar-border-toggle"
+              onMouseDown={handleSidebarResizeStart}
+              onClick={handleToggleSidebar}
+              aria-label="Hide sidebar"
+              title="Drag to resize, click to hide sidebar"
+            />
             {rightSidebarPanels}
           </div>
+        )}
+
+        {!isSidebarVisible && rightSidebarPanels.length > 0 && (
+          <button
+            type="button"
+            className="sidebar-border-toggle sidebar-border-toggle--collapsed"
+            onClick={handleToggleSidebar}
+            aria-label="Show sidebar"
+            title="Show sidebar"
+          />
         )}
       </div>
 
@@ -750,10 +850,7 @@ export const App: React.FC = () => {
         progress={progress}
         progressMessage={progressMessage}
         lastCompileTimingSummary={lastCompileTimingSummary}
-        waveformSamples={waveformSamples}
         isAudioPlaying={audioRuntimeDebug.isPlaying}
-        onToggleRuntimeDebug={() => setShowRuntimeDebug((v) => !v)}
-        runtimeDebugVisible={showRuntimeDebug}
       />
     </div>
   );

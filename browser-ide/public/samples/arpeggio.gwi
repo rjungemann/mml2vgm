@@ -1,16 +1,42 @@
-; mml2vgm Browser IDE - Arpeggio Sample
-; Demonstrates arpeggios and chords
+'{
 
-@OPNA
+    TitleName   = Arpeggio
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
 
-; Part 0: Arpeggio pattern
-@0 v100 l16 o4
-@0 c e g c e g c2. >c e g c e g c2.
+    PartYM2612  = A
+    PartSN76489 = B
 
-; Part 1: Bass line
-@1 v80 l8 o2
-@1 c2. d2. e2. f2. g2. a2. b2. >c2.
+}
 
-; Part 2: SSG accent
-@2 v90 l16 o5
-@2 c4 c4 c4 c4 sn8 c4 c4 c4 c4 sn8
+; FM instrument 0 — bright pluck tone
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,002,000,000,000
+'@ 031,015,000,007,001,000,000,004,000,000,000
+'@ 004,006
+
+; YM2612 channels A1–A3 play the three voices of an arpeggio chord
+; All three channels share tempo but carry independent note sequences
+'A1 T120
+'A2 T120
+'A3 T120
+
+; Root — C arpeggio ascending
+'A1 @0 v100 l16 o4 cegcegceg>ceg<
+
+; Third — E arpeggio one beat offset
+'A2 @0 v90 l16 o4 reg r egre g r eg r e
+
+; Fifth — G sustained pedal with octave bounce
+'A3 @0 v80 l4 o3 g2 >g2 g2 >g2
+
+; SN76489 bass — root notes held
+'B1 T120
+
+'B1 v80 l1 o1 c g f c

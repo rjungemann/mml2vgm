@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Document, MMLLanguage, CompileError } from '@/types';
 import { formatService, getFormatFromExtension } from '@/services/formatService';
 
@@ -275,6 +275,7 @@ export const useDocumentStore = create<DocumentStore>()(
         }),
         {
             name: 'mml2vgm-document-store',
+            storage: createJSONStorage(() => sessionStorage),
             partialize: (state) => ({
                 documents: Array.from(state.documents.entries()),
                 activeDocumentId: state.activeDocumentId,

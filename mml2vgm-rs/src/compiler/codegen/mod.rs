@@ -243,6 +243,56 @@ mod tests {
         // XGM header
         assert!(result.len() >= 0x20);
         assert_eq!(&result[0..4], [b'X', b'G', b'M', b' ']);
+        assert_eq!(&result[result.len() - 4..], &[0x0f, 0xff, 0xff, 0xff]);
+    }
+
+    #[test]
+    fn test_xgm_generator_with_note_payload() {
+        let mut ast = MmlAst::new();
+        let mut note = Note::new('C', 0, 4);
+        note.duration = Some(240);
+
+        let part = PartDefinition {
+            name: "FM1".to_string(),
+            chip: Some("YM2612".to_string()),
+            tempo: Some(120),
+            commands: vec![MmlNode::Tempo(crate::compiler::ast::Tempo { bpm: 120 }), MmlNode::Note(note)],
+        };
+
+        ast.parts.insert("FM1".to_string(), part);
+
+        let generator = xgm::XgmGenerator::from_ast(&ast, &CompileOptions::default()).unwrap();
+        let result = generator.generate().unwrap();
+
+        assert!(result.len() > 0x20);
+        assert!(result[0x20..].iter().any(|byte| (byte & 0xf0) == 0x30));
+        assert!(result[0x20..].iter().any(|byte| (byte & 0xf0) == 0x40));
+        assert!(result[0x20..].iter().any(|byte| *byte <= 0x0f));
+    }
+
+    #[test]
+    fn test_xgm2_generator_with_note_payload() {
+        let mut ast = MmlAst::new();
+        let mut note = Note::new('G', 0, 4);
+        note.duration = Some(180);
+
+        let part = PartDefinition {
+            name: "PSG1".to_string(),
+            chip: Some("SN76489".to_string()),
+            tempo: Some(120),
+            commands: vec![MmlNode::Note(note)],
+        };
+
+        ast.parts.insert("PSG1".to_string(), part);
+
+        let generator = xgm::Xgm2Generator::from_ast(&ast, &CompileOptions::default()).unwrap();
+        let result = generator.generate().unwrap();
+
+        assert!(result.len() > 0x20);
+        assert_eq!(&result[0..4], [b'X', b'G', b'M', b'2']);
+        assert!(result[0x20..].iter().any(|byte| (byte & 0xf0) == 0x10));
+        assert!(result[0x20..].iter().any(|byte| (byte & 0xf0) == 0x20));
+        assert_eq!(&result[result.len() - 4..], &[0x0f, 0xff, 0xff, 0xff]);
     }
 
     #[test]
@@ -256,5 +306,30 @@ mod tests {
         // ZGM header
         assert!(result.len() >= 0x40);
         assert_eq!(&result[0..4], [b'Z', b'G', b'M', b' ']);
+        assert!(result.windows(3).any(|window| window == b"Def"));
+        assert!(result.windows(3).any(|window| window == b"Trk"));
+    }
+
+    #[test]
+    fn test_zgm_generator_with_note_payload() {
+        let mut ast = MmlAst::new();
+        let mut note = Note::new('E', 0, 4);
+        note.duration = Some(120);
+
+        let part = PartDefinition {
+            name: "A1".to_string(),
+            chip: Some("SN76489".to_string()),
+            tempo: Some(150),
+            commands: vec![MmlNode::Note(note), MmlNode::Rest(Rest { duration: 60, dotted: false })],
+        };
+
+        ast.parts.insert("A1".to_string(), part);
+
+        let generator = zgm::ZgmGenerator::from_ast(&ast, &CompileOptions::default()).unwrap();
+        let result = generator.generate().unwrap();
+
+        assert!(result.len() > 0x40);
+        assert!(result.windows(2).any(|window| window == b"A1"));
+        assert!(result.contains(&0x10));
     }
 }

@@ -1,25 +1,48 @@
 //! PCM data handling utilities
-//!
-//! Implementation will be done in Phase 5.
 
 use crate::MmlResult;
 
-/// PCM format
+/// PCM sample format
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PcmFormat {
-    /// 8-bit unsigned PCM
     U8,
-    /// 8-bit signed PCM
     S8,
-    /// 16-bit little-endian signed PCM
     S16LE,
-    /// 16-bit big-endian signed PCM
     S16BE,
-    /// 32-bit float PCM
     F32,
 }
 
-/// Convert PCM data between formats
-pub fn convert_pcm(_data: &[u8], _from: PcmFormat, _to: PcmFormat) -> MmlResult<Vec<u8>> {
-    unimplemented!("PCM conversion not yet implemented")
+/// Convert PCM data between formats.
+pub fn convert_pcm(data: &[u8], from: PcmFormat, to: PcmFormat) -> MmlResult<Vec<u8>> {
+    use PcmFormat::*;
+    if from == to {
+        return Ok(data.to_vec());
+    }
+    match (from, to) {
+        (U8, S16LE) => Ok(data.iter()
+            .flat_map(|&b| { let s = ((b as i16) - 128) * 256; s.to_le_bytes() })
+            .collect()),
+        (S8, S16LE) => Ok(data.iter()
+            .flat_map(|&b| { let s = (b as i8) as i16 * 256; s.to_le_bytes() })
+            .collect()),
+        (S16BE, S16LE) => Ok(data.chunks_exact(2)
+            .flat_map(|c| i16::from_be_bytes([c[0], c[1]]).to_le_bytes())
+            .collect()),
+        (S16LE, S16BE) => Ok(data.chunks_exact(2)
+            .flat_map(|c| i16::from_le_bytes([c[0], c[1]]).to_be_bytes())
+            .collect()),
+        (F32, S16LE) => Ok(data.chunks_exact(4)
+            .flat_map(|c| {
+                let f = f32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                let s = (f.clamp(-1.0, 1.0) * 32767.0) as i16;
+                s.to_le_bytes()
+            })
+            .collect()),
+        (S16LE, F32) => Ok(data.chunks_exact(2)
+            .flat_map(|c| (i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).to_le_bytes())
+            .collect()),
+        _ => Err(crate::MmlError::Compilation(format!(
+            "Unsupported PCM conversion: {:?} -> {:?}", from, to
+        ))),
+    }
 }

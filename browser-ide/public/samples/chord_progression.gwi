@@ -1,16 +1,47 @@
-; mml2vgm Browser IDE - Chord Progression Sample
-; Demonstrates chord playing with multiple parts
+'{
 
-@OPNA
+    TitleName   = Chord Progression
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
 
-@0 v100 l4 o4
-@0 c e g a2. >c e g a2.
+    PartYM2612  = A
+    PartSN76489 = B
 
-@1 v80 l2 o3
-@1 c e g c e g f a c f a c
+}
 
-@2 v90 l4 o2
-@2 c2. g2. f2. c2.
+; FM instrument 0 — warm organ tone (algorithm 7)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,007,000,005,001,000,000,001,000,000,000
+'@ 031,007,000,005,001,000,000,001,000,000,000
+'@ 031,007,000,005,001,000,000,001,000,000,000
+'@ 031,007,000,005,001,000,000,001,000,000,000
+'@ 007,000
 
-@3 v70 l8 o4
-@3 c e g c e g c2 c e g c e g c2
+; I–V–IV–I chord progression in C major
+; A1 carries the melody, A2–A4 carry chord voices
+'A1 T96
+'A2 T96
+'A3 T96
+'A4 T96
+
+; Melody line — scalar run over the chords
+'A1 @0 v110 l4 o5 c2 b a g | e2 d c2. r |
+'A1 @0 l4 o5 f2 e d c | c2. r c2. r
+
+; Chord voice 1 — thirds
+'A2 @0 v80 l1 o4 c g f c
+
+; Chord voice 2 — fifths
+'A3 @0 v70 l1 o4 e >d< a e
+
+; Chord voice 3 — octave doubling
+'A4 @0 v60 l1 o3 g >b a g
+
+; SN76489 bass — root notes
+'B1 T96
+
+'B1 v90 l1 o2 c g f c

@@ -1,16 +1,4 @@
 //! Sound chip emulation module
-//!
-//! This module contains emulation implementations for various sound chips.
-//! It provides a unified interface through the `SoundChip` trait for writing
-//! to chip registers and generating audio samples.
-//!
-//! # Architecture
-//!
-//! Each sound chip has:
-//! - A struct representing its internal state
-//! - Implementation of the `SoundChip` trait
-//! - Register-level emulation
-//! - Sample generation
 
 pub mod ym2612;
 pub mod sn76489;
@@ -29,48 +17,20 @@ pub mod c352;
 use crate::{MmlError, MmlResult};
 
 /// Trait for all sound chips
-///
-/// This trait provides a common interface for all supported sound chips,
-/// allowing the player to work with any chip through the same interface.
 pub trait SoundChipEmulator {
-    /// Get the chip name
     fn name(&self) -> &'static str;
-
-    /// Get the default clock rate in Hz
     fn clock_rate(&self) -> u32;
-
-    /// Reset the chip to power-on state
     fn reset(&mut self);
-
-    /// Write to a chip register
     fn write(&mut self, addr: u8, data: u8);
-
-    /// Read from a chip register (returns 0xFF if not supported)
-    fn read(&self, addr: u8) -> u8 {
-        0xFF
-    }
-
-    /// Advance the chip state by one clock cycle
+    fn read(&self, addr: u8) -> u8 { 0xFF }
     fn clock(&mut self);
-
-    /// Generate audio samples
-    /// 
-    /// Fills the provided buffer with interleaved stereo samples.
-    /// Each sample should be in the range [-1.0, 1.0].
-    /// The number of samples generated is buffer.len() / 2 (stereo).
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32);
-
-    /// Write to a chip register with explicit port selection.
-    /// Port 0 = first register bank, Port 1 = second register bank (e.g. YM2608 ch4-6).
     fn write_port(&mut self, port: u8, addr: u8, data: u8) {
         let _ = port;
         self.write(addr, data);
     }
-
-    /// Check if the chip has been initialized
-    fn is_initialized(&self) -> bool {
-        true
-    }
+    fn is_initialized(&self) -> bool { true }
+    fn load_pcm_data(&mut self, _block_type: u8, _data: &[u8]) {}
 }
 
 /// Clock the chip for a specific number of cycles

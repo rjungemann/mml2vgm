@@ -144,6 +144,13 @@ impl SoundChipEmulator for SegaPCM {
         self.regs[addr as usize]
     }
 
+    fn load_pcm_data(&mut self, block_type: u8, data: &[u8]) {
+        if block_type == 0x04 {
+            let len = data.len().min(self.pcm_memory.len());
+            self.pcm_memory[..len].copy_from_slice(&data[..len]);
+        }
+    }
+
     fn clock(&mut self) {
         for ch in &mut self.channels {
             if ch.active && ch.playback_rate > 0 {

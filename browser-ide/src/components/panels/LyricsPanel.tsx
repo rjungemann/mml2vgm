@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 interface LyricLine {
   text: string;
@@ -137,8 +138,8 @@ const LyricsPanel: React.FC<LyricsPanelProps> = ({
   // Use the provided currentTime, or fall back to internal state
   const [internalCurrentTime, setInternalCurrentTime] = React.useState(0);
   const displayTime = currentTime ?? internalCurrentTime;
-  const [fontSize, setFontSize] = React.useState(14);
-  const [isAutoScroll, setIsAutoScroll] = React.useState(true);
+  const [fontSize, setFontSize] = useSessionStorageState<number>('mml2vgm:lyrics:fontSize', 14);
+  const [isAutoScroll, setIsAutoScroll] = useSessionStorageState<boolean>('mml2vgm:lyrics:autoScroll', true);
 
   // No need for internal simulation when connected to audio player
 

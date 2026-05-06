@@ -24,6 +24,109 @@ This document outlines a plan for creating a cross-platform, command-line utilit
 
 ---
 
+## 2026-05 Legacy C# Parity Audit And Backlog
+
+This section converts the current parity audit into a concrete implementation backlog.
+The parity reference is the legacy C# snapshot at the parent of commit `e046b39`
+(where `mml2vgm/Core` and `mml2vgm/Corex64` still existed).
+
+### Research Summary
+
+- Legacy C# had explicit chip/format enums in `mml2vgm/Core/Enums.cs` including `VGM`, `XGM`, `XGM2`, `ZGM` and a wide chip list.
+- Legacy C# had dedicated format builders in `mml2vgm/Core/XGM2maker.cs` and `mml2vgm/Core/ZGMmaker.cs`.
+- Current Rust has broad declared enums, but compile/runtime coverage is narrower than declarations:
+  - format generators: [mml2vgm-rs/src/compiler/codegen/vgm.rs](../mml2vgm-rs/src/compiler/codegen/vgm.rs), [mml2vgm-rs/src/compiler/codegen/xgm.rs](../mml2vgm-rs/src/compiler/codegen/xgm.rs), [mml2vgm-rs/src/compiler/codegen/zgm.rs](../mml2vgm-rs/src/compiler/codegen/zgm.rs)
+  - runtime chip wiring: [mml2vgm-rs/src/player/chip_player.rs](../mml2vgm-rs/src/player/chip_player.rs)
+  - declared chips/formats: [mml2vgm-rs/src/lib.rs](../mml2vgm-rs/src/lib.rs)
+
+### Concrete Implementation Backlog
+
+#### Milestone A: Stabilize Declared Surface (1-2 weeks)
+
+1. Fix format extension mismatch for XGM2 in compiler output path.
+    - File: [mml2vgm-rs/src/compiler/compiler.rs](../mml2vgm-rs/src/compiler/compiler.rs)
+    - Deliverable: `OutputFormat::XGM2` emits `.xgm2`.
+    - Acceptance: unit test asserts extension mapping for all formats.
+
+2. Add a support-tier model for chips and formats.
+    - Files: [mml2vgm-rs/src/lib.rs](../mml2vgm-rs/src/lib.rs), [mml2vgm-wasm/src/lib.rs](../mml2vgm-wasm/src/lib.rs), [mml2vgm-rs/src/main.rs](../mml2vgm-rs/src/main.rs)
+    - Deliverable: each chip/format labeled `full`, `partial`, or `declared`.
+    - Acceptance: CLI and WASM support listings expose tier and stay in sync.
+
+3. Align Browser IDE target chip defaults with real generator maturity.
+    - File: [browser-ide/src/App.tsx](../browser-ide/src/App.tsx)
+    - Deliverable: explicit gating by support tier.
+    - Acceptance: no default compile target claims unsupported end-to-end paths.
+
+#### Milestone B: Format Parity First (2-4 weeks)
+
+1. Complete XGM command stream generation.
+    - File: [mml2vgm-rs/src/compiler/codegen/xgm.rs](../mml2vgm-rs/src/compiler/codegen/xgm.rs)
+    - Scope: frame packing, loop handling, YM2612 + SN76489 command emission.
+    - Acceptance: golden tests vs fixture outputs; non-empty command blocks for melody/percussion samples.
+
+2. Complete XGM2 command stream and block metadata.
+    - File: [mml2vgm-rs/src/compiler/codegen/xgm.rs](../mml2vgm-rs/src/compiler/codegen/xgm.rs)
+    - Scope: FM/PSG block handling, wait/frame accounting, loop/jump metadata.
+    - Acceptance: fixture parity for representative songs and valid headers.
+
+3. Complete ZGM define/track division generation.
+    - File: [mml2vgm-rs/src/compiler/codegen/zgm.rs](../mml2vgm-rs/src/compiler/codegen/zgm.rs)
+    - Scope: define records per used chip, command ID allocation, track payload serialization.
+    - Acceptance: generated ZGM contains populated define/track data and passes parser sanity checks.
+
+#### Milestone C: VGM Multi-Chip Codegen (2-3 weeks)
+
+1. Expand VGM codegen from PSG-first path to multi-chip register emission.
+    - File: [mml2vgm-rs/src/compiler/codegen/vgm.rs](../mml2vgm-rs/src/compiler/codegen/vgm.rs)
+    - Priority chips: YM2608, YM2151, YM2203, YM3812, YM3526, Y8950, YMF262.
+    - Acceptance: register writes emitted for selected chips from MML parts and audible playback in chip player.
+
+2. Add regression tests per chip write family.
+    - Files: [mml2vgm-rs/tests](../mml2vgm-rs/tests), [browser-ide/src/test/__tests__](../browser-ide/src/test/__tests__)
+    - Acceptance: per-chip smoke cases assert non-silent sustained playback.
+
+#### Milestone D: Runtime Chip Coverage Parity (4-8 weeks)
+
+1. Implement runtime wiring for chips already declared but currently not added in player.
+    - File: [mml2vgm-rs/src/player/chip_player.rs](../mml2vgm-rs/src/player/chip_player.rs)
+    - Batch D1: YM2413, AY8910, HuC6280.
+    - Batch D2: K051649, K053260, K054539, QSound.
+    - Batch D3: NES, DMG, VRC6, POKEY.
+    - Batch D4: YM2609, YM2610B, YM2612X, YM2612X2, SN76489X2, MIDI/CONDUCTOR strategy.
+    - Acceptance: `ChipPlayer::add_chip` supports all declared chips with at least partial audio behavior.
+
+2. Add emulator modules for missing chips.
+    - File: [mml2vgm-rs/src/chips/mod.rs](../mml2vgm-rs/src/chips/mod.rs)
+    - Acceptance: module list and player wiring match declared `SoundChip` enum.
+
+#### Milestone E: Legacy-Only Gap Decision (1 week)
+
+The legacy C# enum included `YMF271` and `Gigatron`, while current Rust `SoundChip` does not.
+
+1. Decide: add to Rust `SoundChip` or explicitly document de-scoping.
+    - Files: [mml2vgm-rs/src/lib.rs](../mml2vgm-rs/src/lib.rs), [README.md](../README.md), [docs/Browser_IDE_Limitations.md](./Browser_IDE_Limitations.md)
+    - Acceptance: no ambiguity between declared support and historical support.
+
+### Prioritized Work Queue (Actionable)
+
+1. P0: XGM2 extension mapping fix and support-tier metadata.
+2. P0: XGM/XGM2/ZGM command serialization completion.
+3. P1: VGM multi-chip codegen for FM/OPL/OPN family.
+4. P1: Runtime wiring and modules for high-impact chips (YM2413/AY8910/HuC6280).
+5. P2: Konami/Capcom and console family chips.
+6. P2: Legacy-only gap resolution (`YMF271`, `Gigatron`).
+
+### Exit Criteria For Parity Claim
+
+- Every declared format can produce non-placeholder output from at least one real sample.
+- Every declared chip is either:
+  - fully implemented and tested, or
+  - marked partial with explicit limitations in CLI/WASM/IDE surfaces.
+- Support listings in CLI, WASM, and docs match actual behavior.
+
+---
+
 1. **Create a standalone CLI tool** named `mml2vgm-rs`
 2. **Cross-platform support**: Windows, macOS, Linux
 3. **Core functionality**:

@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { 
     IDESettings, 
     EditorSettings, 
@@ -56,6 +56,9 @@ const defaultPanelVisibility: Record<PanelType, boolean> = {
     compileOptions: true,
     info: true,
     script: false,
+    runtime: true,
+    compilation: true,
+    waveform: true,
 };
 
 const defaultPanelPositions: Record<PanelType, PanelPosition> = {
@@ -71,7 +74,10 @@ const defaultPanelPositions: Record<PanelType, PanelPosition> = {
     debug: 'floating',
     playback: 'bottom',
     compileOptions: 'right',
-    info: 'right',
+    info: 'bottom',
+    runtime: 'bottom',
+    compilation: 'bottom',
+    waveform: 'bottom',
 };
 
 export const defaultSettings: IDESettings = {
@@ -438,6 +444,7 @@ export const useSettingsStore = create<SettingsStore>()(
         }),
         {
             name: 'mml2vgm-settings-store',
+            storage: createJSONStorage(() => sessionStorage),
         }
     )
 );

@@ -4,6 +4,9 @@
 // MML Types
 // ============================================================================
 
+/** Declared implementation maturity for a chip or format. */
+export type SupportTier = 'full' | 'partial' | 'declared';
+
 /** Supported output formats */
 export type OutputFormat = 'vgm' | 'xgm' | 'xgm2' | 'zgm';
 
@@ -16,7 +19,7 @@ export type SoundChip =
     | 'YM2413' | 'YM2203'
     | 'RF5C164' | 'SegaPCM' | 'HuC6280' | 'C140' | 'C352'
     | 'AY8910' | 'K051649' | 'K053260' | 'K054539' | 'QSound'
-    | 'NES' | 'DMG' | 'VRC6' | 'POKEY' | 'MIDI';
+    | 'NES' | 'DMG' | 'VRC6' | 'POKEY' | 'MIDI' | 'CONDUCTOR';
 
 /** Chip information */
 export interface ChipInfo {
@@ -26,12 +29,15 @@ export interface ChipInfo {
     isPsg: boolean;
     isFm: boolean;
     supportsPcm: boolean;
+    supportTier: SupportTier;
+    browserCompileDefault: boolean;
 }
 
 /** Format information */
 export interface FormatInfo {
     name: OutputFormat;
     extension: string;
+    supportTier: SupportTier;
 }
 
 // ============================================================================
@@ -240,7 +246,10 @@ export type PanelType =
     | 'compileOptions'
     | 'info'
     | 'folderTree'
-    | 'script';
+    | 'script'
+    | 'runtime'
+    | 'compilation'
+    | 'waveform';
 
 /** Panel position */
 export type PanelPosition = 

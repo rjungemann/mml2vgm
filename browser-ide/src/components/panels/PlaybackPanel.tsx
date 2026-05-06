@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { audioService } from '@/services/audioService';
 import type { AudioStatus } from '@/services/audioService';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 interface PlaybackPanelProps {
   // Props can be used to pass document data or compile results
@@ -14,8 +15,8 @@ const PlaybackPanel: React.FC<PlaybackPanelProps> = ({
 }) => {
   // Get initial state from audio service
   const [status, setStatus] = useState<AudioStatus>(audioService.getStatus());
-  const [volume, setVolume] = useState(audioService.getVolume() * 100);
-  const [loop, setLoop] = useState(audioService.isLooping());
+  const [volume, setVolume] = useSessionStorageState<number>('mml2vgm:playback:volume', Math.round(audioService.getVolume() * 100));
+  const [loop, setLoop] = useSessionStorageState<boolean>('mml2vgm:playback:loop', audioService.isLooping());
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
 

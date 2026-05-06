@@ -55,6 +55,14 @@ A plan for creating a cross-platform, command-line utility in Rust for MML compi
 
 ## Recent Progress
 
+### 2026-05-06 - Added C# Parity Backlog To Rust CLI Plan
+- Added a concrete implementation backlog based on the deleted C# snapshot (parent of `e046b39`)
+- Captures format parity tasks for XGM/XGM2/ZGM completion
+- Captures chip parity tasks for declared-but-not-wired chips in Rust runtime
+- Adds explicit decision gate for legacy-only chips (`YMF271`, `Gigatron`)
+- Defines exit criteria for claiming parity in docs/CLI/WASM/browser surfaces
+- See: [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) section "2026-05 Legacy C# Parity Audit And Backlog"
+
 ### 2026-05-04 14:00 UTC - Browser IDE Phase 5 COMPLETED (100%)
 - **Services Created:**
   - `partService.ts`: Parse and manage MML parts from source or compile results, mute/solo/volume/pan, keyboard assignment

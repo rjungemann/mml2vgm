@@ -159,7 +159,12 @@ fn list_supported_chips() {
     for (category, chips) in &categories {
         println!("  {}:", category);
         for chip in chips {
-            println!("    - {} (clock: {}Hz)", chip.name(), chip.clock_rate());
+            println!(
+                "    - {} [{}] (clock: {}Hz)",
+                chip.name(),
+                chip.support_tier(),
+                chip.clock_rate()
+            );
         }
         println!();
     }
@@ -169,10 +174,10 @@ fn list_supported_chips() {
 fn list_supported_formats() {
     println!("Supported Output Formats:");
     println!();
-    println!("  - vgm  - Standard VGM format");
-    println!("  - xgm  - XGM format (Mega Drive)");
-    println!("  - xgm2 - XGM2 format (Mega Drive with extended features)");
-    println!("  - zgm  - ZGM format (Extended VGM with YM2609 and MIDI support)");
+    println!("  - vgm  [{}] - Standard VGM format", OutputFormat::VGM.support_tier());
+    println!("  - xgm  [{}] - XGM format (Mega Drive)", OutputFormat::XGM.support_tier());
+    println!("  - xgm2 [{}] - XGM2 format (Mega Drive with extended features)", OutputFormat::XGM2.support_tier());
+    println!("  - zgm  [{}] - ZGM format (Extended VGM with YM2609 and MIDI support)", OutputFormat::ZGM.support_tier());
     println!();
     println!("Default: vgm");
 }
@@ -185,12 +190,7 @@ fn determine_output_path(input: Option<&PathBuf>, output: Option<&PathBuf>, form
 
     if let Some(in_path) = input {
         let stem = in_path.file_stem().unwrap_or_else(|| in_path.as_os_str());
-        let extension = match format {
-            OutputFormat::VGM => "vgm",
-            OutputFormat::XGM => "xgm",
-            OutputFormat::XGM2 => "xgm2",
-            OutputFormat::ZGM => "zgm",
-        };
+        let extension = format.extension();
         let mut out_path = in_path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
         out_path.push(format!("{}.{}", stem.to_string_lossy(), extension));
         return Ok(out_path);
@@ -456,6 +456,14 @@ mod tests {
         ).unwrap();
         
         assert_eq!(path, PathBuf::from("test.xgm"));
+
+        let path = determine_output_path(
+            Some(&input),
+            None,
+            OutputFormat::XGM2
+        ).unwrap();
+
+        assert_eq!(path, PathBuf::from("test.xgm2"));
 
         let custom = PathBuf::from("custom.vgm");
         let path = determine_output_path(

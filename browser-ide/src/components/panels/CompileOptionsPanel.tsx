@@ -1,43 +1,22 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { OutputFormat, SoundChip } from '@/types';
 import { useCompileStore } from '@/stores/compileStore';
 import { useDocumentStore } from '@/stores/documentStore';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 const CompileOptionsPanel: React.FC = () => {
-  const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('vgm');
-  const [selectedChips, setSelectedChips] = useState<SoundChip[]>(['YM2608', 'SN76489']);
-  const [clockCount, setClockCount] = useState(0);
-  const [compression, setCompression] = useState(0);
-  const [optimize, setOptimize] = useState(true);
-  const [verbose, setVerbose] = useState(false);
-  const [debug, setDebug] = useState(false);
-  const [compileStartedAt, setCompileStartedAt] = useState<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState(0);
-
+  const [selectedFormat, setSelectedFormat] = useSessionStorageState<OutputFormat>('mml2vgm:compile:selectedFormat', 'vgm');
+  const [selectedChips, setSelectedChips] = useSessionStorageState<SoundChip[]>('mml2vgm:compile:selectedChips', ['YM2608', 'SN76489']);
+  const [clockCount, setClockCount] = useSessionStorageState<number>('mml2vgm:compile:clockCount', 0);
+  const [compression, setCompression] = useSessionStorageState<number>('mml2vgm:compile:compression', 0);
+  const [optimize, setOptimize] = useSessionStorageState<boolean>('mml2vgm:compile:optimize', true);
+  const [verbose, setVerbose] = useSessionStorageState<boolean>('mml2vgm:compile:verbose', false);
+  const [debug, setDebug] = useSessionStorageState<boolean>('mml2vgm:compile:debug', false);
   // Get compile function and active document from stores
-  const { compile, status, progress, progressMessage, lastCompileTimingSummary } = useCompileStore((state) => ({
+  const { compile, status } = useCompileStore((state) => ({
     compile: state.compile,
     status: state.status,
-    progress: state.progress,
-    progressMessage: state.progressMessage,
-    lastCompileTimingSummary: state.lastCompileTimingSummary,
   }));
-    useEffect(() => {
-      if (status === 'compiling') {
-        if (!compileStartedAt) {
-          setCompileStartedAt(Date.now());
-        }
-
-        const interval = setInterval(() => {
-          setElapsedMs(compileStartedAt ? Date.now() - compileStartedAt : 0);
-        }, 200);
-
-        return () => clearInterval(interval);
-      }
-
-      setCompileStartedAt(null);
-      setElapsedMs(0);
-    }, [status, compileStartedAt]);
 
   const { activeDocumentId } = useDocumentStore((state) => ({
     activeDocumentId: state.activeDocumentId,
@@ -288,32 +267,6 @@ const CompileOptionsPanel: React.FC = () => {
         >
           Compile
         </button>
-      </div>
-
-      {/* Compile Diagnostics */}
-      <div style={{ marginTop: '8px', backgroundColor: 'var(--bg-tertiary)', padding: '6px', borderRadius: '3px', border: '1px solid var(--border-color)' }}>
-        <div style={{ fontSize: '12px', marginBottom: '4px' }}><strong>Compile Diagnostics</strong></div>
-        <div style={{ fontSize: '11px', marginBottom: '2px' }}>
-          <span style={{ color: 'var(--text-muted)' }}>Status:</span> <span>{status}</span>
-          {status === 'compiling' && typeof progress === 'number' && (
-            <span>{` (${Math.round(progress)}%)`}</span>
-          )}
-        </div>
-        {status === 'compiling' && (
-          <div style={{ fontSize: '11px', marginBottom: '2px' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Elapsed:</span> <span>{(elapsedMs / 1000).toFixed(1)}s</span>
-          </div>
-        )}
-        {progressMessage && (
-          <div style={{ fontSize: '11px', marginBottom: '2px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Phase:</span> <span>{progressMessage}</span>
-          </div>
-        )}
-        {lastCompileTimingSummary && status !== 'compiling' && (
-          <div style={{ fontSize: '11px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Last:</span> <span>{lastCompileTimingSummary}</span>
-          </div>
-        )}
       </div>
     </div>
   );

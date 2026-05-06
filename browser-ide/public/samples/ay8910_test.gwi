@@ -1,12 +1,29 @@
-; mml2vgm Browser IDE - AY8910 style sample (UTF-8)
-; This fixture is intentionally plain UTF-8 text so test loaders can read it.
+'{
 
-@OPNA
+    TitleName   = PSG Tone Test
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
 
-; Melody
-@0 v100 l8 o4
-@0 c d e g a g e d c2
+    PartSN76489 = B
 
-; Bass
-@1 v80 l4 o2
-@1 c2 g2 c2 g2
+}
+
+; SN76489 PSG — three independent tone channels
+; No FM instrument definitions needed for PSG parts
+
+; Set tempo for all channels
+'B1 T120
+'B2 T120
+'B3 T120
+
+; Channel B1 — melody (pentatonic scale)
+'B1 v100 l8 o4 c d e g a g e d c2
+
+; Channel B2 — counter-melody (offset by one beat)
+'B2 v80 l8 o3 r2 g a >c d< a g e d2
+
+; Channel B3 — bass pedal
+'B3 v70 l2 o2 c g c g

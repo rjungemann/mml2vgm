@@ -27,6 +27,8 @@ pub struct Parser {
     current_tempo: u32,
     /// Whether we're in a definition context (after apostrophe)
     in_definition_context: bool,
+    /// FM instrument being accumulated row-by-row: (instrument_number, rows_collected)
+    pending_fm_instrument: Option<(u32, Vec<Vec<u32>>)>,
 }
 
 impl Parser {
@@ -40,6 +42,7 @@ impl Parser {
             current_volume: 127,
             current_tempo: 120,
             in_definition_context: false,
+            pending_fm_instrument: None,
         }
     }
 
@@ -150,6 +153,8 @@ impl Parser {
             }
         }
 
+        // Finalize any FM instrument still being accumulated at end of file
+        self.finalize_pending_fm_instrument(&mut ast);
         Ok(ast)
     }
 
@@ -222,14 +227,47 @@ impl Parser {
                 Token::AtSign => {
                     self.parse_instrument_definition(ast)?;
                 }
+
+                // C# format part names where the letter is a note letter: 'A1, 'B2, 'F1 …
+                Token::Note(letter) => {
+                    let letter = letter.to_ascii_uppercase();
+                    self.advance(); // consume the note letter
+                    let part_name = if let Some(Token::Number(n)) = self.current_token() {
+                        let n = n;
+                        self.advance(); // consume the channel number
+                        format!("{}{}", letter, n)
+                    } else {
+                        letter.to_string()
+                    };
+                    self.ensure_part(ast, &part_name);
+                    self.current_part = Some(part_name);
+                }
+
                 Token::Identifier(ref name) => {
+                    let name = name.clone();
                     let name_upper = name.to_uppercase();
-                    if name_upper.starts_with("E") {
+
+                    // Single alphabetic letter followed by a channel number → C# part name (H1, I1 …)
+                    if name.len() == 1
+                        && name.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+                    {
+                        let letter = name.chars().next().unwrap().to_ascii_uppercase();
+                        self.advance(); // consume the letter
+                        let part_name = if let Some(Token::Number(n)) = self.current_token() {
+                            let n = n;
+                            self.advance();
+                            format!("{}{}", letter, n)
+                        } else {
+                            letter.to_string()
+                        };
+                        self.ensure_part(ast, &part_name);
+                        self.current_part = Some(part_name);
+                    } else if name_upper.starts_with("E") {
                         self.parse_envelope_definition(ast)?;
                     } else if name_upper.starts_with("A") && name.len() > 1 {
                         self.parse_arpeggio_definition(ast)?;
                     } else {
-                        self.parse_part_definition(ast, name)?;
+                        self.parse_part_definition(ast, &name)?;
                     }
                 }
                 _ => {
@@ -238,8 +276,23 @@ impl Parser {
                 }
             }
         }
-        
+
         Ok(())
+    }
+
+    /// Create a part entry in `ast.parts` if it does not already exist.
+    fn ensure_part(&self, ast: &mut MmlAst, name: &str) {
+        if !ast.parts.contains_key(name) {
+            ast.parts.insert(
+                name.to_string(),
+                PartDefinition {
+                    name: name.to_string(),
+                    chip: None,
+                    tempo: None,
+                    commands: Vec::new(),
+                },
+            );
+        }
     }
 
     /// Parse part definition
@@ -294,103 +347,165 @@ impl Parser {
         Ok(())
     }
 
-    /// Parse instrument definition
+    /// Parse instrument definition after `'@`.
+    ///
+    /// Handles:
+    /// - `'@ M NNN` / `'@ F NNN` — FM instrument header (multi-line C# format)
+    /// - `'@ NNN,...` — FM operator/ALG row continuation (if accumulating)
+    /// - `'@ P NNN,...` — PCM instrument
+    /// - `'@ E NNN,...` — Envelope
+    /// - `'@ A NNN,...` — Arpeggio
     fn parse_instrument_definition(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
-        // Consume @ if present
         if matches!(self.current_token(), Some(Token::AtSign)) {
             self.advance();
         }
-        
-        let type_char = if let Some(Token::Identifier(s)) = self.current_token() {
-            let s_upper = s.to_uppercase();
-            self.advance();
-            if s_upper.starts_with("F") {
-                'F'
-            } else if s_upper.starts_with("P") {
-                'P'
-            } else if s_upper.starts_with("E") {
-                'E'
-            } else if s_upper.starts_with("A") {
-                'A'
-            } else {
-                return Ok(());
-            }
-        } else {
-            // Not an identifier after @, advance past whatever is there to avoid infinite loop
-            if self.current_token().is_some() {
-                self.advance();
-            }
-            return Ok(());
-        };
-        
-        match type_char {
-            'F' => self.parse_fm_instrument(ast),
-            'P' => self.parse_pcm_instrument(ast),
-            'E' => self.parse_envelope_definition(ast),
-            'A' => self.parse_arpeggio_definition(ast),
-            _ => Ok(()),
-        }
-    }
 
-    /// Parse FM instrument definition
-    fn parse_fm_instrument(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
-        let number = if let Some(Token::Number(n)) = self.current_token() {
-            self.advance();
-            n
-        } else if let Some(Token::Identifier(s)) = self.current_token() {
-            if s.parse::<u32>().is_ok() {
-                self.advance();
-                s.parse::<u32>().unwrap()
-            } else {
-                return Ok(());
+        match self.current_token() {
+            // Continuation row: '@ 031,012,...  — operator row or ALG/FB row
+            Some(Token::Number(first)) => {
+                let first = first;
+                if self.pending_fm_instrument.is_some() {
+                    self.parse_fm_instrument_row(ast, first)?;
+                } else {
+                    // Stray numeric row with no pending FM instrument; skip it
+                    self.advance();
+                    while let Some(token) = self.current_token() {
+                        match token {
+                            Token::Apostrophe | Token::Eof => break,
+                            _ => self.advance(),
+                        }
+                    }
+                }
             }
-        } else {
-            return Ok(());
-        };
-        
-        // Skip whitespace/commas
-        while let Some(token) = self.current_token() {
-            match token {
-                Token::Comma | Token::Whitespace(_) => self.advance(),
-                _ => break,
+
+            // Type letter that the lexer sees as an Identifier: M, P, A (not note letters)
+            Some(Token::Identifier(ref s)) => {
+                let s_upper = s.to_uppercase();
+                self.advance(); // consume the type letter
+                if s_upper.starts_with('M') || s_upper.starts_with('F') {
+                    self.start_fm_instrument(ast)?;
+                } else if s_upper.starts_with('P') {
+                    self.parse_pcm_instrument(ast)?;
+                } else if s_upper.starts_with('E') {
+                    self.parse_envelope_definition(ast)?;
+                } else if s_upper.starts_with('A') {
+                    self.parse_arpeggio_definition(ast)?;
+                }
+                // Unknown type letter — type already consumed, silently skip
             }
-        }
-        
-        let name = if let Some(Token::StringLiteral(s)) = self.current_token() {
-            self.advance();
-            s
-        } else if let Some(Token::Identifier(s)) = self.current_token() {
-            self.advance();
-            s
-        } else {
-            String::new()
-        };
-        
-        // Skip whitespace/commas
-        while let Some(token) = self.current_token() {
-            match token {
-                Token::Comma | Token::Whitespace(_) => self.advance(),
-                _ => break,
+
+            // F, E, A, B, C, D, G are note letters → Token::Note in the lexer
+            Some(Token::Note(letter)) => {
+                let letter_upper = letter.to_ascii_uppercase();
+                self.advance(); // consume the note-letter type token
+                match letter_upper {
+                    'F' => self.start_fm_instrument(ast)?,
+                    'E' => self.parse_envelope_definition(ast)?,
+                    'A' => self.parse_arpeggio_definition(ast)?,
+                    _ => {
+                        while let Some(token) = self.current_token() {
+                            match token {
+                                Token::Apostrophe | Token::Eof => break,
+                                _ => self.advance(),
+                            }
+                        }
+                    }
+                }
             }
-        }
-        
-        let mut parameters = Vec::new();
-        while let Some(token) = self.current_token() {
-            match token {
-                Token::Number(n) => {
-                    parameters.push(n);
+
+            _ => {
+                if self.current_token().is_some() {
                     self.advance();
                 }
-                Token::Comma | Token::Whitespace(_) => self.advance(),
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Begin accumulating a new FM instrument definition.
+    ///
+    /// Called after `'@ M NNN` or `'@ F NNN` is seen.  Reads the instrument number,
+    /// skips any trailing content on the same line, and arms `pending_fm_instrument`.
+    fn start_fm_instrument(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
+        // Commit any previously started but not-yet-complete instrument
+        self.finalize_pending_fm_instrument(ast);
+
+        let number = match self.current_token() {
+            Some(Token::Number(n)) => {
+                let n = n;
+                self.advance();
+                n
+            }
+            Some(Token::Identifier(ref s)) => {
+                if let Ok(n) = s.parse::<u32>() {
+                    self.advance();
+                    n
+                } else {
+                    return Ok(());
+                }
+            }
+            _ => 0,
+        };
+
+        // Skip any remaining content on this header line (e.g. a patch name)
+        while let Some(token) = self.current_token() {
+            match token {
                 Token::Apostrophe | Token::Eof => break,
                 _ => self.advance(),
             }
         }
-        
-        let inst = FmInstrument { number, name, parameters };
-        ast.fm_instruments.insert(number, inst);
-        
+
+        self.pending_fm_instrument = Some((number, Vec::new()));
         Ok(())
+    }
+
+    /// Accumulate one comma-separated parameter row into the pending FM instrument.
+    ///
+    /// `first` is the first number already matched (but not yet consumed).
+    /// After 5 rows (4 operators × 11 params + 1 ALG/FB row × 2 params), the
+    /// instrument is finalised and stored.
+    fn parse_fm_instrument_row(&mut self, ast: &mut MmlAst, first: u32) -> MmlResult<()> {
+        let mut row = vec![first];
+        self.advance(); // consume first number
+
+        while let Some(token) = self.current_token() {
+            match token {
+                Token::Number(n) => {
+                    row.push(n);
+                    self.advance();
+                }
+                Token::Comma => self.advance(),
+                Token::Apostrophe | Token::Eof => break,
+                _ => break,
+            }
+        }
+
+        if let Some((_, rows)) = &mut self.pending_fm_instrument {
+            rows.push(row);
+        }
+
+        // Finalise after 5 rows: 4 operator rows + 1 ALG/FB row
+        let ready = self.pending_fm_instrument
+            .as_ref()
+            .map_or(false, |(_, rows)| rows.len() >= 5);
+        if ready {
+            self.finalize_pending_fm_instrument(ast);
+        }
+
+        Ok(())
+    }
+
+    /// Commit a pending FM instrument (even if incomplete) into the AST.
+    fn finalize_pending_fm_instrument(&mut self, ast: &mut MmlAst) {
+        if let Some((number, rows)) = self.pending_fm_instrument.take() {
+            let mut parameters: Vec<u32> = Vec::new();
+            for row in rows {
+                parameters.extend(row);
+            }
+            let inst = FmInstrument { number, name: String::new(), parameters };
+            ast.fm_instruments.insert(number, inst);
+        }
     }
 
     /// Parse PCM instrument definition

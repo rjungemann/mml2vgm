@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 interface DebugMessage {
   timestamp: string;
@@ -12,8 +13,8 @@ const DebugPanel: React.FC = () => {
   const [messages, setMessages] = React.useState<DebugMessage[]>([
     { timestamp: new Date().toISOString(), type: 'info', source: 'System', message: 'Debug panel initialized' },
   ]);
-  const [filter, setFilter] = React.useState<'all' | 'info' | 'warning' | 'error' | 'log'>('all');
-  const [autoScroll, setAutoScroll] = React.useState(true);
+  const [filter, setFilter] = useSessionStorageState<'all' | 'info' | 'warning' | 'error' | 'log'>('mml2vgm:debug:filter', 'all');
+  const [autoScroll, setAutoScroll] = useSessionStorageState<boolean>('mml2vgm:debug:autoScroll', true);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   // Mock debug messages

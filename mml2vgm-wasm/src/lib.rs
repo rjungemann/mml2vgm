@@ -26,7 +26,7 @@
 //! ```
 
 use mml2vgm::{
-    CompileOptions, OutputFormat, SoundChip, 
+    ALL_OUTPUT_FORMATS, ALL_SOUND_CHIPS, CompileOptions, OutputFormat, SoundChip,
     compiler::compiler::MmlCompiler,
     compiler::lexer,
     error::MmlError,
@@ -241,37 +241,7 @@ fn token_to_string(token: &mml2vgm::compiler::lexer::Token) -> String {
 /// JSON array of chip information objects
 #[wasm_bindgen(catch)]
 pub fn get_supported_chips() -> String {
-    let chips = vec![
-        SoundChip::YM2612, SoundChip::YM2612X, SoundChip::YM2612X2,
-        SoundChip::SN76489, SoundChip::SN76489X2,
-        SoundChip::YM2608,
-        SoundChip::YM2609,
-        SoundChip::YM2610B,
-        SoundChip::YM2151,
-        SoundChip::YM3526,
-        SoundChip::Y8950,
-        SoundChip::YM3812,
-        SoundChip::YMF262,
-        SoundChip::YM2413,
-        SoundChip::YM2203,
-        SoundChip::RF5C164,
-        SoundChip::SegaPCM,
-        SoundChip::HuC6280,
-        SoundChip::C140,
-        SoundChip::C352,
-        SoundChip::AY8910,
-        SoundChip::K051649,
-        SoundChip::K053260,
-        SoundChip::K054539,
-        SoundChip::QSound,
-        SoundChip::NES,
-        SoundChip::DMG,
-        SoundChip::VRC6,
-        SoundChip::POKEY,
-        SoundChip::MIDI,
-    ];
-    
-    let chip_infos: Vec<_> = chips.iter().map(|chip| {
+    let chip_infos: Vec<_> = ALL_SOUND_CHIPS.iter().map(|chip| {
         serde_json::json!({
             "name": chip.name(),
             "variant": format!("{:?}", chip),
@@ -279,6 +249,8 @@ pub fn get_supported_chips() -> String {
             "isPsg": chip.is_psg(),
             "isFm": chip.is_fm(),
             "supportsPcm": chip.supports_pcm(),
+            "supportTier": chip.support_tier(),
+            "browserCompileDefault": chip.browser_compile_default(),
         })
     }).collect();
     
@@ -291,17 +263,11 @@ pub fn get_supported_chips() -> String {
 /// JSON array of format information objects
 #[wasm_bindgen(catch)]
 pub fn get_supported_formats() -> String {
-    let formats = vec![
-        OutputFormat::VGM,
-        OutputFormat::XGM,
-        OutputFormat::XGM2,
-        OutputFormat::ZGM,
-    ];
-    
-    let format_infos: Vec<_> = formats.iter().map(|fmt| {
+    let format_infos: Vec<_> = ALL_OUTPUT_FORMATS.iter().map(|fmt| {
         serde_json::json!({
-            "name": format!("{:?}", fmt),
-            "extension": fmt.to_string(),
+            "name": fmt.to_string(),
+            "extension": fmt.extension(),
+            "supportTier": fmt.support_tier(),
         })
     }).collect();
     
@@ -323,6 +289,11 @@ pub fn parse_sound_chip(chip_name: &str) -> Result<JsValue, JsValue> {
                 "name": chip.name(),
                 "variant": format!("{:?}", chip),
                 "clockRate": chip.clock_rate(),
+                "isPsg": chip.is_psg(),
+                "isFm": chip.is_fm(),
+                "supportsPcm": chip.supports_pcm(),
+                "supportTier": chip.support_tier(),
+                "browserCompileDefault": chip.browser_compile_default(),
             })).unwrap())
         }
         Err(e) => Err(JsValue::from_str(&format!("Invalid chip name: {}", e))),
@@ -341,8 +312,9 @@ pub fn parse_output_format(format_name: &str) -> Result<JsValue, JsValue> {
     match format_name.parse::<OutputFormat>() {
         Ok(fmt) => {
             Ok(JsValue::from_serde(&serde_json::json!({
-                "name": format!("{:?}", fmt),
-                "extension": fmt.to_string(),
+                "name": fmt.to_string(),
+                "extension": fmt.extension(),
+                "supportTier": fmt.support_tier(),
             })).unwrap())
         }
         Err(e) => Err(JsValue::from_str(&format!("Invalid format name: {}", e))),

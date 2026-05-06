@@ -33,16 +33,16 @@ export const TabBar: React.FC<TabBarProps> = ({
               }
             }}
           >
-            <span>{doc.filename || 'Untitled'}</span>
-            {isDirty && <span style={{ color: 'var(--accent-warning)' }}> *</span>}
+            <span className={`tab-filename ${isDirty ? 'dirty' : ''}`}>{doc.filename || 'Untitled'}</span>
             <span
               className="close-button"
+              aria-label={`Close ${doc.filename || 'Untitled'}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onCloseTab(doc.id);
               }}
             >
-              x
+              &times;
             </span>
           </button>
         );

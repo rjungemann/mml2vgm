@@ -1,18 +1,38 @@
-; mml2vgm Browser IDE - Hello World Sample
-; This is a simple MML file that plays a basic melody
-; Format: GWI (mml2vgm format)
+'{
 
-; Set up OPNA (YM2608) chip
-@OPNA
+    TitleName   = Hello World
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
 
-; Part 0: FM Melody (Channel 0)
-@0 v100 l4 o4
-@0 c d e f g a b >c2.
+    PartYM2612  = A
+    PartSN76489 = B
 
-; Part 1: FM Bass (Channel 1)
-@1 v80 l8 o2
-@1 c2. c2. f2. f2. g2. g2. c2.
+}
 
-; Part 2: SSG Drums (Channel 2)
-@2 v100 l16 o5
-@2 c4 sn4 c4 sn4 c4 c4 sn8 c4 sn4 c4 sn4 c4 c4 sn8
+; FM instrument 0 — simple sustained tone (algorithm 7, all operators as carriers)
+; '@ M <patch-number>
+;   comment line (column headers, ignored by compiler)
+;   4 operator rows: AR DR SR RR SL TL KS ML DT AM SSG-EG
+;   1 algorithm/feedback row: ALG FB
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 007,000
+
+; YM2612 FM melody — part A (YM2612), channel 1
+; Tempo is set on the first line for this part
+'A1 T120
+
+; @0 selects FM instrument 0, v=volume, l=default length, o=octave
+'A1 @0 v100 l4 o4 c d e f g a b >c2.
+
+; SN76489 PSG bass — part B (SN76489), channel 1
+'B1 T120
+
+'B1 v100 l2 o2 c. g. f. c.

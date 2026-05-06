@@ -1,16 +1,33 @@
-; mml2vgm Browser IDE - Drum Pattern Sample
-; Demonstrates SSG drum patterns
+'{
 
-@OPNA
+    TitleName   = Drum Pattern
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
 
-; Part 0: Kick and Snare
-@0 v100 l16 o5
-@0 bd4 sn4 bd4 sn4 bd4 bd4 sn8 bd4 sn4 bd4 sn4 bd4 bd4 sn8
+    PartSN76489 = B
 
-; Part 1: Hi-hats
-@1 v80 l16 o6
-@1 hh4 hh4 hh4 hh4 hh4 hh4 hh4 hh4
+}
 
-; Part 2: Toms
-@2 v90 l8 o4
-@2 tom4 tom4 tom8 tom4 tom4 tom8
+; SN76489 percussion — three PSG tone channels used as drum stand-ins
+; B1 = kick (very low pitch, short decay)
+; B2 = snare (mid pitch, short)
+; B3 = hi-hat (high pitch, very short)
+;
+; Note: real kit drums typically use PCM samples via '@ P definitions.
+; This example uses PSG tones for a chiptune-style percussion effect.
+
+'B1 T128
+'B2 T128
+'B3 T128
+
+; Kick — hits on beats 1 and 3
+'B1 v100 l16 o1 c4 r4 r4 r4 | c4 r4 r4 r4 | c4 r4 r4 r4 | c4 r4 r4 r4
+
+; Snare — hits on beats 2 and 4
+'B2 v90 l16 o3 r4 r4 c4 r4 | r4 r4 c4 r4 | r4 r4 c4 r4 | r4 r4 c4 r4
+
+; Hi-hat — eighth-note pattern
+'B3 v60 l16 o6 c8 c8 c8 c8 c8 c8 c8 c8

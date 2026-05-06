@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { midiService } from '@/services/midiService';
 import { partService } from '@/services/partService';
 import type { MidiNoteEvent } from '@/services/midiService';
+import { useSessionStorageState } from '@/utils/useSessionStorageState';
 
 interface MIDIKey {
   note: string;
@@ -24,10 +25,11 @@ const BLACK_KEYS: Record<string, number> = {
 };
 
 const MIDIKeyboardPanel: React.FC = () => {
+  const [savedMode, setSavedMode] = useSessionStorageState<'preview' | 'input'>('mml2vgm:midi:mode', 'preview');
   // Get state from midiService
   const [midiState, setMidiState] = useState(midiService.getState());
   const [activeKeys, setActiveKeys] = React.useState<Set<number>>(new Set());
-  const [octaveOffset, setOctaveOffset] = React.useState(3);
+  const [octaveOffset, setOctaveOffset] = useSessionStorageState<number>('mml2vgm:midi:octaveOffset', 3);
   
   // Get parts from partService for part selection
   const [parts, setParts] = useState(() => partService.getParts());
@@ -57,6 +59,10 @@ const MIDIKeyboardPanel: React.FC = () => {
       midiService.removeStateListener(handleStateUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    midiService.setMode(savedMode);
+  }, [savedMode]);
   
   // Listen to partService changes
   useEffect(() => {
@@ -213,7 +219,11 @@ const MIDIKeyboardPanel: React.FC = () => {
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <select
             value={mode}
-            onChange={(e) => midiService.setMode(e.target.value as 'preview' | 'input')}
+            onChange={(e) => {
+              const nextMode = e.target.value as 'preview' | 'input';
+              setSavedMode(nextMode);
+              midiService.setMode(nextMode);
+            }}
             style={{
               fontSize: '10px',
               padding: '2px',

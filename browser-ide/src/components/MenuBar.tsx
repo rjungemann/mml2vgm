@@ -6,6 +6,8 @@ interface MenuBarProps {
   onCloseDocument: () => void;
   onCloseAllDocuments: () => void;
   onToggleTheme: () => void;
+  onToggleSidebar: () => void;
+  isSidebarVisible: boolean;
   onCompile: () => void;
   onCompileAndPlay: () => void;
   onPlay: () => void;
@@ -41,6 +43,8 @@ const MenuBar: React.FC<MenuBarProps> = ({
   onCloseDocument,
   onCloseAllDocuments,
   onToggleTheme,
+  onToggleSidebar,
+  isSidebarVisible,
   onCompile,
   onCompileAndPlay,
   onPlay,
@@ -188,6 +192,11 @@ const MenuBar: React.FC<MenuBarProps> = ({
         break;
       case 'view':
         items.push({ label: 'Toggle Theme', onClick: onToggleTheme, disabled: false });
+        items.push({
+          label: isSidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
+          onClick: onToggleSidebar,
+          disabled: false,
+        });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Zoom In', disabled: true });
         items.push({ label: 'Zoom Out', disabled: true });
@@ -236,12 +245,21 @@ const MenuBar: React.FC<MenuBarProps> = ({
         items.push({ label: 'Help Topics', disabled: true });
         items.push({ label: 'MML Reference', disabled: true });
         items.push({ label: 'About...', disabled: true });
-        items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Check for Updates', disabled: true });
         break;
     }
     return items;
-  }, [onNewDocument, onToggleTheme, onCompile, onCompileAndPlay, onPlay, onStop, isPlaying, onLoadExample]);
+  }, [
+    onNewDocument,
+    onToggleTheme,
+    onToggleSidebar,
+    isSidebarVisible,
+    onCompile,
+    onCompileAndPlay,
+    onPlay,
+    onStop,
+    isPlaying,
+    onLoadExample,
+  ]);
 
   const toggleMenu = useCallback((menu: string) => {
     setActiveMenu((prev) => (prev === menu ? null : menu));
