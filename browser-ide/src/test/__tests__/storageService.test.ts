@@ -31,6 +31,7 @@ class MockIDBDatabase {
     name: string;
     version: number;
     objectStoreNames: DOMStringList;
+    private stores: Map<string, Map<string, any>> = new Map();
     
     constructor(name: string, version: number) {
         this.name = name;
@@ -40,6 +41,13 @@ class MockIDBDatabase {
     
     transaction(storeNames: string[], mode: IDBTransactionMode): MockIDBTransaction {
         return new MockIDBTransaction(this, storeNames, mode);
+    }
+
+    getStoreData(name: string): Map<string, any> {
+        if (!this.stores.has(name)) {
+            this.stores.set(name, new Map());
+        }
+        return this.stores.get(name)!;
     }
     
     close() {}
@@ -80,12 +88,13 @@ class MockIDBObjectStore {
     private db: MockIDBDatabase;
     private name: string;
     private mode: IDBTransactionMode;
-    private data: Map<string, any> = new Map();
+    private data: Map<string, any>;
     
     constructor(db: MockIDBDatabase, name: string, mode: IDBTransactionMode) {
         this.db = db;
         this.name = name;
         this.mode = mode;
+        this.data = db.getStoreData(name);
     }
     
     get(key: string): MockIDBRequest {
@@ -128,11 +137,30 @@ class MockIDBObjectStore {
 // Mock IDBRequest
 class MockIDBRequest {
     result: any;
-    onsuccess: ((event: any) => void) | null = null;
-    onerror: ((event: any) => void) | null = null;
+    private _onsuccess: ((event: any) => void) | null = null;
+    private _onerror: ((event: any) => void) | null = null;
     
     constructor(result: any) {
         this.result = result;
+    }
+
+    set onsuccess(callback: ((event: any) => void) | null) {
+        this._onsuccess = callback;
+        if (callback) {
+            queueMicrotask(() => callback({ target: this }));
+        }
+    }
+
+    get onsuccess(): ((event: any) => void) | null {
+        return this._onsuccess;
+    }
+
+    set onerror(callback: ((event: any) => void) | null) {
+        this._onerror = callback;
+    }
+
+    get onerror(): ((event: any) => void) | null {
+        return this._onerror;
     }
 }
 
@@ -191,17 +219,20 @@ describe('StorageService', () => {
         it('should handle initialization when not supported', async () => {
             const originalIndexedDB = global.indexedDB;
             delete (global as any).indexedDB;
-            
-            const service = new StorageService();
-            await expect(service.init()).rejects.toThrow();
-            expect(service.isSupported).toBe(false);
-            
-            global.indexedDB = originalIndexedDB as any;
+
+            try {
+                const service = new StorageService();
+                await expect(service.init()).resolves.toBeUndefined();
+                expect(service.isSupported).toBe(false);
+                expect(service.error).toContain('IndexedDB is not supported');
+            } finally {
+                global.indexedDB = originalIndexedDB as any;
+            }
         });
     });
 
     describe('Document Storage', () => {
-        it('should save and load a document', async () => {
+        it('should save and load a document', { timeout: 1500 }, async () => {
             const mockDoc: any = {
                 id: 'test-doc-1',
                 filename: 'test.gwi',

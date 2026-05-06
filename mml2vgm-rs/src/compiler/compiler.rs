@@ -68,9 +68,26 @@ impl MmlCompiler {
 
     /// Read input file
     fn read_file(&self, path: &Path) -> MmlResult<String> {
-        fs::read_to_string(path).map_err(|e| {
+        let source = fs::read_to_string(path).map_err(|e| {
             MmlError::UnsupportedCommand(format!("Failed to read file {}: {}", path.display(), e))
-        })
+        })?;
+        Ok(self.normalize_source(&source))
+    }
+
+    /// Normalize source before tokenization.
+    fn normalize_source(&self, source: &str) -> String {
+        source
+            .replace("\r\n", "\n")
+            .split('\n')
+            .map(|line| {
+                if line.trim_start().starts_with(';') {
+                    ""
+                } else {
+                    line
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Tokenize source code
@@ -111,8 +128,10 @@ impl MmlCompiler {
     /// This is useful for WASM/browser integration where file system access
     /// is not available.
     pub fn compile_from_source(&self, source: &str) -> MmlResult<CompileResult> {
+        let source = self.normalize_source(source);
+
         // 1. Tokenize (Lexer)
-        let tokens = self.lex(source)?;
+        let tokens = self.lex(&source)?;
 
         // 2. Parse (Parser)
         let ast = self.parse(tokens)?;
@@ -134,8 +153,10 @@ impl MmlCompiler {
 
     /// Validate MML source code from a string without generating output
     pub fn validate_from_source(&self, source: &str) -> MmlResult<()> {
+        let source = self.normalize_source(source);
+
         // 1. Tokenize
-        let tokens = self.lex(source)?;
+        let tokens = self.lex(&source)?;
 
         // 2. Parse
         let _ast = self.parse(tokens)?;
@@ -227,5 +248,12 @@ mod tests {
         let compiler = MmlCompiler::new(CompileOptions::default());
         let result = compiler.compile(Path::new("/nonexistent/file.gwi"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compiler_validation_semicolon_comments() -> MmlResult<()> {
+        let compiler = MmlCompiler::new(CompileOptions::default());
+        compiler.validate_from_source("; comment\n'Y01 v100 l4 o4\n'Y01 c d e f\n")?;
+        Ok(())
     }
 }

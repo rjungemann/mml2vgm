@@ -85,6 +85,10 @@ rust-help:
 
 # Build WASM module
 wasm-build:
+    cd mml2vgm-wasm && wasm-pack build --release
+
+# Build WASM module in debug mode (slower runtime, faster iterative compile)
+wasm-build-debug:
     cd mml2vgm-wasm && wasm-pack build
 
 # Build WASM in release mode

@@ -5,12 +5,12 @@
 
 ; Part 0: Arpeggio pattern
 @0 v100 l16 o4
-  c e g c e g c2. >c e g c e g c2.
+@0 c e g c e g c2. >c e g c e g c2.
 
 ; Part 1: Bass line
 @1 v80 l8 o2
-  c2. d2. e2. f2. g2. a2. b2. >c2.
+@1 c2. d2. e2. f2. g2. a2. b2. >c2.
 
 ; Part 2: SSG accent
 @2 v90 l16 o5
-  c4 c4 c4 c4 sn8 c4 c4 c4 c4 sn8
+@2 c4 c4 c4 c4 sn8 c4 c4 c4 c4 sn8

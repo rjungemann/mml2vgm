@@ -126,10 +126,12 @@ impl SN76489 {
 
     /// Create a new SN76489 emulator with a custom clock rate
     pub fn with_clock_rate(clock_rate: u32) -> Self {
+        let sample_rate: u32 = 44100;
+        let clock_divider = clock_rate as f64 / sample_rate as f64;
         Self {
             clock_rate,
-            sample_rate: 44100,
-            clock_divider: 0.0,
+            sample_rate,
+            clock_divider,
             accumulated_cycles: 0.0,
             channels: [Default::default(); 3],
             noise_channel: Default::default(),

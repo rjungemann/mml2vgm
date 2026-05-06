@@ -36,6 +36,12 @@ export default defineConfig({
   
   // Server settings for development
   server: {
+    // Allow Vite to serve files from parent directories (needed for mml2vgm-wasm/pkg)
+    fs: {
+      allow: [
+        path.resolve(__dirname, '..'),
+      ],
+    },
     headers: {
       // Required for SharedArrayBuffer in Chrome/Edge
       'Cross-Origin-Opener-Policy': 'same-origin',

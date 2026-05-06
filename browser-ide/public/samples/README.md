@@ -39,7 +39,7 @@ This directory contains sample MML files for testing the Browser IDE.
 
 1. Create a new file with `.gwi` extension
 2. Start with `@OPNA` or another chip directive
-3. Define parts with `@0`, `@1`, `@2`, etc.
+3. Define channel parts with `@0`, `@1`, `@2`, ...
 4. Use standard MML commands for notes, volume, octave, etc.
 
 Example:

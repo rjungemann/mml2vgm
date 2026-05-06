@@ -17,8 +17,17 @@ export async function initializeWasm(): Promise<void> {
   try {
     console.log('[WasmWrapper] Initializing WASM module...');
 
-    // Import the WASM module - this triggers the glue code initialization
+    // Import the wasm-pack JS glue module
     const imported = await import('mml2vgm-wasm');
+
+    // wasm-pack generates a default async init() that fetches and instantiates
+    // the .wasm binary. Without calling it, all WASM functions fail because the
+    // internal `wasm` variable (which holds WebAssembly exports) is undefined.
+    if (typeof imported.default === 'function') {
+      console.log('[WasmWrapper] Calling WASM init() to load binary...');
+      await imported.default();
+      console.log('[WasmWrapper] WASM binary loaded successfully');
+    }
 
     // The imported module should have all the exported functions and classes
     wasmModule = imported;
@@ -113,6 +122,19 @@ export function extractResultData(result: any): {
   console.log('[WasmWrapper] Result type:', typeof result);
   console.log('[WasmWrapper] Result constructor:', result.constructor?.name);
 
+  const readValue = <T>(obj: any, key: string, fallback: T): T => {
+    const value = obj?.[key];
+    if (typeof value === 'function') {
+      try {
+        return value.call(obj) as T;
+      } catch (e) {
+        console.warn(`[WasmWrapper] ${key}() invocation failed:`, e);
+        return fallback;
+      }
+    }
+    return (value ?? fallback) as T;
+  };
+
   // Call the getter methods on the result object
   let data: Uint8Array;
   let partCount: number;
@@ -122,20 +144,18 @@ export function extractResultData(result: any): {
   let chipsUsed: string;
 
   try {
-    // These should be methods on the JsCompileResult instance
-    console.log('[WasmWrapper] Calling result.get_data()...');
-    const dataArray = result.get_data?.();
-    data = new Uint8Array(dataArray || []);
-    console.log('[WasmWrapper] get_data() succeeded, length:', data.length);
+    console.log('[WasmWrapper] Reading result data...');
+    const dataArray = readValue<any>(result, 'get_data', readValue<any>(result, 'data', []));
+    data = dataArray instanceof Uint8Array ? dataArray : new Uint8Array(dataArray || []);
+    console.log('[WasmWrapper] data read succeeded, length:', data.length);
   } catch (e) {
-    console.error('[WasmWrapper] get_data() failed:', e);
-    console.log('[WasmWrapper] Attempting alternative access...');
+    console.error('[WasmWrapper] data read failed:', e);
     data = new Uint8Array([]);
   }
 
   try {
-    console.log('[WasmWrapper] Calling result.part_count()...');
-    partCount = result.part_count?.() ?? 0;
+    console.log('[WasmWrapper] Reading part_count...');
+    partCount = Number(readValue<any>(result, 'part_count', 0)) || 0;
     console.log('[WasmWrapper] part_count():', partCount);
   } catch (e) {
     console.error('[WasmWrapper] part_count() failed:', e);
@@ -143,8 +163,8 @@ export function extractResultData(result: any): {
   }
 
   try {
-    console.log('[WasmWrapper] Calling result.command_count()...');
-    commandCount = result.command_count?.() ?? 0;
+    console.log('[WasmWrapper] Reading command_count...');
+    commandCount = Number(readValue<any>(result, 'command_count', 0)) || 0;
     console.log('[WasmWrapper] command_count():', commandCount);
   } catch (e) {
     console.error('[WasmWrapper] command_count() failed:', e);
@@ -152,8 +172,8 @@ export function extractResultData(result: any): {
   }
 
   try {
-    console.log('[WasmWrapper] Calling result.duration_samples()...');
-    durationSamples = result.duration_samples?.() ?? 0n;
+    console.log('[WasmWrapper] Reading duration_samples...');
+    durationSamples = readValue<any>(result, 'duration_samples', 0n) ?? 0n;
     console.log('[WasmWrapper] duration_samples():', durationSamples);
   } catch (e) {
     console.error('[WasmWrapper] duration_samples() failed:', e);
@@ -161,8 +181,8 @@ export function extractResultData(result: any): {
   }
 
   try {
-    console.log('[WasmWrapper] Calling result.duration_seconds()...');
-    durationSeconds = result.duration_seconds?.() ?? 0;
+    console.log('[WasmWrapper] Reading duration_seconds...');
+    durationSeconds = Number(readValue<any>(result, 'duration_seconds', 0)) || 0;
     console.log('[WasmWrapper] duration_seconds():', durationSeconds);
   } catch (e) {
     console.error('[WasmWrapper] duration_seconds() failed:', e);
@@ -170,8 +190,15 @@ export function extractResultData(result: any): {
   }
 
   try {
-    console.log('[WasmWrapper] Calling result.chips_used()...');
-    chipsUsed = result.chips_used?.() ?? '[]';
+    console.log('[WasmWrapper] Reading chips_used...');
+    const rawChips = readValue<any>(result, 'chips_used', []);
+    if (typeof rawChips === 'string') {
+      chipsUsed = rawChips;
+    } else if (Array.isArray(rawChips)) {
+      chipsUsed = JSON.stringify(rawChips);
+    } else {
+      chipsUsed = '[]';
+    }
     console.log('[WasmWrapper] chips_used():', chipsUsed.substring(0, 50));
   } catch (e) {
     console.error('[WasmWrapper] chips_used() failed:', e);

@@ -109,10 +109,10 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
     const optionsJson = JSON.stringify(options);
     phase(`Options prepared (length=${optionsJson.length})`);
 
-    // Call the WASM compile function
-    // Wrap in Promise to allow timeout
+    // Call the WASM compile function.
+    // Note: compile_mml is synchronous; timeout protection must happen in the main thread.
     phase('Preparing synchronous WASM compile call');
-    const compilationPromise = Promise.resolve().then(() => {
+    const result: any = await Promise.resolve().then(() => {
       phase('Starting synchronous compile_mml call');
       const startTime = performance.now();
       try {
@@ -130,16 +130,7 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
       }
     });
 
-    // Add a timeout to compilation
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        console.error(`[Worker][${requestId}] Compilation timed out after 60 seconds`);
-        reject(new Error('Compilation timeout (60s)'));
-      }, 60000);
-    });
-
-    phase('Waiting for compilation completion (60s timeout)');
-    const result: any = await Promise.race([compilationPromise, timeoutPromise]);
+    phase('Synchronous compile_mml call completed');
     phase('Compilation completed successfully');
 
     postMessageToMain({

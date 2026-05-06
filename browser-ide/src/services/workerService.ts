@@ -109,7 +109,9 @@ export interface WorkerManagerConfig {
  * Manages a pool of workers and distributes compile requests
  */
 export class WorkerManager {
-  private static readonly COMPILE_TIMEOUT_MS = 60000;
+  private static readonly COMPILE_TIMEOUT_MS = 15000;
+  private static readonly WORKER_INIT_TIMEOUT_MS = 8000;
+  private static readonly FALLBACK_TIMEOUT_MS = 20000;
 
   private workers: WorkerEntry[] = [];
   private queue: CompileRequest[] = [];
@@ -295,11 +297,7 @@ export class WorkerManager {
     console.error(`[WorkerManager] Compile timed out after ${WorkerManager.COMPILE_TIMEOUT_MS}ms for request: ${requestId}`);
 
     this.clearWorkerTimeout(entry);
-    this.handleError(
-      requestId,
-      `Compilation timeout (${Math.floor(WorkerManager.COMPILE_TIMEOUT_MS / 1000)}s)`,
-      'timeout'
-    );
+    const timedOutRequest = this.activeRequests.get(requestId);
 
     this.workers = this.workers.filter(w => w !== entry);
 
@@ -313,16 +311,65 @@ export class WorkerManager {
     entry.isInitialized = false;
     entry.currentRequestId = null;
 
+    this.workersActive = this.workers.some(w => w.isInitialized);
+
+    // Recreate worker in the background so timeout handling does not block fallback.
     if (!this.isTerminated) {
-      try {
-        await this.createWorker();
-      } catch (e) {
-        console.warn('[WorkerManager] Failed to recreate worker after timeout:', e);
-      }
+      void this.recreateWorkerAfterTimeout();
     }
 
-    this.workersActive = this.workers.some(w => w.isInitialized);
+    if (timedOutRequest && this.useFallback && this.fallbackCompile) {
+      try {
+        console.warn(`[WorkerManager] Falling back to main-thread compile for ${requestId} after worker timeout`);
+        this.handleProgress(requestId, 20, 'Worker timeout; retrying on main thread fallback...');
+        const fallbackResult = await this.runFallbackWithTimeout(timedOutRequest.mml, timedOutRequest.options, requestId);
+        this.handleProgress(requestId, 90, 'Main-thread fallback compile completed');
+        this.handleResult(requestId, fallbackResult);
+      } catch (fallbackError) {
+        const message = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        this.handleError(requestId, `Worker timeout fallback failed: ${message}`, 'timeout');
+      }
+    } else {
+      this.handleError(
+        requestId,
+        `Compilation timeout (${Math.floor(WorkerManager.COMPILE_TIMEOUT_MS / 1000)}s)`,
+        'timeout'
+      );
+    }
+
     this.processQueue();
+  }
+
+  private async recreateWorkerAfterTimeout(): Promise<void> {
+    try {
+      await this.createWorker();
+      this.workersActive = this.workers.some(w => w.isInitialized);
+      console.log('[WorkerManager] Replacement worker initialized after timeout');
+      this.processQueue();
+    } catch (e) {
+      this.workersActive = this.workers.some(w => w.isInitialized);
+      console.warn('[WorkerManager] Failed to recreate worker after timeout:', e);
+    }
+  }
+
+  private async runFallbackWithTimeout(
+    mml: string,
+    options: CompileOptions,
+    requestId: string
+  ): Promise<CompileResult> {
+    if (!this.fallbackCompile) {
+      throw new Error('No fallback compile function configured');
+    }
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Main-thread fallback timeout (${Math.floor(WorkerManager.FALLBACK_TIMEOUT_MS / 1000)}s)`));
+      }, WorkerManager.FALLBACK_TIMEOUT_MS);
+    });
+
+    const compilePromise = this.fallbackCompile(mml, options);
+    console.log(`[WorkerManager] Starting main-thread fallback compile for ${requestId}`);
+    return Promise.race([compilePromise, timeoutPromise]);
   }
   
   /**
@@ -330,7 +377,7 @@ export class WorkerManager {
    */
   private async initializeWorker(entry: WorkerEntry): Promise<void> {
     const requestId = `init-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    const timeout = 30000; // 30 second timeout for worker initialization (increased for WASM init)
+    const timeout = WorkerManager.WORKER_INIT_TIMEOUT_MS;
 
     return new Promise((resolve, reject) => {
       const timeoutHandle = setTimeout(() => {
@@ -366,6 +413,19 @@ export class WorkerManager {
   setProgressCallback(callback?: (progress: number, message: string) => void): void {
     this.progressCallback = callback;
   }
+
+  /**
+   * Normalize browser-authored MML before compilation.
+   * Some legacy/sample files use ';' full-line comments that can trigger parser stalls,
+   * so strip those lines while preserving all musical content.
+   */
+  private preprocessMml(mml: string): string {
+    return mml
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith(';'))
+      .join('\n');
+  }
   
   /**
    * Compile MML in a worker (or fallback to main thread)
@@ -379,6 +439,7 @@ export class WorkerManager {
     }
     
     const requestId = `compile-${this.nextRequestId++}`;
+    const normalizedMml = this.preprocessMml(mml);
     const status = this.getStatus();
     console.log(`[WorkerManager] Compile requested. Status:`, status);
     
@@ -388,7 +449,7 @@ export class WorkerManager {
       return new Promise((resolve, reject) => {
         const request: CompileRequest = {
           requestId,
-          mml,
+          mml: normalizedMml,
           options,
           resolve,
           reject,
@@ -406,7 +467,7 @@ export class WorkerManager {
     // Fallback to main thread if no workers are active
     if (this.useFallback && this.fallbackCompile) {
       console.log(`[WorkerManager] Using fallback to main thread (workersActive=${this.workersActive}, workers=${this.workers.length})`);
-      return this.fallbackCompile(mml, options);
+      return this.fallbackCompile(normalizedMml, options);
     }
     
     // No fallback available - throw error

@@ -60,6 +60,13 @@ pub trait SoundChipEmulator {
     /// The number of samples generated is buffer.len() / 2 (stereo).
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32);
 
+    /// Write to a chip register with explicit port selection.
+    /// Port 0 = first register bank, Port 1 = second register bank (e.g. YM2608 ch4-6).
+    fn write_port(&mut self, port: u8, addr: u8, data: u8) {
+        let _ = port;
+        self.write(addr, data);
+    }
+
     /// Check if the chip has been initialized
     fn is_initialized(&self) -> bool {
         true

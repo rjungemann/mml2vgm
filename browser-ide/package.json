@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:e2e:install": "playwright install firefox",
+    "test:e2e:firefox": "playwright test tests/e2e/firefox-arpeggio-duration.spec.ts --project=firefox"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
@@ -31,6 +33,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.13.2",

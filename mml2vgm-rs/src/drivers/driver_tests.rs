@@ -11,6 +11,7 @@ use crate::drivers::{
 use std::sync::Arc;
 
 const TIMEOUT_SECS: u64 = 2;
+const VGM_HEADER_SIZE: usize = 0x40;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,30 @@ fn assert_driver_conforms(driver: &dyn ExternalDriver, own_extension: &str, mini
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "{}: test exceeded timeout", driver.id());
 }
 
+fn assert_valid_vgm_output(bytes: &[u8]) {
+    assert!(
+        bytes.len() >= VGM_HEADER_SIZE,
+        "expected at least {} bytes, got {}",
+        VGM_HEADER_SIZE,
+        bytes.len()
+    );
+    assert_eq!(&bytes[0..4], b"Vgm ", "missing VGM magic");
+
+    let eof_offset = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
+    assert_eq!(
+        eof_offset + 4,
+        bytes.len(),
+        "EOF offset should match total file size"
+    );
+}
+
+fn assert_compile_outputs_valid_vgm(driver: &dyn ExternalDriver, snippet: &str) {
+    let result = driver
+        .compile(snippet, &DriverCompileOptions::default())
+        .expect("compile should succeed for fixture snippet");
+    assert_valid_vgm_output(&result.data);
+}
+
 // ── M98 ───────────────────────────────────────────────────────────────────────
 
 const M98_SNIPPET: &str = "; M98 test\nt120\no4\nC4 D4 E4\n";
@@ -88,6 +113,11 @@ fn m98_detect_content_keywords() {
 fn m98_detect_pc98_keyword() {
     let conf = M98Driver.detect("PC-98 sound driver\n", None);
     assert!(conf >= 80);
+}
+
+#[test]
+fn m98_compile_outputs_valid_vgm() {
+    assert_compile_outputs_valid_vgm(&M98Driver, M98_SNIPPET);
 }
 
 // ── Mucom88 ───────────────────────────────────────────────────────────────────
@@ -119,6 +149,11 @@ fn mucom_psg_channel_range() {
         let _ = MucomDriver.compile(&src, &opts);
     }
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
+}
+
+#[test]
+fn mucom_compile_outputs_valid_vgm() {
+    assert_compile_outputs_valid_vgm(&MucomDriver, MUCOM_SNIPPET);
 }
 
 // ── MoonDriver ────────────────────────────────────────────────────────────────
@@ -154,6 +189,11 @@ fn moon_opna_target_compiles() {
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
 }
 
+#[test]
+fn moon_compile_outputs_valid_vgm() {
+    assert_compile_outputs_valid_vgm(&MoonDriver, MOON_SNIPPET);
+}
+
 // ── PMD ───────────────────────────────────────────────────────────────────────
 
 const PMD_SNIPPET: &str = "; PMD test\n@0 t120 o4 C4 D4 E4\n";
@@ -171,6 +211,11 @@ fn pmd_finite_loop_parses() {
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
 }
 
+#[test]
+fn pmd_compile_outputs_valid_vgm() {
+    assert_compile_outputs_valid_vgm(&PMDDriver, PMD_SNIPPET);
+}
+
 // ── Muap ─────────────────────────────────────────────────────────────────────
 
 const MUAP_SNIPPET: &str = "@OPNA\n@FM 0 t120 o4 C4 D4 E4\n";
@@ -186,6 +231,11 @@ fn muap_detect_extension_high_confidence() {
     let conf = MuapDriver.detect("", Some("track.muap"));
     assert!(conf >= 80, "expected ≥80, got {}", conf);
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
+}
+
+#[test]
+fn muap_compile_outputs_valid_vgm() {
+    assert_compile_outputs_valid_vgm(&MuapDriver, MUAP_SNIPPET);
 }
 
 // ── Driver Registry ───────────────────────────────────────────────────────────

@@ -10,6 +10,37 @@ use std::path::PathBuf;
 use mml2vgm::{CompileOptions, OutputFormat};
 use mml2vgm::compiler::compiler::MmlCompiler;
 
+const VGM_HEADER_SIZE: usize = 0x40;
+
+fn read_u32_le(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes([
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3],
+    ])
+}
+
+fn assert_valid_vgm_output(bytes: &[u8]) {
+    assert!(
+        bytes.len() >= VGM_HEADER_SIZE,
+        "expected at least a {}-byte VGM header, got {} bytes",
+        VGM_HEADER_SIZE,
+        bytes.len()
+    );
+    assert_eq!(&bytes[0..4], b"Vgm ", "missing VGM magic");
+
+    let eof_offset = read_u32_le(bytes, 4) as usize;
+    assert_eq!(
+        eof_offset + 4,
+        bytes.len(),
+        "EOF offset should match total VGM file size"
+    );
+
+    let version = read_u32_le(bytes, 8);
+    assert!(version >= 0x0000_0150, "unexpected VGM version: {version:#x}");
+}
+
 #[test]
 fn test_compile_all_examples() {
     let samples_dir = PathBuf::from("../browser-ide/public/samples");
@@ -65,6 +96,7 @@ fn test_compile_all_examples() {
 
         match compiler.compile_from_source(&mml_content) {
             Ok(result) => {
+                assert_valid_vgm_output(&result.data);
                 println!(
                     "✓ {} - Compiled successfully ({} bytes, {} parts, {} commands, {:.2}s)",
                     filename,
@@ -116,6 +148,7 @@ fn test_simple_compilation() {
     
     match result {
         Ok(result) => {
+            assert_valid_vgm_output(&result.data);
             println!("Success! Output: {} bytes", result.data.len());
         }
         Err(e) => {
@@ -147,6 +180,7 @@ fn test_file_compilation() {
     
     match result {
         Ok(result) => {
+            assert_valid_vgm_output(&result.data);
             println!("Success! Output: {} bytes", result.data.len());
         }
         Err(e) => {
@@ -154,4 +188,27 @@ fn test_file_compilation() {
             panic!("Compilation failed");
         }
     }
+}
+
+#[test]
+fn test_browser_sample_comment_lines_compile_from_source() {
+    use std::time::Instant;
+
+    let input_path = PathBuf::from("../browser-ide/public/samples/hello_world.gwi");
+    let mml = fs::read_to_string(&input_path).expect("Failed to read hello_world.gwi");
+    let compiler = MmlCompiler::new(CompileOptions {
+        format: OutputFormat::VGM,
+        ..Default::default()
+    });
+
+    let start = Instant::now();
+    let result = compiler.compile_from_source(&mml).expect("Compilation failed");
+    let elapsed = start.elapsed();
+
+    assert!(
+        elapsed.as_secs_f64() < 5.0,
+        "comment-bearing browser sample compile took too long: {:.2}s",
+        elapsed.as_secs_f64()
+    );
+    assert_valid_vgm_output(&result.data);
 }

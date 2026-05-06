@@ -8,6 +8,23 @@ This directory contains smoke tests for the mml2vgm Browser IDE.
 
 ## Running Tests
 
+### Option 0: Firefox E2E Regression (Playwright)
+
+This catches regressions where `arpeggio.gwi` starts and then quickly becomes silent.
+
+1. Install Firefox browser support for Playwright:
+   ```bash
+   cd browser-ide
+   npm run test:e2e:install
+   ```
+
+2. Run the Firefox playback-duration regression test:
+   ```bash
+   npm run test:e2e:firefox
+   ```
+
+The test file is `tests/e2e/firefox-arpeggio-duration.spec.ts` and asserts that playback remains audible for longer than an initial burst.
+
 ### Option 1: Interactive Browser Testing
 
 1. Start the dev server:

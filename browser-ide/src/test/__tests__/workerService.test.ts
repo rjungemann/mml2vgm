@@ -6,7 +6,7 @@
  * focus on the manager API surface and graceful-degradation paths.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Worker API is not available in jsdom – provide a minimal stub.
 global.Worker = class {
@@ -45,16 +45,14 @@ describe('WorkerService', () => {
   it('WorkerManager instance has cancel method', { timeout: 2000 }, async () => {
     const { WorkerManager } = await import('@/services/workerService');
     const mgr = new WorkerManager({ maxWorkers: 1 });
-    expect(typeof mgr.cancel).toBe('function');
+    expect(typeof mgr.cancelActiveCompilation).toBe('function');
   });
 
   it('WorkerManager instance has destroy/terminate method', { timeout: 2000 }, async () => {
     const { WorkerManager } = await import('@/services/workerService');
     const mgr = new WorkerManager({ maxWorkers: 1 });
     const hasDestroy =
-      typeof (mgr as any).destroy === 'function' ||
-      typeof (mgr as any).terminate === 'function' ||
-      typeof (mgr as any).dispose === 'function';
+      typeof (mgr as any).terminateAll === 'function';
     expect(hasDestroy).toBe(true);
   });
 
@@ -73,10 +71,10 @@ describe('WorkerService', () => {
 
   // ── getWorkerManager returns singleton ────────────────────────────────────
 
-  it('getWorkerManager() returns same instance each call', { timeout: 2000 }, async () => {
-    const { getWorkerManager } = await import('@/services/workerService');
-    const a = getWorkerManager();
-    const b = getWorkerManager();
+  it('getWorkerManagerSync() returns same instance each call', { timeout: 2000 }, async () => {
+    const { getWorkerManagerSync } = await import('@/services/workerService');
+    const a = getWorkerManagerSync();
+    const b = getWorkerManagerSync();
     expect(a).toBe(b);
   });
 });

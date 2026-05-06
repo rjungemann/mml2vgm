@@ -10,6 +10,7 @@ use std::process;
 use mml2vgm::{
     CompileInfo, CompileOptions, CompileResult, MmlResult, OutputFormat, SoundChip,
     compiler::compiler::MmlCompiler,
+    player::VgmPlayer,
 };
 
 /// mml2vgm-rs: MML to VGM/XGM/ZGM compiler and player
@@ -367,8 +368,47 @@ fn main() {
                 // Play if requested
                 if args.play && !result.data.is_empty() {
                     info!("Playing output...");
-                    // TODO: Implement playback in Phase 5
-                    warn!("Playback not yet implemented");
+                    let mut player = VgmPlayer::new();
+                    if let Err(e) = player.load(&result.data) {
+                        error!("Failed to load VGM for playback: {}", e);
+                        process::exit(1);
+                    }
+                    player.init_chips_from_header();
+                    let sample_rate = 44100u32;
+                    let samples = match player.render_to_pcm(sample_rate) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!("Failed to render audio: {}", e);
+                            process::exit(1);
+                        }
+                    };
+                    if samples.is_empty() {
+                        warn!("No audio samples generated — check MML content and chip driver.");
+                    } else {
+                        match rodio::OutputStream::try_default() {
+                            Ok((_stream, handle)) => {
+                                match rodio::Sink::try_new(&handle) {
+                                    Ok(sink) => {
+                                        let source = rodio::buffer::SamplesBuffer::new(
+                                            2, sample_rate, samples,
+                                        );
+                                        sink.append(source);
+                                        println!("Playing... (Ctrl+C to stop)");
+                                        sink.sleep_until_end();
+                                        println!("Playback complete.");
+                                    }
+                                    Err(e) => {
+                                        error!("Audio sink error: {}", e);
+                                        process::exit(1);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("No audio output device: {}", e);
+                                process::exit(1);
+                            }
+                        }
+                    }
                 }
 
                 process::exit(0);

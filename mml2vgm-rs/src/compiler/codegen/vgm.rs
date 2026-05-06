@@ -322,7 +322,7 @@ impl VgmGenerator {
             });
             
             // Volume (attenuation) - lower = louder
-            let volume = 0x0F; // Max volume for now
+            let volume = 0x00; // 0x00 = max volume, 0x0F = silent (attenuation: 0=loud, 15=mute)
             self.commands.push(VgmCommand {
                 command_type: VgmCommandType::Sn76489Write,
                 data: vec![0x90 | (volume & 0x0F) as u8], // Channel 0 volume
@@ -466,6 +466,10 @@ impl VgmGenerator {
             self.write_pcm_data_block(pcm, &mut output)?;
         }
 
+        // EOF offset is stored at 0x04 as a relative offset from 0x04.
+        let eof_offset = output.len().saturating_sub(4) as u32;
+        output[4..8].copy_from_slice(&eof_offset.to_le_bytes());
+
         Ok(output)
     }
 
@@ -473,6 +477,9 @@ impl VgmGenerator {
     fn write_header(&self, output: &mut Vec<u8>) -> MmlResult<()> {
         // Write ident
         output.extend_from_slice(&self.header.ident);
+
+        // EOF offset placeholder (patched after command/data emission)
+        output.extend_from_slice(&0u32.to_le_bytes());
 
         // Write version
         output.extend_from_slice(&self.header.version.to_le_bytes());
@@ -507,8 +514,12 @@ impl VgmGenerator {
         // Write SN76489 flags
         output.push(self.header.sn76489_flags);
 
-        // Reserved bytes (0x100 - current position)
-        while output.len() < 0x100 {
+        // Write YM2612 and YM2151 clocks in their standard header slots.
+        output.extend_from_slice(&self.header.ym2612_clock.to_le_bytes());
+        output.extend_from_slice(&self.header.ym2151_clock.to_le_bytes());
+
+        // Minimal VGM header size used by the current player/parser.
+        while output.len() < 0x40 {
             output.push(0);
         }
 

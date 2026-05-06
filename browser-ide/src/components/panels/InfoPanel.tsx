@@ -6,9 +6,11 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { wasmService } from '@/services/wasmService';
 
 const InfoPanel: React.FC = () => {
-  const { getResult } = useCompileStore(
+  const { getResult, lastCompileTimingSummary, compileTimingHistory } = useCompileStore(
     useShallow((state) => ({
       getResult: state.getResult,
+      lastCompileTimingSummary: state.lastCompileTimingSummary,
+      compileTimingHistory: state.compileTimingHistory,
     }))
   );
 
@@ -126,9 +128,56 @@ const InfoPanel: React.FC = () => {
               <span style={{ color: 'var(--text-muted)' }}>Compiled:</span> 
               <span>{activeResult.timestamp.toLocaleTimeString()}</span>
             </div>
+            {lastCompileTimingSummary && (
+              <div style={{ marginBottom: '2px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Timing:</span> 
+                <span>{lastCompileTimingSummary}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      <div style={{ marginBottom: '8px' }}>
+        <h3 style={{ margin: '0 0 4px 0', fontSize: '13px' }}>Compile Timing History</h3>
+        <div style={{ backgroundColor: 'var(--bg-tertiary)', padding: '4px', borderRadius: '3px', maxHeight: '180px', overflowY: 'auto' }}>
+          {compileTimingHistory.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)' }}>No compile timings yet</div>
+          ) : (
+            compileTimingHistory.map((entry, idx) => (
+              <div
+                key={`${entry.timestamp.toISOString()}-${idx}`}
+                style={{
+                  marginBottom: '3px',
+                  paddingBottom: '3px',
+                  borderBottom: idx < compileTimingHistory.length - 1 ? '1px solid var(--border-color)' : 'none',
+                }}
+              >
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>{entry.timestamp.toLocaleTimeString()}</span>
+                  <span>{' '}</span>
+                  <span
+                    style={{
+                      color:
+                        entry.status === 'success'
+                          ? 'var(--accent-primary)'
+                          : entry.status === 'cancelled'
+                            ? 'var(--text-muted)'
+                            : 'var(--accent-error)',
+                    }}
+                  >
+                    {entry.status.toUpperCase()}
+                  </span>
+                  {entry.documentId && (
+                    <span style={{ color: 'var(--text-muted)' }}>{` (${entry.documentId})`}</span>
+                  )}
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{entry.summary}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       <div style={{ marginBottom: '8px' }}>
         <h3 style={{ margin: '0 0 4px 0', fontSize: '13px' }}>System Information</h3>

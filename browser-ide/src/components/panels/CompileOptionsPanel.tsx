@@ -1,22 +1,44 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { OutputFormat, SoundChip } from '@/types';
 import { useCompileStore } from '@/stores/compileStore';
 import { useDocumentStore } from '@/stores/documentStore';
 
 const CompileOptionsPanel: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<OutputFormat>('vgm');
-  const [selectedChips, setSelectedChips] = useState<SoundChip[]>(['YM2608']);
-  const [clockRate, setClockRate] = useState(7987200);
+  const [selectedChips, setSelectedChips] = useState<SoundChip[]>(['YM2608', 'SN76489']);
+  const [clockCount, setClockCount] = useState(0);
   const [compression, setCompression] = useState(0);
   const [optimize, setOptimize] = useState(true);
   const [verbose, setVerbose] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [compileStartedAt, setCompileStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   // Get compile function and active document from stores
-  const { compile, status } = useCompileStore((state) => ({
+  const { compile, status, progress, progressMessage, lastCompileTimingSummary } = useCompileStore((state) => ({
     compile: state.compile,
     status: state.status,
+    progress: state.progress,
+    progressMessage: state.progressMessage,
+    lastCompileTimingSummary: state.lastCompileTimingSummary,
   }));
+    useEffect(() => {
+      if (status === 'compiling') {
+        if (!compileStartedAt) {
+          setCompileStartedAt(Date.now());
+        }
+
+        const interval = setInterval(() => {
+          setElapsedMs(compileStartedAt ? Date.now() - compileStartedAt : 0);
+        }, 200);
+
+        return () => clearInterval(interval);
+      }
+
+      setCompileStartedAt(null);
+      setElapsedMs(0);
+    }, [status, compileStartedAt]);
+
   const { activeDocumentId } = useDocumentStore((state) => ({
     activeDocumentId: state.activeDocumentId,
   }));
@@ -62,6 +84,14 @@ const CompileOptionsPanel: React.FC = () => {
     { value: 'MIDI', label: 'MIDI Output', group: 'Other' },
   ];
 
+  const clockCountPresets = [
+    { value: 0, label: 'Auto (driver/MML default)' },
+    { value: 96, label: '96 (half resolution)' },
+    { value: 192, label: '192 (common default)' },
+    { value: 384, label: '384 (higher timing resolution)' },
+    { value: 768, label: '768 (very high timing resolution)' },
+  ];
+
   // Toggle chip selection
   const toggleChip = (chip: SoundChip) => {
     setSelectedChips((prev) => {
@@ -72,6 +102,14 @@ const CompileOptionsPanel: React.FC = () => {
     });
   };
 
+  const toBrowserTargetChips = (chips: SoundChip[]): string[] => {
+    const normalized = chips.map((chip) => chip.toLowerCase());
+    if (normalized.length === 1 && normalized[0] === 'ym2608') {
+      return ['ym2608', 'sn76489'];
+    }
+    return normalized;
+  };
+
   // Handle compile
   const handleCompile = useCallback(async () => {
     if (!activeDocumentId || status === 'compiling') return;
@@ -79,8 +117,8 @@ const CompileOptionsPanel: React.FC = () => {
     try {
       const options: any = {
         format: selectedFormat,
-        target_chips: selectedChips.map(chip => chip.toLowerCase()),
-        clock_count: clockRate,
+        target_chips: toBrowserTargetChips(selectedChips),
+        clock_count: clockCount,
         compression,
         optimize,
         verbose,
@@ -92,7 +130,7 @@ const CompileOptionsPanel: React.FC = () => {
     } catch (error) {
       console.error('Compilation error:', error);
     }
-  }, [activeDocumentId, compile, status, selectedFormat, selectedChips, clockRate, compression, optimize, verbose, debug]);
+  }, [activeDocumentId, compile, status, selectedFormat, selectedChips, clockCount, compression, optimize, verbose, debug]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '4px' }}>
@@ -169,17 +207,25 @@ const CompileOptionsPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Clock Rate */}
+      {/* Clock Count */}
       <div style={{ marginBottom: '8px' }}>
         <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px' }}>
-          Clock Rate (Hz)
+          Clock Count Override
         </label>
-        <input
-          type="number"
-          value={clockRate}
-          onChange={(e) => setClockRate(Number(e.target.value))}
+        <select
+          value={clockCount}
+          onChange={(e) => setClockCount(Number(e.target.value))}
           style={{ width: '100%', padding: '4px', fontSize: '12px' }}
-        />
+        >
+          {clockCountPresets.map((preset) => (
+            <option key={preset.value} value={preset.value}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+        <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          Use Auto unless you need explicit MML clock-count behavior tuning.
+        </div>
       </div>
 
       {/* Options */}
@@ -242,6 +288,32 @@ const CompileOptionsPanel: React.FC = () => {
         >
           Compile
         </button>
+      </div>
+
+      {/* Compile Diagnostics */}
+      <div style={{ marginTop: '8px', backgroundColor: 'var(--bg-tertiary)', padding: '6px', borderRadius: '3px', border: '1px solid var(--border-color)' }}>
+        <div style={{ fontSize: '12px', marginBottom: '4px' }}><strong>Compile Diagnostics</strong></div>
+        <div style={{ fontSize: '11px', marginBottom: '2px' }}>
+          <span style={{ color: 'var(--text-muted)' }}>Status:</span> <span>{status}</span>
+          {status === 'compiling' && typeof progress === 'number' && (
+            <span>{` (${Math.round(progress)}%)`}</span>
+          )}
+        </div>
+        {status === 'compiling' && (
+          <div style={{ fontSize: '11px', marginBottom: '2px' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Elapsed:</span> <span>{(elapsedMs / 1000).toFixed(1)}s</span>
+          </div>
+        )}
+        {progressMessage && (
+          <div style={{ fontSize: '11px', marginBottom: '2px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Phase:</span> <span>{progressMessage}</span>
+          </div>
+        )}
+        {lastCompileTimingSummary && status !== 'compiling' && (
+          <div style={{ fontSize: '11px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Last:</span> <span>{lastCompileTimingSummary}</span>
+          </div>
+        )}
       </div>
     </div>
   );

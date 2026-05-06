@@ -85,7 +85,8 @@ export const defaultSettings: IDESettings = {
     // Compilation
     outputFormat: 'vgm',
     defaultChip: 'YM2612',
-    clockRate: 7670454,
+    // Clock count override (0 = auto/default from driver or MML)
+    clockRate: 0,
     
     // Audio
     audio: defaultAudioSettings,

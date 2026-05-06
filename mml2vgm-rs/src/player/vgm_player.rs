@@ -88,6 +88,7 @@ impl VgmPlayer {
         }
 
         header.version = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        header.eof_offset = eof_offset as u32;
         header.sn76489_clock =
             u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
         header.ym2413_clock =
@@ -140,6 +141,23 @@ impl VgmPlayer {
                         offset += 2;
                         commands.push((current_time, vec![cmd, addr, value]));
                     }
+                }
+                0x54..=0x5F => {
+                    // Various chip writes (addr + data byte each)
+                    if offset + 2 <= data.len() {
+                        let addr = data[offset];
+                        let value = data[offset + 1];
+                        offset += 2;
+                        commands.push((current_time, vec![cmd, addr, value]));
+                    }
+                }
+                0x70..=0x7F => {
+                    // Short wait: (cmd & 0x0F) + 1 samples
+                    current_time = current_time.saturating_add((cmd & 0x0F) as u32 + 1);
+                }
+                0x80..=0x8F => {
+                    // YM2612 DAC write + wait (cmd & 0x0F) samples
+                    current_time = current_time.saturating_add((cmd & 0x0F) as u32);
                 }
                 0x61 => {
                     // Wait n samples
@@ -264,7 +282,8 @@ impl VgmPlayer {
             self.current_command += 1;
         }
 
-        // Generate samples from all chips
+        // Zero the buffer first, then let each chip contribute
+        buffer.fill(0.0);
         for (_, chip) in &mut self.chips {
             chip.generate_samples(buffer, self.sample_rate);
         }
@@ -274,9 +293,124 @@ impl VgmPlayer {
         Ok(())
     }
 
-    fn _execute_command(&mut self, _cmd_data: &[u8]) -> MmlResult<()> {
-        // Command execution will be implemented with full chip support
+    fn _execute_command(&mut self, cmd_data: &[u8]) -> MmlResult<()> {
+        if cmd_data.is_empty() {
+            return Ok(());
+        }
+        match cmd_data[0] {
+            0x50 if cmd_data.len() >= 2 => {
+                for (chip, emu) in &mut self.chips {
+                    if matches!(chip, SoundChip::SN76489 | SoundChip::SN76489X2) {
+                        emu.write(0, cmd_data[1]); break;
+                    }
+                }
+            }
+            0x52 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if matches!(chip, SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2) {
+                        emu.write_port(0, cmd_data[1], cmd_data[2]); break;
+                    }
+                }
+            }
+            0x53 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if matches!(chip, SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2) {
+                        emu.write_port(1, cmd_data[1], cmd_data[2]); break;
+                    }
+                }
+            }
+            0x54 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM2151 { emu.write(cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x55 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM2203 { emu.write(cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x56 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM2608 {
+                        emu.write_port(0, cmd_data[1], cmd_data[2]); break;
+                    }
+                }
+            }
+            0x57 if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM2608 {
+                        emu.write_port(1, cmd_data[1], cmd_data[2]); break;
+                    }
+                }
+            }
+            _ => {}
+        }
         Ok(())
+    }
+
+    /// Initialize chip emulators from the VGM header.
+    /// Uses parsed commands first, then falls back to YM2608 for OPNA-oriented test playback.
+    pub fn init_chips_from_header(&mut self) {
+        if !self.chips.is_empty() {
+            return;
+        }
+
+        let mut has_sn76489 = false;
+        let mut has_ym2612 = false;
+        let mut has_ym2151 = false;
+        let mut has_ym2203 = false;
+        let mut has_ym2608 = false;
+
+        for (_, cmd) in &self.commands {
+            match cmd.first().copied() {
+                Some(0x50) => has_sn76489 = true,
+                Some(0x52 | 0x53) => has_ym2612 = true,
+                Some(0x54) => has_ym2151 = true,
+                Some(0x55) => has_ym2203 = true,
+                Some(0x56 | 0x57) => has_ym2608 = true,
+                _ => {}
+            }
+        }
+
+        if has_sn76489 {
+            self.chips.push((SoundChip::SN76489, Box::new(crate::chips::sn76489::SN76489::new())));
+        }
+        if has_ym2612 {
+            self.chips.push((SoundChip::YM2612, Box::new(crate::chips::ym2612::YM2612::new())));
+        }
+        if has_ym2151 {
+            self.chips.push((SoundChip::YM2151, Box::new(crate::chips::ym2151::YM2151::new())));
+        }
+        if has_ym2203 {
+            self.chips.push((SoundChip::YM2203, Box::new(crate::chips::ym2203::YM2203::new())));
+        }
+        if has_ym2608 {
+            self.chips.push((SoundChip::YM2608, Box::new(crate::chips::ym2608::YM2608::new())));
+        }
+
+        if self.chips.is_empty() {
+            self.chips.push((SoundChip::YM2608, Box::new(crate::chips::ym2608::YM2608::new())));
+        }
+    }
+
+    /// Render the full VGM to an interleaved stereo f32 PCM vector at the given sample rate.
+    pub fn render_to_pcm(&mut self, sample_rate: u32) -> MmlResult<Vec<f32>> {
+        self.sample_rate = sample_rate;
+        self.play()?;
+        let total = self.duration() as usize;
+        if total == 0 {
+            return Ok(Vec::new());
+        }
+        let mut all_samples = Vec::with_capacity(total * 2);
+        const CHUNK: usize = 1024;
+        let mut buf = vec![0.0f32; CHUNK * 2];
+        while (self.current_sample as usize) < total {
+            let remaining = total - self.current_sample as usize;
+            let n = CHUNK.min(remaining);
+            self.generate_samples(&mut buf[..n * 2], n)?;
+            all_samples.extend_from_slice(&buf[..n * 2]);
+        }
+        Ok(all_samples)
     }
 
     /// Set the audio backend for playback

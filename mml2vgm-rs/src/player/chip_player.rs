@@ -193,8 +193,12 @@ impl ChipPlayer {
 
     /// Generate the next batch of samples
     pub fn generate_samples(&mut self, sample_count: usize) -> MmlResult<Vec<f32>> {
-        if self.state != ChipPlayerState::Playing {
-            return Ok(vec![0.0; sample_count * 2]); // Return silence for stereo
+        // When stopped, still generate samples so WASM callers (which manage
+        // their own state externally) receive chip output immediately after
+        // register writes without needing an explicit play() call.
+        // CLI usage sets state to Playing before calling generate_samples.
+        if self.state == ChipPlayerState::Paused {
+            return Ok(vec![0.0; sample_count * 2]); // Return silence when paused
         }
 
         self.sample_buffer.clear();

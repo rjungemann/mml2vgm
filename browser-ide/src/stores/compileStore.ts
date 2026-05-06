@@ -16,6 +16,25 @@ import { wasmService } from '@/services/wasmService';
 /** Compilation status */
 export type CompileStatus = 'idle' | 'queued' | 'compiling' | 'success' | 'error';
 
+export type CompilePath = 'worker' | 'fallback' | 'unknown';
+
+export interface CompileTimingBreakdown {
+    queueMs: number;
+    documentLookupMs: number;
+    compileMs: number;
+    postProcessMs: number;
+    totalMs: number;
+    path: CompilePath;
+}
+
+export interface CompileTimingEntry {
+    timestamp: Date;
+    status: 'success' | 'error' | 'cancelled';
+    summary: string;
+    documentId: string | null;
+    timing: CompileTimingBreakdown;
+}
+
 /** A compile request in the queue */
 interface CompileRequest {
     id: string;
@@ -41,6 +60,7 @@ export interface StoreCompileResult {
     durationSamples: number;
     durationSeconds: number;
     chipsUsed: string[];
+    timing?: CompileTimingBreakdown;
 }
 
 interface CompileState {
@@ -64,6 +84,15 @@ interface CompileState {
 
     // Current progress message
     progressMessage: string;
+
+    // Last compile timing details for UI diagnostics
+    lastCompileTiming: CompileTimingBreakdown | null;
+
+    // Human-readable last compile timing summary
+    lastCompileTimingSummary: string;
+
+    // Recent compile timings (newest first)
+    compileTimingHistory: CompileTimingEntry[];
 
     // Web Worker settings
     useWebWorkers: boolean;
@@ -119,8 +148,22 @@ const initialState: CompileState = {
     lastCompileTime: null,
     progress: 0,
     progressMessage: '',
+    lastCompileTiming: null,
+    lastCompileTimingSummary: '',
+    compileTimingHistory: [],
     useWebWorkers: WorkerManager.isSupported(),
     workerManager: null,
+};
+
+const normalizeMs = (value: number): number => Math.max(0, Math.round(value));
+const MAX_TIMING_HISTORY = 20;
+
+const pushTimingHistory = (history: CompileTimingEntry[], entry: CompileTimingEntry): CompileTimingEntry[] => {
+    return [entry, ...history].slice(0, MAX_TIMING_HISTORY);
+};
+
+const formatTimingSummary = (timing: CompileTimingBreakdown): string => {
+    return `${timing.path} total ${timing.totalMs}ms (queue ${timing.queueMs}ms, lookup ${timing.documentLookupMs}ms, compile ${timing.compileMs}ms, post ${timing.postProcessMs}ms)`;
 };
 
 export const useCompileStore = create<CompileStore>()(
@@ -304,6 +347,9 @@ export const useCompileStore = create<CompileStore>()(
 
             // Get the next request
             const request = state.queue[0];
+            const dequeueTimeMs = Date.now();
+            const queueMs = normalizeMs(dequeueTimeMs - request.timestamp.getTime());
+            const totalStartMs = Date.now();
 
             // Update status
             set({
@@ -313,38 +359,50 @@ export const useCompileStore = create<CompileStore>()(
                     i === 0 ? { ...r, status: 'compiling' } : r
                 ),
                 progress: 0,
-                progressMessage: 'Starting compilation...',
+                progressMessage: `Starting compilation (queued ${queueMs}ms)...`,
             });
 
             try {
                 // Get the document from the document store
+                const documentLookupStartMs = Date.now();
                 const { useDocumentStore } = await import('@/stores/documentStore');
                 const documentStore = useDocumentStore.getState();
                 const doc = documentStore.getDocument(request.documentId);
+                const documentLookupMs = normalizeMs(Date.now() - documentLookupStartMs);
 
                 if (!doc) {
                     throw new Error(`Document not found: ${request.documentId}`);
                 }
 
                 // Update progress
-                get().setProgress(10, 'Starting compilation...');
+                get().setProgress(10, `Document ready (${documentLookupMs}ms)`);
 
                 // Try to use WorkerManager if available, otherwise fall back to wasmService
                 const currentState = get();
                 let result;
                 const startTime = Date.now();
+                let compilePath: CompilePath = 'unknown';
 
                 console.log(`[compileStore] Deciding compilation path: useWebWorkers=${currentState.useWebWorkers}, hasWorkerManager=${!!currentState.workerManager}`);
 
+                const compileStartMs = Date.now();
                 if (currentState.useWebWorkers && currentState.workerManager) {
+                    compilePath = 'worker';
+                    get().setProgress(20, 'Compiling via worker...');
                     console.log('[compileStore] Using WorkerManager for compilation');
                     result = await currentState.workerManager.compile(doc.content, request.options);
                 } else {
+                    compilePath = 'fallback';
+                    get().setProgress(20, 'Compiling on main thread fallback...');
                     console.log('[compileStore] Using wasmService fallback for compilation');
                     const { wasmService } = await import('@/services/wasmService');
                     result = await wasmService.compile(doc.content, request.options);
                 }
                 const duration = Date.now() - startTime;
+                const compileMs = normalizeMs(Date.now() - compileStartMs);
+                const postProcessStartMs = Date.now();
+
+                get().setProgress(80, 'Processing compile output...');
 
                 // Extract metadata from compile result
                 const info = result.info || {
@@ -356,19 +414,48 @@ export const useCompileStore = create<CompileStore>()(
                     format_version: '',
                 };
 
+                const dataLength = result.data?.length || 0;
+                const partCount = info.part_count || 0;
+                const commandCount = info.command_count || 0;
+                const metadataChipsUsed = (info.chips_used || []).map(c => c as string);
+                const optionChips = Array.isArray(request.options?.target_chips)
+                    ? request.options.target_chips.map((chip) => String(chip).toUpperCase())
+                    : [];
+                const chipsUsed = metadataChipsUsed.length > 0 ? metadataChipsUsed : optionChips;
+                const hasPlayableMetadata = partCount > 0 || commandCount > 0 || metadataChipsUsed.length > 0;
+
+                if (dataLength === 0) {
+                    throw new Error(
+                        'Compilation produced empty binary output. Check MML source and compile options.'
+                    );
+                }
+
+                const warnings: CompileError[] = [];
+                if (!hasPlayableMetadata) {
+                    warnings.push({
+                        type: 'warning',
+                        message: 'Compilation metadata is empty (parts/commands/chips). Proceeding with binary output and fallback chips.',
+                        line: 1,
+                        column: 1,
+                        length: 1,
+                        severity: 'warning',
+                        code: 'EMPTY_METADATA',
+                    });
+                }
+
                 // Create compile result with metadata
                 const compileResult: StoreCompileResult = {
                     documentId: request.documentId,
                     data: result.data,
                     errors: [],
-                    warnings: [],
+                    warnings,
                     duration,
                     timestamp: new Date(),
-                    partCount: info.part_count || 0,
-                    commandCount: info.command_count || 0,
+                    partCount,
+                    commandCount,
                     durationSamples: info.duration_samples || 0,
                     durationSeconds: info.duration_seconds || 0,
-                    chipsUsed: (info.chips_used || []).map(c => c as string),
+                    chipsUsed,
                 };
 
                 // Store result
@@ -391,6 +478,26 @@ export const useCompileStore = create<CompileStore>()(
                     []
                 );
 
+                const postProcessMs = normalizeMs(Date.now() - postProcessStartMs);
+                const totalMs = normalizeMs(Date.now() - totalStartMs);
+                const timing: CompileTimingBreakdown = {
+                    queueMs,
+                    documentLookupMs,
+                    compileMs,
+                    postProcessMs,
+                    totalMs,
+                    path: compilePath,
+                };
+                const timingSummary = formatTimingSummary(timing);
+                compileResult.timing = timing;
+                const timingEntry: CompileTimingEntry = {
+                    timestamp: new Date(),
+                    status: 'success',
+                    summary: timingSummary,
+                    documentId: request.documentId,
+                    timing,
+                };
+
                 // Remove from queue and update status
                 set({
                     status: 'success',
@@ -399,7 +506,10 @@ export const useCompileStore = create<CompileStore>()(
                     results,
                     lastCompileTime: new Date(),
                     progress: 100,
-                    progressMessage: 'Compilation complete',
+                    progressMessage: `Compilation complete (${timingSummary})`,
+                    lastCompileTiming: timing,
+                    lastCompileTimingSummary: timingSummary,
+                    compileTimingHistory: pushTimingHistory(get().compileTimingHistory, timingEntry),
                 });
 
                 // Resolve the promise
@@ -412,6 +522,22 @@ export const useCompileStore = create<CompileStore>()(
             } catch (error) {
                 const errorMessage = (error as Error).message || 'Unknown compilation error';
                 const isCancelled = /cancel/i.test(errorMessage);
+                const failureTiming: CompileTimingBreakdown = {
+                    queueMs,
+                    documentLookupMs: 0,
+                    compileMs: 0,
+                    postProcessMs: 0,
+                    totalMs: normalizeMs(Date.now() - totalStartMs),
+                    path: 'unknown',
+                };
+                const failureSummary = `failed in ${failureTiming.totalMs}ms (${errorMessage})`;
+                const failureEntry: CompileTimingEntry = {
+                    timestamp: new Date(),
+                    status: isCancelled ? 'cancelled' : 'error',
+                    summary: failureSummary,
+                    documentId: request.documentId,
+                    timing: failureTiming,
+                };
 
                 // Update status
                 set({
@@ -420,6 +546,9 @@ export const useCompileStore = create<CompileStore>()(
                     queue: state.queue.slice(1),
                     progress: 0,
                     progressMessage: '',
+                    lastCompileTiming: failureTiming,
+                    lastCompileTimingSummary: failureSummary,
+                    compileTimingHistory: pushTimingHistory(get().compileTimingHistory, failureEntry),
                 });
 
                 // Update document store with error

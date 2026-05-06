@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { wasmService } from '@/services/wasmService';
-import { audioService } from '@/services/audioService';
+import { audioService, type AudioRuntimeDebugInfo } from '@/services/audioService';
 import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
 import { formatService } from '@/services/formatService';
@@ -27,12 +27,19 @@ import LyricsPanel from '@/components/panels/LyricsPanel';
 import MixerPanel from '@/components/panels/MixerPanel';
 import MIDIKeyboardPanel from '@/components/panels/MIDIKeyboardPanel';
 import DebugPanel from '@/components/panels/DebugPanel';
+import AudioWaveformView from '@/components/AudioWaveformView';
 import { TabBar } from '@/components/TabBar';
 
 export const App: React.FC = () => {
   const [isWasmReady, setIsWasmReady] = useState(false);
   const [wasmError, setWasmError] = useState<string | null>(null);
+  const [runtimeFeedback, setRuntimeFeedback] = useState<string | null>(null);
   const [defaultCompileOptions, setDefaultCompileOptions] = useState<any>(null);
+  const [showRuntimeDebug, setShowRuntimeDebug] = useState(false);
+  const [audioRuntimeDebug, setAudioRuntimeDebug] = useState<AudioRuntimeDebugInfo>(
+    audioService.getRuntimeDebugInfo()
+  );
+  const [waveformSamples, setWaveformSamples] = useState<number[]>(() => Array.from(audioService.getWaveformSnapshot(512)));
   const wasmInitialized = useRef(false);
 
   // Document store
@@ -57,6 +64,14 @@ export const App: React.FC = () => {
 
   // Get active document
   const activeDocument = activeDocumentId ? documents.get(activeDocumentId) || null : null;
+
+  const announceRuntimeFeedback = useCallback((message: string | null) => {
+    setRuntimeFeedback(message);
+    const announcer = document.getElementById('aria-live-announcer');
+    if (announcer) {
+      announcer.textContent = message || '';
+    }
+  }, []);
 
   // Helper function to create a basic timing map for trace playback
   // Maps time in milliseconds to source position (line, column)
@@ -83,8 +98,13 @@ export const App: React.FC = () => {
     return timingMap;
   };
 
+  const getBrowserTargetChips = useCallback(() => {
+    // Current VGM codegen path still relies on PSG writes for many browser samples.
+    return ['ym2608', 'sn76489'];
+  }, []);
+
   // Compile store
-  const { compile, cancel, status, getResult, progress, progressMessage } = useCompileStore(
+  const { compile, cancel, status, getResult, progress, progressMessage, lastCompileTimingSummary } = useCompileStore(
     useShallow((state) => ({
       compile: state.compile,
       cancel: state.cancel,
@@ -92,11 +112,24 @@ export const App: React.FC = () => {
       getResult: state.getResult,
       progress: state.progress,
       progressMessage: state.progressMessage,
+      lastCompileTimingSummary: state.lastCompileTimingSummary,
     }))
   );
 
   // Get compiled data for active document
-  const compiledData = activeDocumentId ? getResult(activeDocumentId)?.data : undefined;
+  const activeCompileResult = activeDocumentId ? getResult(activeDocumentId) : undefined;
+  const compiledData = activeCompileResult?.data;
+
+  useEffect(() => {
+    const refresh = () => {
+      setAudioRuntimeDebug(audioService.getRuntimeDebugInfo());
+      setWaveformSamples(Array.from(audioService.getWaveformSnapshot(512)));
+    };
+
+    refresh();
+    const id = window.setInterval(refresh, 200);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Initialize all services on mount
   useEffect(() => {
@@ -146,6 +179,20 @@ export const App: React.FC = () => {
       // Cleanup if needed
     };
   }, []);
+
+  useEffect(() => {
+    const listener = {
+      onError: (error: Error) => {
+        announceRuntimeFeedback(`Audio error: ${error.message}`);
+      },
+    };
+
+    audioService.addEventListener(listener);
+
+    return () => {
+      audioService.removeEventListener(listener);
+    };
+  }, [announceRuntimeFeedback]);
 
   // Handle document creation
   const handleNewDocument = useCallback(() => {
@@ -249,36 +296,42 @@ export const App: React.FC = () => {
   const handleCompile = useCallback(async () => {
     console.log('[App] handleCompile called');
     console.log('[App] activeDocument:', !!activeDocument, 'status:', status, 'defaultCompileOptions:', !!defaultCompileOptions);
-    if (!activeDocument || status === 'compiling' || !defaultCompileOptions) {
+    if (!activeDocument || status === 'compiling') {
       console.log('[App] handleCompile returning early - condition check failed');
       return;
     }
 
     try {
+      announceRuntimeFeedback(null);
       const options: any = {
-        ...defaultCompileOptions,
+        ...(defaultCompileOptions || {}),
         format: 'vgm',
-        target_chips: ['ym2608'],
-        clock_count: 7987200,
+        target_chips: getBrowserTargetChips(),
+        // 0 means auto/default clock count from driver/MML.
+        clock_count: 0,
       };
 
       console.log('[App] Calling compile with activeDocumentId:', activeDocumentId);
       await compile(activeDocumentId!, options);
     } catch (error) {
       console.error('Compilation error:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      announceRuntimeFeedback(`Compile error: ${message}`);
     }
-  }, [activeDocument, activeDocumentId, compile, status, defaultCompileOptions]);
+  }, [activeDocument, activeDocumentId, compile, status, defaultCompileOptions, announceRuntimeFeedback, getBrowserTargetChips]);
 
   // Handle compile and play (F5 behavior)
   const handleCompileAndPlay = useCallback(async () => {
-    if (!activeDocument || status === 'compiling' || !defaultCompileOptions) return;
+    if (!activeDocument || status === 'compiling') return;
     
     try {
+      announceRuntimeFeedback(null);
       const options: any = {
-        ...defaultCompileOptions,
+        ...(defaultCompileOptions || {}),
         format: 'vgm',
-        target_chips: ['ym2608'],
-        clock_count: 7987200,
+        target_chips: getBrowserTargetChips(),
+        // 0 means auto/default clock count from driver/MML.
+        clock_count: 0,
       };
       
       // Compile
@@ -286,46 +339,68 @@ export const App: React.FC = () => {
       
       // After compilation, get the result and auto-play
       const result = getResult(activeDocumentId!);
-      if (result?.data) {
-        // Parse parts from compile result
-        const chipsUsed = result.chipsUsed && result.chipsUsed.length > 0 
-          ? result.chipsUsed 
-          : ['ym2608', 'sn76489'];
-        
-        partService.parseFromCompileResult(
-          result.partCount || 0,
-          chipsUsed,
-          activeDocumentId
-        );
-        
-        // Create a basic timing map based on duration
-        const durationMs = (result.durationSeconds || 0) * 1000;
-        const timingMap = createTimingMap(
-          activeDocument.content,
-          durationMs
-        );
-        
-        // Initialize trace service with compile result
-        traceService.init({
-          data: result.data,
-          partCount: result.partCount || 0,
-          duration: durationMs,
-          timingMap,
-        });
-        
-        // Start trace playback
-        traceService.start();
-        
-        // Play via audio service with chips from compile result
-        await audioService.playVGM(result.data, {
-          chips: chipsUsed as any[],
-          volume: audioService.getVolume(),
-        });
+      if (!result) {
+        throw new Error('Compilation finished but no result was returned.');
       }
+
+      const chipsUsed = result.chipsUsed && result.chipsUsed.length > 0
+        ? result.chipsUsed
+        : [];
+      const dataLength = result.data?.length || 0;
+      const hasPlayableOutput = dataLength > 0;
+
+      if (!hasPlayableOutput) {
+        const feedback = `Compile output is not playable (bytes=${dataLength}, parts=${result.partCount}, commands=${result.commandCount}, chips=${chipsUsed.length}).`;
+        useDocumentStore.getState().setCompileResults(activeDocumentId!, false, [
+          {
+            type: 'compile',
+            message: feedback,
+            line: 1,
+            column: 1,
+            length: 1,
+            severity: 'error',
+          },
+        ]);
+        throw new Error(feedback);
+      }
+
+      const chipsToPlay = chipsUsed.length > 0 ? chipsUsed : ['YM2608', 'SN76489'];
+
+      partService.parseFromCompileResult(
+        result.partCount,
+        chipsToPlay,
+        activeDocumentId
+      );
+
+      // Create a basic timing map based on duration
+      const durationMs = (result.durationSeconds || 0) * 1000;
+      const timingMap = createTimingMap(
+        activeDocument.content,
+        durationMs
+      );
+
+      // Initialize trace service with compile result
+      traceService.init({
+        data: result.data!,
+        partCount: result.partCount,
+        duration: durationMs,
+        timingMap,
+      });
+
+      // Start trace playback
+      traceService.start();
+
+      // Play via audio service with chips from compile result
+      await audioService.playVGM(result.data!, {
+        chips: chipsToPlay as any[],
+        volume: audioService.getVolume(),
+      });
     } catch (error) {
       console.error('Compile and play error:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      announceRuntimeFeedback(`Play error: ${message}`);
     }
-  }, [activeDocument, activeDocumentId, compile, status, getResult, createTimingMap]);
+  }, [activeDocument, activeDocumentId, compile, status, getResult, createTimingMap, defaultCompileOptions, announceRuntimeFeedback, getBrowserTargetChips]);
 
   // Handle play/pause
   const handlePlay = useCallback(() => {
@@ -521,40 +596,141 @@ export const App: React.FC = () => {
         />
       )}
 
+      {runtimeFeedback && (
+        <div
+          role="alert"
+          style={{
+            margin: '0 8px 8px',
+            padding: '8px 10px',
+            border: '1px solid var(--status-error-fg, #d64545)',
+            background: 'var(--status-error-bg, rgba(214, 69, 69, 0.12))',
+            color: 'var(--status-error-fg, #d64545)',
+            borderRadius: '4px',
+            fontSize: '12px',
+          }}
+        >
+          {runtimeFeedback}
+        </div>
+      )}
+
+      <div
+        style={{
+          margin: '0 8px 8px',
+          border: '1px solid var(--border-color)',
+          borderRadius: '4px',
+          background: 'var(--bg-tertiary)',
+          fontSize: '12px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setShowRuntimeDebug((v) => !v)}
+          style={{
+            width: '100%',
+            textAlign: 'left',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-primary)',
+            padding: '8px 10px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
+        >
+          Runtime Debug {showRuntimeDebug ? '▼' : '▶'}
+        </button>
+
+        {showRuntimeDebug && (
+          <div
+            style={{
+              padding: '8px 10px 10px',
+              borderTop: '1px solid var(--border-color)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '6px 12px',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <div>Compile bytes: {activeCompileResult?.data?.length || 0}</div>
+            <div>Compile parts: {activeCompileResult?.partCount || 0}</div>
+            <div>Compile commands: {activeCompileResult?.commandCount || 0}</div>
+            <div>Compile chips: {(activeCompileResult?.chipsUsed || []).join(', ') || '(none)'}</div>
+
+            <div>Audio playing: {audioRuntimeDebug.isPlaying ? 'yes' : 'no'}</div>
+            <div>Audio paused: {audioRuntimeDebug.isPaused ? 'yes' : 'no'}</div>
+            <div>VGM bytes loaded: {audioRuntimeDebug.vgmDataLength}</div>
+            <div>Parsed VGM commands: {audioRuntimeDebug.parsedCommandCount}</div>
+            <div>Commands applied: {audioRuntimeDebug.appliedWriteCount}</div>
+            <div>Commands skipped: {audioRuntimeDebug.skippedWriteCount}</div>
+            <div>Pending commands: {audioRuntimeDebug.pendingCommandCount}</div>
+            <div>Buffers generated: {audioRuntimeDebug.generatedBufferCount}</div>
+            <div>Silent buffer streak: {audioRuntimeDebug.silentBufferCount}</div>
+            <div>Last peak: {audioRuntimeDebug.lastPeak.toExponential(3)}</div>
+            <div>Silence warning emitted: {audioRuntimeDebug.emittedSilenceWarning ? 'yes' : 'no'}</div>
+            <div>Playback chips: {audioRuntimeDebug.chips.join(', ') || '(none)'}</div>
+
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ marginBottom: 6, fontWeight: 600 }}>Waveform</div>
+              <AudioWaveformView samples={waveformSamples} />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Main Layout */}
       <div className="main-layout">
-        {/* Editor Area */}
-        <div className="editor-container" id="editor-container" role="main" aria-label="MML Editor">
-          {activeDocument && (
-            <MonacoEditor
-              document={activeDocument}
-              onChange={(content) => {
-                useDocumentStore.getState().updateDocumentContent(activeDocumentId!, content);
-              }}
-              settings={settings.editor}
-              currentPosition={traceStatus.currentPosition}
-              navigationPosition={navigatePosition}
-            />
-          )}
+        <div className="editor-column">
+          {/* Editor Area */}
+          <div className="editor-container" id="editor-container" role="main" aria-label="MML Editor">
+            {activeDocument && (
+              <MonacoEditor
+                document={activeDocument}
+                onChange={(content) => {
+                  useDocumentStore.getState().updateDocumentContent(activeDocumentId!, content);
+                }}
+                settings={settings.editor}
+                currentPosition={traceStatus.currentPosition}
+                navigationPosition={navigatePosition}
+              />
+            )}
 
-          {status === 'compiling' && (
-            <div className="compile-overlay" role="status" aria-live="polite" aria-label="Compiling">
-              <div className="compile-spinner" aria-hidden="true" />
-              <div className="compile-overlay-text">
-                <strong>Compiling...</strong>
-                <span>
-                  {progressMessage || 'Processing MML in background worker'}
-                  {typeof progress === 'number' && progress > 0 ? ` (${Math.round(progress)}%)` : ''}
+            {status === 'compiling' && (
+              <div className="compile-overlay" role="status" aria-live="polite" aria-label="Compiling">
+                <div className="compile-spinner" aria-hidden="true" />
+                <div className="compile-overlay-text">
+                  <strong>Compiling...</strong>
+                  <span>
+                    {progressMessage || 'Processing MML in background worker'}
+                    {typeof progress === 'number' && progress > 0 ? ` (${Math.round(progress)}%)` : ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="button small danger"
+                  onClick={() => cancel()}
+                  aria-label="Cancel compilation"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Panel (left/editor side) */}
+          {bottomPanel && (
+            <div className="bottom-panel">
+              <div className="bottom-panel-header">
+                <span className="panel-title">
+                  {bottomPanelType === 'errorList' ? 'Errors' :
+                   bottomPanelType === 'info' ? 'Information' :
+                   bottomPanelType === 'log' ? 'Output Log' :
+                   'Output'}
                 </span>
               </div>
-              <button
-                type="button"
-                className="button small danger"
-                onClick={() => cancel()}
-                aria-label="Cancel compilation"
-              >
-                Cancel
-              </button>
+              <div className="bottom-panel-content">
+                {bottomPanel}
+              </div>
+              <div className="bottom-panel-resizer" />
             </div>
           )}
         </div>
@@ -567,30 +743,17 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* Bottom Panel */}
-      {bottomPanel && (
-        <div className="bottom-panel">
-          <div className="bottom-panel-header">
-            <span className="panel-title">
-              {bottomPanelType === 'errorList' ? 'Errors' :
-               bottomPanelType === 'info' ? 'Information' :
-               bottomPanelType === 'log' ? 'Output Log' :
-               'Output'}
-            </span>
-          </div>
-          <div className="bottom-panel-content">
-            {bottomPanel}
-          </div>
-          <div className="bottom-panel-resizer" />
-        </div>
-      )}
-
       {/* Status Bar */}
       <StatusBar
         document={activeDocument}
         compileStatus={status}
         progress={progress}
         progressMessage={progressMessage}
+        lastCompileTimingSummary={lastCompileTimingSummary}
+        waveformSamples={waveformSamples}
+        isAudioPlaying={audioRuntimeDebug.isPlaying}
+        onToggleRuntimeDebug={() => setShowRuntimeDebug((v) => !v)}
+        runtimeDebugVisible={showRuntimeDebug}
       />
     </div>
   );

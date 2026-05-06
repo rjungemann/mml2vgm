@@ -7,12 +7,12 @@
 
 ; Part 0: FM Melody (Channel 0)
 @0 v100 l4 o4
-  c d e f g a b >c2.
+@0 c d e f g a b >c2.
 
 ; Part 1: FM Bass (Channel 1)
 @1 v80 l8 o2
-  c2. c2. f2. f2. g2. g2. c2.
+@1 c2. c2. f2. f2. g2. g2. c2.
 
 ; Part 2: SSG Drums (Channel 2)
 @2 v100 l16 o5
-  c4 sn4 c4 sn4 c4 c4 sn8 c4 sn4 c4 sn4 c4 c4 sn8
+@2 c4 sn4 c4 sn4 c4 c4 sn8 c4 sn4 c4 sn4 c4 c4 sn8
