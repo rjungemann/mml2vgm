@@ -598,6 +598,34 @@ impl Parser {
                         }
                         break;
                     }
+                    // Chip names like "C140" tokenize as Note('C') + Number(140) because
+                    // the lexer treats A-G as note letters. Reconstruct the full name.
+                    Token::Note(c) => {
+                        let letter = c.to_ascii_uppercase();
+                        self.advance();
+                        let suffix = match self.current_token() {
+                            Some(Token::Number(n)) => {
+                                let s = n.to_string();
+                                self.advance();
+                                s
+                            }
+                            Some(Token::Identifier(s)) => {
+                                let s = s.clone();
+                                self.advance();
+                                s
+                            }
+                            _ => String::new(),
+                        };
+                        chip = format!("{}{}", letter, suffix);
+                        if self.current_token() == Some(Token::Comma) {
+                            self.advance();
+                            if let Some(Token::Number(n)) = self.current_token() {
+                                option = Some(n);
+                                self.advance();
+                            }
+                        }
+                        break;
+                    }
                     _ => break,
                 }
             }
@@ -1060,8 +1088,30 @@ mod tests {
     fn test_parse_simple_mml() {
         let source = "o4 cde f g a b> c";
         let ast = parse(source).unwrap();
-        
+
         // Should have octave change and notes
         assert!(!ast.global_settings.is_empty());
+    }
+
+    #[test]
+    fn parse_pcm_c140_chip_name() {
+        // C140 starts with the note letter C, so the lexer emits Note('C') + Number(140)
+        // rather than Identifier("C140"). The parser must reassemble the chip name.
+        let source = "'@ P 1,\"sample.wav\",8000,100,C140,1400";
+        let ast = parse(source).unwrap();
+        let inst = ast.pcm_instruments.get(&1).expect("instrument 1 should be parsed");
+        assert_eq!(inst.chip, "C140");
+        assert_eq!(inst.option, Some(1400));
+    }
+
+    #[test]
+    fn parse_pcm_rf5c164_chip_name() {
+        // Rf5c164 starts with R (not a note letter) so the lexer produces a single
+        // Identifier token — verify the existing path still works correctly.
+        let source = "'@ P 2,\"sample.wav\",8000,100,Rf5c164,1400";
+        let ast = parse(source).unwrap();
+        let inst = ast.pcm_instruments.get(&2).expect("instrument 2 should be parsed");
+        assert_eq!(inst.chip, "Rf5c164");
+        assert_eq!(inst.option, Some(1400));
     }
 }

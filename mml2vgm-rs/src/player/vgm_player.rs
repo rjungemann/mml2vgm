@@ -73,6 +73,9 @@ impl VgmPlayer {
         header.loop_samples = u32::from_le_bytes([data[32], data[33], data[34], data[35]]);
         header.rate = u32::from_le_bytes([data[36], data[37], data[38], data[39]]);
         if header.rate == 0 { header.rate = 44100; }
+        if header.version >= 0x151 && data.len() >= 0x3C {
+            header.segapcm_clock = u32::from_le_bytes([data[0x38], data[0x39], data[0x3A], data[0x3B]]);
+        }
         Ok(header)
     }
 
@@ -98,19 +101,7 @@ impl VgmPlayer {
                         commands.push((current_time, vec![cmd, a, v]));
                     }
                 }
-                0x54..=0x57 => {
-                    if offset + 2 <= data.len() {
-                        let a = data[offset]; let v = data[offset+1]; offset += 2;
-                        commands.push((current_time, vec![cmd, a, v]));
-                    }
-                }
-                0x58 | 0x59 => {
-                    if offset + 3 <= data.len() {
-                        let a = data[offset]; let b = data[offset+1]; let v = data[offset+2]; offset += 3;
-                        commands.push((current_time, vec![cmd, a, b, v]));
-                    }
-                }
-                0x5A..=0x5F => {
+                0x54..=0x5F => {
                     if offset + 2 <= data.len() {
                         let a = data[offset]; let v = data[offset+1]; offset += 2;
                         commands.push((current_time, vec![cmd, a, v]));
@@ -162,7 +153,7 @@ impl VgmPlayer {
             offset += 1;
             match cmd {
                 0x50 | 0x52 | 0x53 | 0x54..=0x5F => { offset += 2; }
-                0x58 | 0x59 | 0xC0 | 0xC1 => { offset += 3; }
+                0xC0 | 0xC1 => { offset += 3; }
                 0x61 => { offset += 2; }
                 0x62 | 0x63 => {}
                 0x70..=0x7F | 0x80..=0x8F => {}
@@ -292,35 +283,51 @@ impl VgmPlayer {
                     if *chip == SoundChip::YM2608 { emu.write_port(1, cmd_data[1], cmd_data[2]); break; }
                 }
             }
-            0x58 if cmd_data.len() >= 4 => {
+            0x58 if cmd_data.len() >= 3 => {
                 for (chip, emu) in &mut self.chips {
-                    if *chip == SoundChip::SegaPCM {
-                        let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
-                        emu.write(off as u8, cmd_data[3]); break;
+                    if *chip == SoundChip::YM2610B {
+                        emu.write_port(0, cmd_data[1], cmd_data[2]); break;
                     }
                 }
             }
-            0x59 if cmd_data.len() >= 4 => {
+            0x59 if cmd_data.len() >= 3 => {
                 for (chip, emu) in &mut self.chips {
-                    if *chip == SoundChip::SegaPCM {
-                        let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
-                        emu.write_port(1, off as u8, cmd_data[3]); break;
+                    if *chip == SoundChip::YM2610B {
+                        emu.write_port(1, cmd_data[1], cmd_data[2]); break;
                     }
                 }
             }
             0xC0 if cmd_data.len() >= 4 => {
-                for (chip, emu) in &mut self.chips {
-                    if *chip == SoundChip::RF5C164 {
-                        let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
-                        emu.write(off as u8, cmd_data[3]); break;
+                let has_segapcm = self.header.as_ref().map_or(false, |h| h.segapcm_clock > 0);
+                let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
+                if has_segapcm {
+                    for (chip, emu) in &mut self.chips {
+                        if *chip == SoundChip::SegaPCM {
+                            emu.write(off as u8, cmd_data[3]); break;
+                        }
+                    }
+                } else {
+                    for (chip, emu) in &mut self.chips {
+                        if *chip == SoundChip::RF5C164 {
+                            emu.write(off as u8, cmd_data[3]); break;
+                        }
                     }
                 }
             }
             0xC1 if cmd_data.len() >= 4 => {
-                for (chip, emu) in &mut self.chips {
-                    if *chip == SoundChip::RF5C164 {
-                        let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
-                        emu.write_port(1, off as u8, cmd_data[3]); break;
+                let has_segapcm = self.header.as_ref().map_or(false, |h| h.segapcm_clock > 0);
+                let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
+                if has_segapcm {
+                    for (chip, emu) in &mut self.chips {
+                        if *chip == SoundChip::SegaPCM {
+                            emu.write_port(1, off as u8, cmd_data[3]); break;
+                        }
+                    }
+                } else {
+                    for (chip, emu) in &mut self.chips {
+                        if *chip == SoundChip::RF5C164 {
+                            emu.write_port(1, off as u8, cmd_data[3]); break;
+                        }
                     }
                 }
             }
@@ -336,8 +343,8 @@ impl VgmPlayer {
         let mut has_ym2151 = false;
         let mut has_ym2203 = false;
         let mut has_ym2608 = false;
-        let mut has_rf5c164 = false;
-        let mut has_segapcm = false;
+        let mut has_ym2610b = false;
+        let mut has_c0_opcode = false;
 
         for (_, cmd) in &self.commands {
             match cmd.first().copied() {
@@ -346,19 +353,29 @@ impl VgmPlayer {
                 Some(0x54) => has_ym2151 = true,
                 Some(0x55) => has_ym2203 = true,
                 Some(0x56 | 0x57) => has_ym2608 = true,
-                Some(0xC0 | 0xC1) => has_rf5c164 = true,
-                Some(0x58 | 0x59) => has_segapcm = true,
+                Some(0x58 | 0x59) => has_ym2610b = true,
+                Some(0xC0 | 0xC1) => has_c0_opcode = true,
                 _ => {}
             }
         }
+
+        // 0xC0/0xC1 routes to SegaPCM when the header declares a SegaPCM clock,
+        // otherwise it is an RF5C164 write.
+        let has_segapcm_clock = self.header.as_ref().map_or(false, |h| h.segapcm_clock > 0);
 
         if has_sn76489 { self.chips.push((SoundChip::SN76489, Box::new(crate::chips::sn76489::SN76489::new()))); }
         if has_ym2612 { self.chips.push((SoundChip::YM2612, Box::new(crate::chips::ym2612::YM2612::new()))); }
         if has_ym2151 { self.chips.push((SoundChip::YM2151, Box::new(crate::chips::ym2151::YM2151::new()))); }
         if has_ym2203 { self.chips.push((SoundChip::YM2203, Box::new(crate::chips::ym2203::YM2203::new()))); }
         if has_ym2608 { self.chips.push((SoundChip::YM2608, Box::new(crate::chips::ym2608::YM2608::new()))); }
-        if has_rf5c164 { self.chips.push((SoundChip::RF5C164, Box::new(crate::chips::rf5c164::RF5C164::new()))); }
-        if has_segapcm { self.chips.push((SoundChip::SegaPCM, Box::new(crate::chips::segapcm::SegaPCM::new()))); }
+        if has_ym2610b { self.chips.push((SoundChip::YM2610B, Box::new(crate::chips::ym2608::YM2608::new()))); }
+        if has_c0_opcode {
+            if has_segapcm_clock {
+                self.chips.push((SoundChip::SegaPCM, Box::new(crate::chips::segapcm::SegaPCM::new())));
+            } else {
+                self.chips.push((SoundChip::RF5C164, Box::new(crate::chips::rf5c164::RF5C164::new())));
+            }
+        }
 
         if self.chips.is_empty() {
             self.chips.push((SoundChip::YM2608, Box::new(crate::chips::ym2608::YM2608::new())));
@@ -407,5 +424,64 @@ mod tests {
     fn test_vgm_player_defaults() {
         let player = VgmPlayer::default();
         assert!(!player.is_playing());
+    }
+
+    fn minimal_vgm(extra_commands: &[u8]) -> Vec<u8> {
+        let mut data = vec![0u8; 0x80];
+        data[0..4].copy_from_slice(b"Vgm ");
+        let eof = (data.len() as u32 - 4 + extra_commands.len() as u32 + 1).to_le_bytes();
+        data[4..8].copy_from_slice(&eof);
+        data[8..12].copy_from_slice(&0x171u32.to_le_bytes()); // version 1.71
+        data[36..40].copy_from_slice(&44100u32.to_le_bytes()); // rate
+        data.extend_from_slice(extra_commands);
+        data.push(0x66); // EOF command
+        data
+    }
+
+    #[test]
+    fn test_segapcm_opcode_detection() {
+        // 0x58 aa dd: YM2610 port 0 write — must NOT be detected as SegaPCM
+        let data = minimal_vgm(&[0x58, 0x30, 0xFF]);
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+
+        assert!(player.chips.iter().any(|(c, _)| *c == SoundChip::YM2610B),
+            "0x58 opcode should select YM2610B chip");
+        assert!(!player.chips.iter().any(|(c, _)| *c == SoundChip::SegaPCM),
+            "0x58 opcode must not select SegaPCM");
+    }
+
+    #[test]
+    fn test_c0_dispatches_to_segapcm_when_clock_set() {
+        // 0xC0 with segapcm_clock > 0 in header → SegaPCM, not RF5C164
+        let mut data = minimal_vgm(&[0xC0, 0x00, 0x10, 0xFF]);
+        // Write segapcm_clock at header offset 0x38
+        let clock = 4000000u32.to_le_bytes();
+        data[0x38..0x3C].copy_from_slice(&clock);
+
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+
+        assert!(player.chips.iter().any(|(c, _)| *c == SoundChip::SegaPCM),
+            "0xC0 with segapcm_clock should select SegaPCM");
+        assert!(!player.chips.iter().any(|(c, _)| *c == SoundChip::RF5C164),
+            "0xC0 with segapcm_clock must not select RF5C164");
+    }
+
+    #[test]
+    fn test_c0_dispatches_to_rf5c164_when_no_clock() {
+        // 0xC0 with segapcm_clock == 0 → RF5C164
+        let data = minimal_vgm(&[0xC0, 0x00, 0x10, 0xFF]);
+
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+
+        assert!(player.chips.iter().any(|(c, _)| *c == SoundChip::RF5C164),
+            "0xC0 without segapcm_clock should select RF5C164");
+        assert!(!player.chips.iter().any(|(c, _)| *c == SoundChip::SegaPCM),
+            "0xC0 without segapcm_clock must not select SegaPCM");
     }
 }

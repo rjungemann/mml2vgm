@@ -31,6 +31,8 @@ struct AdpcmAChannel {
     level: u8,
     pan_left: bool,
     pan_right: bool,
+    start_addr: u32,
+    end_addr: u32,
     position: u32,
 }
 
@@ -41,7 +43,11 @@ struct DeltaT {
     pan_right: bool,
     start_addr: u32,
     end_addr: u32,
+    /// Upper bound for playback (registers 0x06/0x07); 0 means no limit.
+    limit_addr: u32,
     delta_n: u16,
+    /// Clock prescaler (registers 0x10/0x11); applied as divisor on the frac step.
+    prescaler: u16,
     level: u8,
     position: u32,
     frac: u32,
@@ -159,12 +165,20 @@ impl YM2608 {
 
     fn get_adpcm_b_sample(&mut self) -> f32 {
         if !self.adpcm_b.active || self.adpcm_b_rom.is_empty() { return 0.0; }
-        let step = if self.adpcm_b.delta_n == 0 { 0x100u32 } else { self.adpcm_b.delta_n as u32 };
+        let raw_step = if self.adpcm_b.delta_n == 0 { 0x100u32 } else { self.adpcm_b.delta_n as u32 };
+        let divisor = if self.adpcm_b.prescaler == 0 { 1u32 } else { self.adpcm_b.prescaler as u32 };
+        let step = (raw_step / divisor).max(1);
         self.adpcm_b.frac += step;
         let mut sample = 0.0f32;
         while self.adpcm_b.frac >= 0x100 {
             self.adpcm_b.frac -= 0x100;
-            let end = (self.adpcm_b.end_addr * 32).min(self.adpcm_b_rom.len() as u32);
+            let end_by_reg = self.adpcm_b.end_addr * 32;
+            let end_by_limit = if self.adpcm_b.limit_addr > 0 {
+                self.adpcm_b.limit_addr * 32
+            } else {
+                u32::MAX
+            };
+            let end = end_by_reg.min(end_by_limit).min(self.adpcm_b_rom.len() as u32);
             if self.adpcm_b.position >= end {
                 self.adpcm_b.active = false;
                 return 0.0;
@@ -232,7 +246,7 @@ impl YM2608 {
                     for (i, ch) in self.adpcm_a_channels.iter_mut().enumerate() {
                         if (data >> i) & 1 == 1 {
                             ch.key_on = key_on;
-                            if key_on { ch.position = 0; }
+                            if key_on { ch.position = ch.start_addr * 32; }
                         }
                     }
                 }
@@ -266,10 +280,35 @@ impl YM2608 {
                 0x03 => { self.adpcm_b.start_addr = (self.adpcm_b.start_addr & 0x00FF) | ((data as u32) << 8); }
                 0x04 => { self.adpcm_b.end_addr = (self.adpcm_b.end_addr & 0xFF00) | data as u32; }
                 0x05 => { self.adpcm_b.end_addr = (self.adpcm_b.end_addr & 0x00FF) | ((data as u32) << 8); }
+                0x06 => { self.adpcm_b.limit_addr = (self.adpcm_b.limit_addr & 0xFF00) | data as u32; }
+                0x07 => { self.adpcm_b.limit_addr = (self.adpcm_b.limit_addr & 0x00FF) | ((data as u32) << 8); }
                 0x08 => { self.adpcm_b.delta_n = (self.adpcm_b.delta_n & 0xFF00) | data as u16; }
                 0x09 => { self.adpcm_b.delta_n = (self.adpcm_b.delta_n & 0x00FF) | ((data as u16) << 8); }
                 0x0A => { self.adpcm_b.level = data; }
-                0x28 => { self.apply_register(0, addr, data); }
+                0x10 => { self.adpcm_b.prescaler = (self.adpcm_b.prescaler & 0xFF00) | data as u16; }
+                0x11 => { self.adpcm_b.prescaler = (self.adpcm_b.prescaler & 0x00FF) | ((data as u16) << 8); }
+                // ADPCM-A start address low/high per channel
+                0x20..=0x25 => {
+                    let ch = (addr - 0x20) as usize;
+                    self.adpcm_a_channels[ch].start_addr =
+                        (self.adpcm_a_channels[ch].start_addr & 0xFF00) | data as u32;
+                }
+                0x28..=0x2D => {
+                    let ch = (addr - 0x28) as usize;
+                    self.adpcm_a_channels[ch].start_addr =
+                        (self.adpcm_a_channels[ch].start_addr & 0x00FF) | ((data as u32) << 8);
+                }
+                // ADPCM-A end address low/high per channel
+                0x30..=0x35 => {
+                    let ch = (addr - 0x30) as usize;
+                    self.adpcm_a_channels[ch].end_addr =
+                        (self.adpcm_a_channels[ch].end_addr & 0xFF00) | data as u32;
+                }
+                0x38..=0x3D => {
+                    let ch = (addr - 0x38) as usize;
+                    self.adpcm_a_channels[ch].end_addr =
+                        (self.adpcm_a_channels[ch].end_addr & 0x00FF) | ((data as u32) << 8);
+                }
                 0xA0 | 0xA1 | 0xA2 => {
                     let ch = (addr - 0xA0) as usize + 3;
                     let hi_idx = 0x100 + (0xA4 + (addr - 0xA0)) as usize;
@@ -327,7 +366,13 @@ impl SoundChipEmulator for YM2608 {
             ch.phase = ch.phase.wrapping_add(1);
         }
         for ch in &mut self.adpcm_a_channels {
-            if ch.key_on { ch.position = ch.position.wrapping_add(1); }
+            if ch.key_on {
+                ch.position = ch.position.wrapping_add(1);
+                let end = if ch.end_addr > 0 { ch.end_addr * 32 } else { u32::MAX };
+                if ch.position >= end {
+                    ch.key_on = false;
+                }
+            }
         }
     }
 
@@ -410,5 +455,91 @@ mod tests {
         let mut chip = YM2608::new();
         chip.load_pcm_data(0x82, &vec![0x55u8; 512]);
         assert_eq!(chip.adpcm_a_rom.len(), 512);
+    }
+
+    #[test]
+    fn test_ym2608_adpcm_b_limit_address() {
+        let mut chip = YM2608::new();
+
+        // Load PCM ROM (128 bytes of dummy data)
+        chip.load_pcm_data(0x81, &vec![0x77u8; 128]);
+
+        // start_addr = 0x0000, end_addr = 0x0004 (end = 4*32 = 128 bytes)
+        chip.write_port(1, 0x02, 0x00);
+        chip.write_port(1, 0x03, 0x00);
+        chip.write_port(1, 0x04, 0x04);
+        chip.write_port(1, 0x05, 0x00);
+
+        // limit_addr = 0x0002 (limit = 2*32 = 64 bytes — tighter than end_addr)
+        chip.write_port(1, 0x06, 0x02);
+        chip.write_port(1, 0x07, 0x00);
+        assert_eq!(chip.adpcm_b.limit_addr, 0x0002);
+
+        // delta_n = 0x0100 (step = 0x100, frac advances exactly 1 byte per call)
+        chip.write_port(1, 0x08, 0x00);
+        chip.write_port(1, 0x09, 0x01);
+
+        // prescaler = 0 (no division)
+        chip.write_port(1, 0x10, 0x00);
+        chip.write_port(1, 0x11, 0x00);
+        assert_eq!(chip.adpcm_b.prescaler, 0);
+
+        // Start playback
+        chip.write_port(1, 0x00, 0x01);
+        assert!(chip.adpcm_b.active);
+
+        // Each call reads one nibble; 2 nibbles per byte → 2*(limit*32)+1 calls to trigger stop.
+        let limit_bytes = 0x0002u32 * 32; // 64
+        for _ in 0..(2 * limit_bytes + 1) {
+            chip.get_adpcm_b_sample();
+        }
+        assert!(!chip.adpcm_b.active,
+            "ADPCM-B must stop at limit_addr boundary when it is less than end_addr");
+
+        // Prescaler test: write prescaler=2 and verify it halves the step
+        chip.write_port(1, 0x10, 0x02);
+        assert_eq!(chip.adpcm_b.prescaler, 2);
+        // restart playback
+        chip.write_port(1, 0x00, 0x01);
+        assert!(chip.adpcm_b.active);
+        // With prescaler=2 and delta_n=0x100, effective step = 0x100/2 = 0x80;
+        // two calls are needed to advance frac past 0x100 by one byte.
+        chip.get_adpcm_b_sample(); // frac += 0x80 (no byte consumed yet)
+        assert!(chip.adpcm_b.active, "channel should still be active after one half-step");
+    }
+
+    #[test]
+    fn test_ym2608_adpcm_a_address_registers() {
+        let mut chip = YM2608::new();
+
+        // CH0 start_addr = 0x0210 (low=0x10, high=0x02)
+        chip.write_port(1, 0x20, 0x10);
+        chip.write_port(1, 0x28, 0x02);
+        // CH0 end_addr = 0x0220 (low=0x20, high=0x02)
+        chip.write_port(1, 0x30, 0x20);
+        chip.write_port(1, 0x38, 0x02);
+
+        assert_eq!(chip.adpcm_a_channels[0].start_addr, 0x0210);
+        assert_eq!(chip.adpcm_a_channels[0].end_addr, 0x0220);
+
+        // Key-on channel 0 (bit7=0 → key-on, bit0=1 → ch0)
+        chip.write(0x10, 0x01);
+        assert!(chip.adpcm_a_channels[0].key_on);
+        assert_eq!(chip.adpcm_a_channels[0].position, 0x0210 * 32,
+            "key-on must reset position to start_addr * 32");
+
+        // Clock until end_addr * 32 is reached; channel should auto-stop
+        let start_pos = 0x0210u32 * 32;
+        let end_pos   = 0x0220u32 * 32;
+        for _ in 0..(end_pos - start_pos) {
+            chip.clock();
+        }
+        assert!(!chip.adpcm_a_channels[0].key_on,
+            "channel must stop when position reaches end_addr * 32");
+
+        // CH3 should be unaffected
+        assert!(!chip.adpcm_a_channels[3].key_on);
+        assert_eq!(chip.adpcm_a_channels[3].start_addr, 0);
+        assert_eq!(chip.adpcm_a_channels[3].end_addr, 0);
     }
 }

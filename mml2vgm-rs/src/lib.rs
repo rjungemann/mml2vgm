@@ -655,9 +655,9 @@ pub struct VgmHeader {
     
     /// YM2151 clock
     pub ym2151_clock: u32,
-    
-    // Additional clocks for other chips
-    // ...
+
+    /// Sega PCM clock (VGM header offset 0x38, version 1.51+)
+    pub segapcm_clock: u32,
 }
 
 impl VgmHeader {
@@ -679,6 +679,7 @@ impl VgmHeader {
             sn76489_flags: 0,
             ym2612_clock: 7670454,
             ym2151_clock: 3579545,
+            segapcm_clock: 0,
         }
     }
 
