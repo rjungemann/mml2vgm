@@ -257,10 +257,11 @@ clean: 2 passed, 0 failed.
 
 ---
 
-## Known Gaps Beyond YM2612 (Future Work)
+## Gaps Beyond YM2612
 
-These are not on the critical path for the initial three-fixture golden master set
-(`T0000`, `T0001`, `T0100`), but will be needed to bring PCM fixtures into the test set.
+These were not on the critical path for the initial three-fixture golden master set
+(`T0000`, `T0001`, `T0100`), but have since been addressed. PCM fixtures still require
+WAV file dependencies from the C# test suite.
 
 > **Already resolved** (confirmed by reading the code): FM param rows ✅ Phase 3b; VGM
 > `0x67` data-block ✅ handled in both `parse_commands` and `parse_data_blocks`; RF5C164
@@ -269,38 +270,18 @@ These are not on the critical path for the initial three-fixture golden master s
 
 ---
 
-### Gap A — PCM chip name starting with a note letter is silently dropped
+### Gap A — PCM chip name starting with a note letter ✅ RESOLVED
 
 **File:** `mml2vgm-rs/src/compiler/parser.rs` → `parse_pcm_instrument`
 
-**Problem:** After parsing the volume field of a `'@ P` line, the chip name is read by
-matching `Token::Identifier`. When the chip name starts with a note letter (`C140`,
-`Rf5c164`), the lexer emits `Token::Note('C'), Token::Number(140)` instead of
-`Token::Identifier("C140")`. The chip field is left empty, so the codegen never emits PCM
-commands for those instruments.
+**Problem:** Chip names like `C140` were tokenised as `Note('C'), Number(140)` instead of
+`Identifier("C140")`, silently leaving the chip field empty.
 
-**Fix:** In the chip-name-reading block of `parse_pcm_instrument`, add a
-`Token::Note(c)` arm that reconstructs the full identifier by appending any immediately
-following `Token::Number(n)`:
+**Fix applied:** Added a `Token::Note(c)` arm in `parse_pcm_instrument` that reconstructs
+the full identifier by appending any immediately following `Token::Number(n)` or
+`Token::Identifier(s)`.
 
-```rust
-Token::Note(c) => {
-    // Chip names like "C140", "Rf5c164" — note letter + optional number
-    let letter = c.to_ascii_uppercase();
-    self.advance();
-    let suffix = if let Some(Token::Number(n)) = self.current_token() {
-        let s = n.to_string();
-        self.advance();
-        s
-    } else {
-        String::new()
-    };
-    chip = format!("{}{}", letter, suffix);
-}
-```
-
-**Test to add:** `parse_pcm_c140_chip_name` — parse `'@ P 1,"str.wav",8000,100,C140,1400`
-and assert `ast.pcm_instruments[1].chip == "C140"`.
+**Tests added:** `parse_pcm_c140_chip_name`, `parse_pcm_rf5c164_chip_name`.
 
 ---
 
@@ -316,117 +297,51 @@ note/rest style — validated by the T0100 six-channel parity test.
 
 ---
 
-### Gap C — SegaPCM VGM opcode confusion with YM2610
+### Gap C — SegaPCM VGM opcode confusion with YM2610 ✅ RESOLVED
 
-**File:** `mml2vgm-rs/src/player/vgm_player.rs` → `init_chips_from_header`,
-`parse_commands`, `_execute_command`
+**File:** `mml2vgm-rs/src/player/vgm_player.rs`
 
-**Problem:** The chip-detection heuristic in `init_chips_from_header` treats opcodes
-`0x58`/`0x59` as SegaPCM, but in the VGM 1.71 specification:
+**Problem:** `0x58`/`0x59` were incorrectly treated as SegaPCM; `0xC0` was always
+routed to RF5C164.
 
-| Opcode | Meaning |
-|---|---|
-| `0x58` | YM2610 OPNB port 0 write (aa dd) |
-| `0x59` | YM2610 OPNB port 1 write (aa dd) |
-| `0xC0` | SegaPCM memory write (mmll dd — 3 bytes) |
+**Fix applied:**
+- `parse_commands`: merged `0x58`/`0x59` into the `0x54..=0x5F` arm (2 data bytes, same as YM2608)
+- `parse_data_blocks`: removed dead `0x58 | 0x59` from the 3-byte arm
+- `VgmHeader`: added `segapcm_clock: u32` field; `parse_header` reads it from offset 0x38 (VGM 1.51+)
+- `init_chips_from_header`: `0x58`/`0x59` → `has_ym2610b`; `0xC0`/`0xC1` checks `segapcm_clock > 0` to add SegaPCM or RF5C164
+- `_execute_command`: `0x58`/`0x59` → `YM2610B`; `0xC0`/`0xC1` → SegaPCM or RF5C164 per header
 
-`0xC0` is currently assigned to RF5C164 in detection and dispatch. The result is that
-any VGM using SegaPCM is silently misrouted to the RF5C164 emulator.
-
-**Fix:**
-
-1. In `init_chips_from_header`, reassign opcode detection:
-   - `0x58 | 0x59` → `has_ym2610 = true` (add a new flag and emulator)
-   - `0xC0` → needs disambiguation: check the VGM header `ym2610b_clock` field; if
-     non-zero assume YM2610 uses 0xC0 range; otherwise detect by context or rely on
-     the header `segapcm_clock` field (offset 0x38 in the VGM 1.51+ header extension).
-
-2. A pragmatic short-term fix without touching the header parser: keep a separate
-   `has_segapcm` flag triggered by checking the VGM header's SegaPCM clock field
-   (already parsed in `VgmHeader` if field exists), and keep `0xC0` dispatched to
-   whichever chip is actually present per header.
-
-3. In `parse_commands`, `0x58`/`0x59` currently parse only 2 bytes (aa dd) — this is
-   correct for YM2610. Update the dispatch in `_execute_command` to route them to a
-   `YM2610` chip rather than `SegaPCM`.
-
-**Test to add:** `segapcm_opcode_detection` — construct a minimal VGM byte sequence with
-a `0xC0 00 00 FF` command (SegaPCM write) and verify it is routed to the SegaPCM
-emulator, not RF5C164.
+**Tests added:** `test_segapcm_opcode_detection`, `test_c0_dispatches_to_segapcm_when_clock_set`, `test_c0_dispatches_to_rf5c164_when_no_clock`.
 
 ---
 
-### Gap D — YM2608 ADPCM-A: start/end address registers not wired
+### Gap D — YM2608 ADPCM-A: start/end address registers not wired ✅ RESOLVED
 
-**File:** `mml2vgm-rs/src/chips/ym2608.rs` → `apply_register` port 1
+**File:** `mml2vgm-rs/src/chips/ym2608.rs`
 
-**Problem:** The ADPCM-A channel playback logic reads `ch.position` to index into
-`adpcm_a_rom`, but the register writes that configure where in the ROM each channel's
-sample lives are not handled. Port 1 addresses:
+**Problem:** Key-on always reset position to 0 and the address registers were ignored,
+producing silence.
 
-| Address | Meaning |
-|---|---|
-| `0x20`–`0x25` | ADPCM-A start address low byte (channels 0–5) |
-| `0x28`–`0x2D` | ADPCM-A start address high byte (channels 0–5) |
-| `0x30`–`0x35` | ADPCM-A end address low byte (channels 0–5) |
-| `0x38`–`0x3D` | ADPCM-A end address high byte (channels 0–5) |
+**Fix applied:**
+- `AdpcmAChannel` gained `start_addr: u32` and `end_addr: u32` fields
+- Port-1 `apply_register` wired: `0x20`–`0x25` (start low), `0x28`–`0x2D` (start high), `0x30`–`0x35` (end low), `0x38`–`0x3D` (end high)
+- Key-on (reg 0x10) now resets `position = start_addr * 32`
+- `clock()` stops the channel (`key_on = false`) when `position >= end_addr * 32`
 
-Without these, key-on always plays from ROM byte 0 and stops immediately when the buffer
-is empty, producing silence.
-
-**Fix:** Add arms in the port-1 branch of `apply_register`:
-
-```rust
-0x20..=0x25 => {
-    let ch = (addr - 0x20) as usize;
-    if ch < 6 {
-        self.adpcm_a_channels[ch].start_addr =
-            (self.adpcm_a_channels[ch].start_addr & 0xFF00) | data as u16;
-    }
-}
-0x28..=0x2D => {
-    let ch = (addr - 0x28) as usize;
-    if ch < 6 {
-        self.adpcm_a_channels[ch].start_addr =
-            (self.adpcm_a_channels[ch].start_addr & 0x00FF) | ((data as u16) << 8);
-    }
-}
-// … end addr 0x30-0x35 / 0x38-0x3D similarly
-```
-
-Also update the key-on handler (port 0 `0x10`) to reset `ch.position` to
-`ch.start_addr as usize * 32` (the VGM ADPCM-A address unit is 32 bytes) and the
-playback loop in `get_adpcm_a_output` to stop at `ch.end_addr`.
-
-The `PcmChannel` / `AdpcmAChannel` struct will need `start_addr: u16` and `end_addr: u16`
-fields if they don't already exist.
-
-**Test to add:** `ym2608_adpcm_a_address_registers` — write a minimal ADPCM-A ROM block
-via `load_pcm_data`, set start/end addresses via `apply_register`, trigger key-on, and
-assert the channel reports `active == true` and advances its position past zero.
+**Test added:** `test_ym2608_adpcm_a_address_registers`.
 
 ---
 
-### Gap E — YM2608 ADPCM-B: limit address and prescaler not wired
+### Gap E — YM2608 ADPCM-B: limit address and prescaler not wired ✅ RESOLVED
 
-**File:** `mml2vgm-rs/src/chips/ym2608.rs` → `apply_register` port 1
+**File:** `mml2vgm-rs/src/chips/ym2608.rs`
 
-**Problem:** The ADPCM-B delta-T engine reads `adpcm_b.start_addr`, `adpcm_b.end_addr`,
-and `adpcm_b.delta_n` correctly, but two register pairs are silently dropped:
+**Problem:** Registers `0x06`/`0x07` (limit address) and `0x10`/`0x11` (prescaler) were
+silently dropped, allowing playback to run past the sample boundary.
 
-| Address | Meaning |
-|---|---|
-| `0x06` / `0x07` | ADPCM-B limit address low / high |
-| `0x10` / `0x11` | ADPCM-B prescaler / clock divider |
+**Fix applied:**
+- `DeltaT` gained `limit_addr: u32` and `prescaler: u16` fields
+- Port-1 `apply_register` wired: `0x06`/`0x07` → `limit_addr`, `0x10`/`0x11` → `prescaler`
+- `get_adpcm_b_sample`: effective end = `min(end_addr * 32, limit_addr * 32, rom_len)` (limit 0 = disabled); frac step = `raw_step / max(prescaler, 1)`
 
-Without the limit address the engine may play past the end of the sample ROM if
-`end_addr` is not set correctly by the VGM stream. Without the prescaler the pitch
-(delta-N) may be computed relative to the wrong clock.
-
-**Fix:** Add port-1 arms for `0x06`/`0x07` storing a `limit_addr: u32` field in
-`AdpcmBState`, and check it in `get_adpcm_b_sample` as an upper bound on `position`.
-Add arms for `0x10`/`0x11` storing `prescaler: u8`; use it as a divisor when advancing
-`frac` if non-zero.
-
-**Test to add:** `ym2608_adpcm_b_limit_address` — set a short limit address and assert
-playback stops at that boundary rather than continuing into uninitialised ROM.
+**Test added:** `test_ym2608_adpcm_b_limit_address`.

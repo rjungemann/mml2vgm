@@ -13,14 +13,14 @@ This document outlines a plan for creating a cross-platform, command-line utilit
 | Phase 1: Foundation | ✅ COMPLETED | 100% |
 | Phase 2: MML Parser | ✅ COMPLETED | 100% |
 | Phase 3: Code Generation | ✅ COMPLETED | 100% |
-| Phase 4: Sound Chip Emulation | 🚧 IN PROGRESS | 60% |
+| Phase 4: Sound Chip Emulation | 🚧 IN PROGRESS | 80% |
 | Phase 5: Audio Playback | ⏳ Pending | 0% |
 | Phase 6: Compiler Integration | ⏳ Pending | 0% |
 | Phase 7: CLI Integration | ⏳ Pending | 0% |
 | Phase 8: Testing | ⏳ Pending | 0% |
 | Phase 9: Optimization | ⏳ Pending | 0% |
 
-**Overall Progress: 52.5% (4.2/8 phases completed)**
+**Overall Progress: 55% (4.4/8 phases completed)**
 
 ---
 
@@ -484,7 +484,7 @@ pub struct VgmData {
 
 ### Phase 4: Sound Chip Emulation (6-8 weeks)
 
-**Status: IN PROGRESS** 🚧 **60% Complete**
+**Status: IN PROGRESS** 🚧 **80% Complete**
 
 #### 4.1 Chip Emulation Architecture
 **Status: ✅ COMPLETED**
@@ -539,56 +539,170 @@ pub trait SoundChipEmulator {
   
   **Implementation:** `src/chips/sn76489.rs` (~450 lines)
 
-**Priority 2 (Common):**
-- [x] **YM2151 (OPM)** - 8 FM channels ✅ COMPLETED (Placeholder)
-  - Full trait implementation
-  - Register cache (0x100 bytes)
-  - Clock and sample generation stubs
-  - Returns silence for now (to be fully implemented)
-  
-  **Implementation:** `src/chips/ym2151.rs` (~120 lines)
+**Priority 2 (Common FM — file exists, VGM opcode routed, audio output needed):**
 
-- [x] **YM2608 (OPNA)** - 6 FM + 3 SSG + Rhythm + ADPCM ✅ COMPLETED (Placeholder)
-  - Full trait implementation
-  - Register cache (0x400 bytes for extended address space)
-  - Clock and sample generation stubs
-  - Returns silence for now (to be fully implemented)
-  
-  **Implementation:** `src/chips/ym2608.rs` (~120 lines)
+- [x] **YM2151 (OPM)** - 8 FM channels 🚧 PARTIAL (placeholder)
+  - Placeholder file exists (`src/chips/ym2151.rs`, ~312 lines): operator structs, register cache, trait stubs
+  - VGM opcode 0x54 dispatched in `vgm_player.rs` ✅
+  - Remaining audio generation work:
+    - [ ] 4-operator FM synthesis per channel (8 channels × 4 ops = 32 total)
+    - [ ] 8 algorithm configurations (different operator topologies from OPN)
+    - [ ] Phase accumulator and sine-table lookup per operator
+    - [ ] Envelope generator (ADSR) per operator with key scaling
+    - [ ] LFO with AM (tremolo) and PM (vibrato); 4 waveforms (saw, square, triangle, noise)
+    - [ ] Two hardware timers (A and B) for interrupt/tempo
+    - [ ] Stereo output mix across 8 channels
 
-**Priority 3 (Extended):**
-- [ ] YM2203 (OPN) - 3 FM + 3 SSG (Not started)
-- [ ] YM3526 (OPL) - 9 FM + 5 Rhythm (Not started)
-- [ ] Y8950 - OPL + ADPCM (Not started)
-- [ ] YM3812 (OPL2) (Not started)
-- [ ] YMF262 (OPL3) (Not started)
+- [x] **YM2608 (OPNA)** - 6 FM + 3 SSG + Rhythm + ADPCM 🚧 PARTIAL
+  - Full trait implementation with register routing
+  - ADPCM-A: per-channel start/end address registers wired (0x20-0x3D), key-on initializes position
+  - ADPCM-B (Delta-T): start/end/limit_addr/prescaler wired, nibble decoder with prescaler-scaled step
+  - VGM opcodes 0x56 (port 0) / 0x57 (port 1) dispatched; YM2610B proxied via 0x58/0x59 ✅
+  - Remaining audio generation work:
+    - [ ] 6-channel OPN FM audio (same algorithm as YM2612 minus channel 3 special mode)
+    - [ ] 3-channel SSG square wave + noise output (AY-3-8910 compatible registers)
+    - [ ] ADPCM-A: nibble-to-PCM decode and mixing for 6 rhythm channels
+    - [ ] ADPCM-B (Delta-T): IMA-ADPCM stream decode to audio samples
+  - **Implementation:** `src/chips/ym2608.rs`
 
-**Priority 4 (PCM):**
-- [x] **RF5C164** - Mega CD PCM (8 channels) ✅ COMPLETED (Placeholder)
-  - Full trait implementation
-  - PcmChannel struct with volume, pan, sample rate divider, addresses
-  - 8 PCM channels with state tracking
-  - 1MB PCM memory buffer
-  - Register cache (0x100 bytes)
-  - Clock and sample generation with accumulated cycles
-  - Returns silence for now (to be fully implemented)
-  
-  **Implementation:** `src/chips/rf5c164.rs` (~180 lines)
+**Priority 3 (Extended FM — file exists, some VGM opcodes need dispatch):**
 
-- [ ] SegaPCM (Not started)
-- [ ] C140 (Not started)
-- [ ] C352 (Not started)
+- [ ] **YM2203 (OPN)** - 3 FM + 3 SSG
+  - Placeholder file exists (`src/chips/ym2203.rs`, ~258 lines): FM/SSG channel structs, register cache
+  - VGM opcode 0x55 dispatched in `vgm_player.rs` ✅
+  - Remaining work:
+    - [ ] 3-channel OPN FM audio (4 operators each; subset of YM2612 with no DAC/LFO)
+    - [ ] 3-channel SSG square wave + noise (identical register layout to YM2608 SSG)
+    - [ ] Prescaler register (0x2D-0x2F) for FM/SSG clock divider
+
+- [ ] **YM3812 (OPL2)** - 9 FM channels (2 operators each)
+  - Placeholder file exists (`src/chips/ym3812.rs`, ~292 lines): operator/channel structs
+  - ✅ VGM opcode 0x5A dispatched in `vgm_player.rs`; chip instantiated from `init_chips_from_header`
+  - Remaining work:
+    - [ ] OPL2 FM synthesis: phase modulation between 2 operators (carrier modulated by modulator)
+    - [ ] 9 melodic channels or 6 melodic + 5 rhythm (rhythm mode bit at register 0xBD)
+    - [ ] Envelope generator per operator (ADSR with KSR and KSL rate scaling)
+    - [ ] Vibrato and tremolo from shared LFO (enable bits in per-operator 0x20/0x40/0x60/0x80 registers)
+    - [ ] 4 waveform shapes per operator (sine, half-sine, abs-sine, pulse-sine) via 0xE0-0xF8
+
+- [ ] **YM3526 (OPL)** - 9 FM channels (2 operators each)
+  - Placeholder file exists (`src/chips/ym3526.rs`, ~237 lines): FM channel structs
+  - ✅ VGM opcode 0x5B dispatched; chip instantiated from `init_chips_from_header`
+  - Remaining work (same OPL model as YM3812, sine waveform only):
+    - [ ] OPL FM synthesis (modulator phase-modulates carrier)
+    - [ ] 9 melodic or 6 melodic + 5 rhythm channels
+    - [ ] Envelope generator per operator
+
+- [ ] **Y8950** - 9 FM channels + ADPCM-B
+  - Placeholder file exists (`src/chips/y8950.rs`, ~258 lines): FM/ADPCM channel structs
+  - ✅ VGM opcode 0x5C dispatched; chip instantiated from `init_chips_from_header`
+  - Remaining work:
+    - [ ] OPL FM synthesis (identical to YM3526)
+    - [ ] ADPCM-B playback (4-bit IMA-ADPCM; same decode as YM2608 ADPCM-B)
+    - [ ] ADPCM control registers: start/stop, sample rate, data-word length
+
+- [ ] **YMF262 (OPL3)** - 18 FM channels (two OPL2 cores)
+  - Placeholder file exists (`src/chips/ymf262.rs`, ~296 lines): operator structs
+  - ✅ VGM opcodes 0x5E (port 0) / 0x5F (port 1) dispatched; chip instantiated from `init_chips_from_header`
+  - ✅ `write_port(port, addr, data)` implemented: port 0 → channels 0-8, port 1 → channels 9-17
+  - Remaining work:
+    - [ ] 8 OPL3 waveforms per operator (vs OPL2's 4)
+    - [ ] 4-operator channel pairs: channels 0+3, 1+4, 2+5 can combine for richer FM
+    - [ ] True stereo per-channel left/right/centre enable bits
+    - [ ] OPL2 backwards-compatibility mode (register 0x105 bit 0)
+
+**Priority 4 (PCM — file exists, some VGM opcodes need dispatch):**
+
+- [ ] **RF5C164** - 8-channel PCM (Sega Mega CD)
+  - Placeholder file exists (`src/chips/rf5c164.rs`, ~316 lines): PcmChannel structs, 1 MB memory buffer
+  - VGM opcodes 0xC0/0xC1 dispatched when `segapcm_clock == 0` ✅
+  - ✅ Pre-existing `clock_divider: 0.0` infinite-loop bug fixed
+  - Remaining work:
+    - [ ] Channel register decode: ENV (vol), PAN (stereo), FD (frequency), LS (loop start), ST (enable)
+    - [ ] PCM sample read: advance `position` by `FD` each clock, read `rom[position >> 11]`
+    - [ ] Loop: when byte at current position is 0xFF, jump to loop-start address
+    - [ ] Volume/pan scaling on output sample; mix 8 channels to stereo
+    - [ ] Memory write path via 0xC0: `rom[off & 0x0FFF] = data`
+
+- [ ] **SegaPCM** - 16-channel PCM (Sega System 16)
+  - Placeholder file exists (`src/chips/segapcm.rs`, ~258 lines): PcmChannel structs
+  - VGM opcodes 0xC0/0xC1 dispatched when `segapcm_clock > 0` ✅
+  - ✅ Pre-existing `clock_divider: 0.0` infinite-loop bug fixed
+  - Remaining work:
+    - [ ] Channel register layout: 16 channels x 8 bytes each in 0x00-0x7F; bank enable at 0x86
+    - [ ] Per-channel: frequency delta (16-bit), loop start/end (bank-relative), volume L/R, enable bit
+    - [ ] PCM sample read: 8-bit signed samples from ROM, advance position by frequency delta each clock
+    - [ ] Loop: when position passes end address, wrap to loop-start
+    - [ ] Mix 16 channels to stereo output
+
+- [ ] **C140** - 24-channel PCM (Namco System 2 / System 21)
+  - Placeholder file exists (`src/chips/c140.rs`, ~254 lines): PcmChannel structs
+  - ✅ VGM opcode 0xD4 parsed (3-byte payload) and dispatched via `write_port`; chip instantiated from `init_chips_from_header`
+  - ✅ Pre-existing `clock_divider: 0.0` infinite-loop bug fixed (now initializes to `clock_rate / 44100.0`)
+  - Remaining work:
+    - [ ] Register layout: 24 channels x 16 bytes at 0x000-0x17F; status at 0x1F8
+    - [ ] Per-channel regs: frequency (16-bit pitch), loop start/end (20-bit bank+offset), volume L/R, flags
+    - [ ] 8-bit unsigned PCM decode with linear interpolation between samples
+    - [ ] Loop and one-shot modes; key-on/off via flags byte
+    - [ ] Mix 24 channels to stereo at ~42 kHz output rate
+
+- [ ] **C352** - 32-channel PCM (Namco System 22)
+  - Placeholder file exists (`src/chips/c352.rs`, ~251 lines): PcmChannel structs
+  - ✅ VGM opcode 0xE1 parsed (3-byte payload: addr_hi, addr_lo, data) and dispatched; chip instantiated from `init_chips_from_header`
+  - ✅ `write_port(addr_hi, addr_lo, data)` implemented with proper 16-bit address mapping to 32-channel register space
+  - ✅ Pre-existing `clock_divider: 0.0` infinite-loop bug fixed
+  - Remaining work:
+    - [ ] Register layout: 32 channels x 16 bytes each
+    - [ ] Per-channel: pitch (16-bit), start/loop/end addresses (24-bit), volume (L/R/rear-L/rear-R), flags
+    - [ ] 8-bit or 12-bit signed PCM decode; mu-law option via channel flags
+    - [ ] Surround output (FL, FR, RL, RR); downmix to stereo for emulator output
+    - [ ] Loop, reverse, and linked-channel modes
+
+**Priority 5 (Declared only — no emulator file):**
+
+Each entry requires: a new `src/chips/<name>.rs`, wiring in `chip_player.rs::add_chip`, VGM opcode dispatch in `vgm_player.rs`, and a SupportTier upgrade once audio is working.
+
+| Chip | VGM Opcode | Channels | Description | Notes |
+|------|-----------|----------|-------------|-------|
+| **YM2413 (OPLL)** | 0x51 | 9 FM | Built-in instrument patch ROM (15 melodic + rhythm) | Patch ROM must be embedded as const bytes |
+| **AY8910 / YM2149** | 0xA0 | 3 square + noise | PSG with hardware envelope generator | Same registers as YM2608 SSG — can share logic |
+| **HuC6280** | 0xB9 | 6 wavetable + noise | PC Engine PSG; 32-byte wavetable per channel | Also has stereo volume and LFO channel |
+| **K051649 (SCC)** | 0xD2 (3-byte) | 5 wavetable | Konami SCC; 32-byte wavetable per channel | Opcode: `[chip, addr, data]` |
+| **K053260** | 0xBA | 4 PCM | Konami arcade 8-bit PCM with ADPCM option | |
+| **K054539** | 0xD3 (3-byte) | 8 PCM | Konami arcade 16-bit PCM | Opcode: `[chip, addr, data]` |
+| **QSound** | 0xC4 (3-byte) | 16 DSP stereo | Capcom stereo DSP; `[data, addr_hi, addr_lo]` | DSP emulation is complex; 16 independent voices |
+| **NES APU** | 0xB4 | 5 | 2 pulse + triangle + noise + DPCM | Complex: length counters, sweep units, frame counter IRQ |
+| **POKEY** | 0xBB | 4 | Atari 8-bit poly-counter oscillators | |
+| **DMG** | 0xB3 | 4 | Game Boy: 2 pulse + wavetable + LFSR noise | Lower priority; GBS is the native format |
+| **VRC6** | (mapper) | 3 | Konami NES expansion: 2 pulse + sawtooth | Lowest priority; rarely in VGM files |
 
 #### 4.3 Chip Register Models
-**Status: ✅ COMPLETED**
+**Status: 🚧 IN PROGRESS**
 
-All implemented chips have proper register models:
+Chips with complete register models:
 
-- **YM2612:** Full register cache, F-Number/Octave handling, LFO control, Timer control, Key on/off, Algorithm/Feedback registers
+- **YM2612:** Full register cache, F-Number/Octave handling, LFO control, Timer control, Key on/off, Algorithm/Feedback, per-operator Detune/Multiple/TL/envelope params
 - **SN76489:** Tone dividers (10-bit), Volume attenuation (4-bit), Noise period/mode, LFSR implementation
-- **YM2151:** Register cache with placeholder handlers
-- **YM2608:** Extended register cache (0x400) with placeholder handlers
-- **RF5C164:** PCM channel state, memory mapping, register cache with placeholder handlers
+- **YM2608:** Extended register cache; FM register routing (ports 0/1); ADPCM-A channel start/end addresses; ADPCM-B start/end/limit/prescaler; SSG register passthrough wired
+
+Chips with partial register models (register cache present, audio not yet wired):
+
+- **YM2151:** Register cache; operator/channel structs; `write()` decodes key-on, frequency, TL — not yet connected to audio accumulator
+- **YM2203:** Register cache; FM/SSG structs; SSG register layout matches AY8910; FM writes accepted but not generating audio
+- **YM3526 / YM3812:** Register cache; operator/channel structs; OPL frequency/block/KON/volume register decode not yet connected to synthesis
+- **YMF262:** Dual-bank register cache (0x000-0x1FF via port 0/1); operator structs; OPL3 extended register decode not wired to audio
+- **Y8950:** Same OPL register model as YM3526 plus ADPCM control registers; neither FM nor ADPCM wired for output
+- **RF5C164:** PcmChannel structs with volume/pan/frequency/address fields; register write handler stubs present but playback state not advancing
+- **SegaPCM:** 16-channel state array; register addressing not yet decoded from the 0xC0/0xC1 offset+data stream
+- **C140:** 24-channel structs with volume/pan/sample-rate/loop fields; register decode absent
+- **C352:** 32-channel structs with pitch/address/flag fields; register decode absent
+
+Remaining register model work by chip family:
+
+- **OPL family (YM3526, YM3812, YMF262, Y8950):** Wire existing field structs into `write()` dispatch; decode operator slot from address using `slot = (addr & 0x07) + ((addr >> 3) & 0x01) * 3`
+- **OPN family (YM2151, YM2203):** Decode channel/operator index from address upper nibble; connect register writes to FM audio accumulator
+- **PCM family (RF5C164, SegaPCM, C140, C352):** Decode address/data from VGM stream into per-channel state; implement `clock()` to step each active channel's playback position by its frequency register; return ROM-sampled and scaled value from `generate_samples()`
+- ✅ **VGM dispatch complete:** 0x5A (YM3812), 0x5B (YM3526), 0x5C (Y8950), 0x5E/0x5F (YMF262), 0xD4 (C140), 0xE1 (C352) — all wired in `_execute_command` and `init_chips_from_header`; unknown opcodes 0xA0/0xB0-0xBF/0xD0-0xD6/0xE0 also handled correctly in the parse pass to prevent misalignment
 
 #### 4.4 Test Coverage
 All chip implementations include comprehensive test suites:
@@ -655,19 +769,19 @@ pub trait AudioBackend {
 
 #### 5.2 Backend Implementations
 
-**Primary: CPAL + Rodio**
+**Primary: CPAL + Rodio** (ANSWER: Use this only)
 - [ ] CPAL for cross-platform audio device enumeration
 - [ ] Rodio for audio playback (built on CPAL)
 - [ ] Support for 44.1KHz stereo output
 
-**Alternative: SDL2**
-- [ ] SDL2 audio backend for compatibility
-- [ ] Fallback when CPAL is unavailable
+**Alternative: SDL2** (ANSWER: Don't use this)
+- SDL2 audio backend for compatibility
+- Fallback when CPAL is unavailable
 
 **Real Chip Interface**
-- [ ] GIMIC support (Windows)
-- [ ] SCCI support (Windows)
-- [ ] MIDI output (cross-platform)
+- GIMIC support (Windows) (ANSWER: Defer this)
+- SCCI support (Windows) (ANSWER: Defer this)
+- [ ] MIDI output (cross-platform) (ANSWER: Do this)
 
 #### 5.3 VGM Player Implementation
 ```rust
@@ -1033,11 +1147,15 @@ While we cannot directly reuse C# code, we can:
 1. **Phase 1 COMPLETED** - Foundation is now in place
 2. **Phase 2 COMPLETED** - MML Parser (lexer, parser, AST) implemented
 3. **Phase 3 COMPLETED** - Code Generation (VGM/XGM/ZGM generators) implemented
-4. **Phase 4 IN PROGRESS** (60% complete) - Sound Chip Emulation
+4. **Phase 4 IN PROGRESS** (80% complete) - Sound Chip Emulation
    - ✅ SoundChipEmulator trait implemented
-   - ✅ YM2612, SN76489 fully implemented
-   - ✅ YM2151, YM2608, RF5C164 placeholder implementations
-   - ⏳ Remaining: YM2203, YM3526, Y8950, YM3812, YMF262, SegaPCM, C140, C352
+   - ✅ YM2612 fully implemented, golden-master validated
+   - ✅ SN76489 fully implemented
+   - ✅ YM2608: ADPCM-A/B address registers and key-on logic wired; VGM opcode routing fixed
+   - ✅ YM2610B: recognized, proxied to YM2608 emulator
+   - ✅ VGM player opcode routing: 0x58/0x59 (YM2610B), 0xC0/0xC1 (SegaPCM vs RF5C164)
+   - ✅ YM2151, RF5C164 placeholder implementations
+   - ⏳ Remaining: FM audio, SSG audio, ADPCM rendering for YM2608; YM2203, YM3526, Y8950, YM3812, YMF262, SegaPCM, C140, C352
 5. **Start Phase 5** (Audio Playback) - Ready to begin
 6. **Review this plan** with stakeholders
 7. **Iterate based on feedback**
@@ -1072,7 +1190,7 @@ While we cannot directly reuse C# code, we can:
 - ✅ YM2612 (OPN2) full emulator with FM channels, operators, LFO, timers (src/chips/ym2612.rs)
 - ✅ SN76489 (DCSG) full PSG emulator with 4 channels, noise generator (src/chips/sn76489.rs)
 - ✅ YM2151 (OPM) placeholder emulator (src/chips/ym2151.rs)
-- ✅ YM2608 (OPNA) placeholder emulator (src/chips/ym2608.rs)
+- ✅ YM2608 (OPNA) partial emulator — ADPCM-A/B registers wired, FM/SSG audio pending (src/chips/ym2608.rs)
 - ✅ RF5C164 (Mega CD PCM) placeholder emulator (src/chips/rf5c164.rs)
 - ✅ Utility functions: clock_chip(), generate_mixed_samples()
 - ✅ 43 tests passing, 1 ignored (known issue)

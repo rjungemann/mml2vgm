@@ -1,5 +1,11 @@
 # WASM Compilation Hang: Debugging Strategy Guide
 
+> **Historical document — issue resolved May 2026.**
+> The hang was caused by `chars().nth(position)` in the lexer (O(n²) per character).
+> Fixed by switching to `source[position..].chars().next()`.
+> See [Performance_Improvement_Plan.md](./Performance_Improvement_Plan.md) for details.
+> This document is kept for reference in case similar regressions are introduced.
+
 ## Problem Statement
 
 The browser IDE's WASM compilation function (`compile_mml()`) hangs indefinitely when processing real MML files (403+ bytes with comments and structure), despite completing quickly on simple test cases (14-byte MML in 7ms).

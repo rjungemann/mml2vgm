@@ -75,7 +75,7 @@ impl C140 {
         Self {
             clock_rate,
             sample_rate: 44100,
-            clock_divider: 0.0,
+            clock_divider: clock_rate as f64 / 44100.0,
             accumulated_cycles: 0.0,
             channels: [Default::default(); 24],
             pcm_memory: vec![0; 1_048_576], // 1MB

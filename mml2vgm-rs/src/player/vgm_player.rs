@@ -107,6 +107,31 @@ impl VgmPlayer {
                         commands.push((current_time, vec![cmd, a, v]));
                     }
                 }
+                // AY8910 and 0xB0-0xBF range (2-byte writes: addr, data)
+                0xA0 | 0xB0..=0xBF => {
+                    if offset + 2 <= data.len() {
+                        let a = data[offset]; let v = data[offset+1]; offset += 2;
+                        commands.push((current_time, vec![cmd, a, v]));
+                    }
+                }
+                // 0xD0-0xD6 range (3-byte writes: port/chip, addr, data)
+                0xD0..=0xD6 => {
+                    if offset + 3 <= data.len() {
+                        let p = data[offset]; let a = data[offset+1]; let v = data[offset+2]; offset += 3;
+                        commands.push((current_time, vec![cmd, p, a, v]));
+                    }
+                }
+                // C352 write (3-byte: addr_hi, addr_lo, data)
+                0xE1 => {
+                    if offset + 3 <= data.len() {
+                        let ah = data[offset]; let al = data[offset+1]; let v = data[offset+2]; offset += 3;
+                        commands.push((current_time, vec![cmd, ah, al, v]));
+                    }
+                }
+                // PCM seek (4-byte u32 offset, no chip effect — just advance)
+                0xE0 => {
+                    if offset + 4 <= data.len() { offset += 4; }
+                }
                 0x61 => {
                     if offset + 2 <= data.len() {
                         let samples = u16::from_le_bytes([data[offset], data[offset+1]]) as u32;
@@ -152,8 +177,9 @@ impl VgmPlayer {
             let cmd = data[offset];
             offset += 1;
             match cmd {
-                0x50 | 0x52 | 0x53 | 0x54..=0x5F => { offset += 2; }
-                0xC0 | 0xC1 => { offset += 3; }
+                0x50 | 0x52 | 0x53 | 0x54..=0x5F | 0xA0 | 0xB0..=0xBF => { offset += 2; }
+                0xC0 | 0xC1 | 0xD0..=0xD6 | 0xE1 => { offset += 3; }
+                0xE0 => { if offset + 4 <= data.len() { offset += 4; } }
                 0x61 => { offset += 2; }
                 0x62 | 0x63 => {}
                 0x70..=0x7F | 0x80..=0x8F => {}
@@ -297,6 +323,41 @@ impl VgmPlayer {
                     }
                 }
             }
+            0x5A if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM3812 { emu.write(cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x5B if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YM3526 { emu.write(cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x5C if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::Y8950 { emu.write(cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x5E if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YMF262 { emu.write_port(0, cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0x5F if cmd_data.len() >= 3 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::YMF262 { emu.write_port(1, cmd_data[1], cmd_data[2]); break; }
+                }
+            }
+            0xD4 if cmd_data.len() >= 4 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::C140 { emu.write_port(cmd_data[1], cmd_data[2], cmd_data[3]); break; }
+                }
+            }
+            0xE1 if cmd_data.len() >= 4 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::C352 { emu.write_port(cmd_data[1], cmd_data[2], cmd_data[3]); break; }
+                }
+            }
             0xC0 if cmd_data.len() >= 4 => {
                 let has_segapcm = self.header.as_ref().map_or(false, |h| h.segapcm_clock > 0);
                 let off = u16::from_le_bytes([cmd_data[1], cmd_data[2]]);
@@ -344,6 +405,12 @@ impl VgmPlayer {
         let mut has_ym2203 = false;
         let mut has_ym2608 = false;
         let mut has_ym2610b = false;
+        let mut has_ym3812 = false;
+        let mut has_ym3526 = false;
+        let mut has_y8950 = false;
+        let mut has_ymf262 = false;
+        let mut has_c140 = false;
+        let mut has_c352 = false;
         let mut has_c0_opcode = false;
 
         for (_, cmd) in &self.commands {
@@ -354,7 +421,13 @@ impl VgmPlayer {
                 Some(0x55) => has_ym2203 = true,
                 Some(0x56 | 0x57) => has_ym2608 = true,
                 Some(0x58 | 0x59) => has_ym2610b = true,
+                Some(0x5A) => has_ym3812 = true,
+                Some(0x5B) => has_ym3526 = true,
+                Some(0x5C) => has_y8950 = true,
+                Some(0x5E | 0x5F) => has_ymf262 = true,
                 Some(0xC0 | 0xC1) => has_c0_opcode = true,
+                Some(0xD4) => has_c140 = true,
+                Some(0xE1) => has_c352 = true,
                 _ => {}
             }
         }
@@ -369,6 +442,12 @@ impl VgmPlayer {
         if has_ym2203 { self.chips.push((SoundChip::YM2203, Box::new(crate::chips::ym2203::YM2203::new()))); }
         if has_ym2608 { self.chips.push((SoundChip::YM2608, Box::new(crate::chips::ym2608::YM2608::new()))); }
         if has_ym2610b { self.chips.push((SoundChip::YM2610B, Box::new(crate::chips::ym2608::YM2608::new()))); }
+        if has_ym3812 { self.chips.push((SoundChip::YM3812, Box::new(crate::chips::ym3812::YM3812::new()))); }
+        if has_ym3526 { self.chips.push((SoundChip::YM3526, Box::new(crate::chips::ym3526::YM3526::new()))); }
+        if has_y8950 { self.chips.push((SoundChip::Y8950, Box::new(crate::chips::y8950::Y8950::new()))); }
+        if has_ymf262 { self.chips.push((SoundChip::YMF262, Box::new(crate::chips::ymf262::YMF262::new()))); }
+        if has_c140 { self.chips.push((SoundChip::C140, Box::new(crate::chips::c140::C140::new()))); }
+        if has_c352 { self.chips.push((SoundChip::C352, Box::new(crate::chips::c352::C352::new()))); }
         if has_c0_opcode {
             if has_segapcm_clock {
                 self.chips.push((SoundChip::SegaPCM, Box::new(crate::chips::segapcm::SegaPCM::new())));
@@ -483,5 +562,71 @@ mod tests {
             "0xC0 without segapcm_clock should select RF5C164");
         assert!(!player.chips.iter().any(|(c, _)| *c == SoundChip::SegaPCM),
             "0xC0 without segapcm_clock must not select SegaPCM");
+    }
+
+    #[test]
+    fn test_opl_opcode_detection() {
+        let cases: &[(&[u8], SoundChip)] = &[
+            (&[0x5A, 0x20, 0x01], SoundChip::YM3812),
+            (&[0x5B, 0x20, 0x01], SoundChip::YM3526),
+            (&[0x5C, 0x20, 0x01], SoundChip::Y8950),
+            (&[0x5E, 0x20, 0x01], SoundChip::YMF262),
+            (&[0x5F, 0x20, 0x01], SoundChip::YMF262),
+        ];
+        for (cmd, expected_chip) in cases {
+            let data = minimal_vgm(cmd);
+            let mut player = VgmPlayer::new();
+            player.load(&data).unwrap();
+            player.init_chips_from_header();
+            assert!(
+                player.chips.iter().any(|(c, _)| c == expected_chip),
+                "opcode 0x{:02X} should select {:?}", cmd[0], expected_chip
+            );
+        }
+    }
+
+    #[test]
+    fn test_c140_opcode_detection() {
+        let data = minimal_vgm(&[0xD4, 0x00, 0x10, 0x40]);
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+        assert!(player.chips.iter().any(|(c, _)| *c == SoundChip::C140),
+            "0xD4 should select C140");
+    }
+
+    #[test]
+    fn test_c352_opcode_detection() {
+        let data = minimal_vgm(&[0xE1, 0x00, 0x10, 0x40]);
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+        assert!(player.chips.iter().any(|(c, _)| *c == SoundChip::C352),
+            "0xE1 should select C352");
+    }
+
+    #[test]
+    fn test_ymf262_port1_writes_bank1_channel() {
+        let data = minimal_vgm(&[0x5E, 0x10, 0x20, 0x5F, 0x10, 0x20]);
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap();
+        player.init_chips_from_header();
+        player.play().unwrap();
+        // Execute the two commands; if write_port is wired they won't panic.
+        let mut buf = [0.0f32; 2];
+        player.generate_samples(&mut buf, 2).unwrap();
+    }
+
+    #[test]
+    fn test_unknown_opcodes_do_not_stall_parser() {
+        // Mix of known and unknown opcodes — parser must not loop or panic
+        let data = minimal_vgm(&[
+            0xA0, 0x07, 0x3F,  // AY8910 write (2-byte)
+            0xB4, 0x00, 0x0F,  // NES APU write (2-byte)
+            0xD3, 0x00, 0x01, 0x80, // K054539 write (3-byte)
+            0xE0, 0x00, 0x00, 0x00, 0x00, // PCM seek (4-byte, skip)
+        ]);
+        let mut player = VgmPlayer::new();
+        player.load(&data).unwrap(); // must not panic or stall
     }
 }

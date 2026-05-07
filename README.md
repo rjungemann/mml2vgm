@@ -10,12 +10,12 @@
 
 **mml2vgm** is a complete toolchain for compiling MML (Music Macro Language) files into VGM, XGM, XGM2, and ZGM formats for Sega Mega Drive/Genesis and other retro gaming systems.
 
-The project now consists of three main components:
+The project consists of three main components:
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| **[Browser IDE](browser-ide/)** | ✅ Phase 7 Complete | Web-based IDE with Monaco Editor, WASM compilation |
-| **[Rust CLI](mml2vgm-rs/)** | 🚧 Phase 4 In Progress | Cross-platform CLI compiler in Rust |
+| **[Browser IDE](browser-ide/)** | ✅ Complete | Web-based IDE with Monaco Editor, WASM compilation |
+| **[Rust CLI](mml2vgm-rs/)** | 🚧 Active Development | Cross-platform CLI compiler in Rust |
 | **[Tauri Desktop](tauri-app/)** | ✅ Ready | Native desktop app wrapper |
 
 ---
@@ -23,23 +23,15 @@ The project now consists of three main components:
 ## 🎯 Current Status
 
 ### Browser IDE (Web)
-- ✅ **Phase 7: Polish & Testing** - COMPLETED (100%)
-- ✅ **Phase 6: Feature Parity** - COMPLETED (100%)
-- ✅ **Phase 5: Advanced Features** - COMPLETED (100%)
-- ✅ **Phase 4: Core Functionality** - COMPLETED (100%)
-- ✅ **Phase 3: UI Components** - COMPLETED (100%)
-- ✅ **Phase 2: Core Structure** - COMPLETED (100%)
-- ✅ **Phase 1: WASM Port** - COMPLETED (100%)
-
-**Overall: 87.5% Complete (7/8 phases)**
+All 8 phases complete. Full-featured web IDE with Monaco editor, multi-format MML
+support, real-time WASM compilation, audio playback, MIDI keyboard, internationalization,
+offline caching, and accessibility support.
 
 ### Rust CLI
-- ✅ **Phase 3: Code Generation** - COMPLETED (100%)
-- ✅ **Phase 2: MML Parser** - COMPLETED (100%)
-- ✅ **Phase 1: Foundation** - COMPLETED (100%)
-- 🚧 **Phase 4: Sound Chip Emulation** - IN PROGRESS (60%)
-
-**Overall: 52.5% Complete (4.2/8 phases)**
+- ✅ **Phase 1: Foundation** — core library, error handling, type system
+- ✅ **Phase 2: MML Parser** — full C#-format parser (song info, FM instruments, all part types)
+- ✅ **Phase 3: Code Generation** — VGM byte-accurate output with full YM2612 parity (golden-master validated)
+- 🚧 **Phase 4: Sound Chip Emulation** — YM2612 and SN76489 complete; YM2608 ADPCM-A/B implemented; player opcode routing corrected; remaining chips are stubs
 
 ---
 
@@ -159,19 +151,19 @@ mml2vgm/
 
 The new Rust implementation (`mml2vgm-rs`) supports the following sound chips:
 
-### ✅ Fully Implemented
-- **YM2612** (OPN2) - 6 FM channels, used in Sega Mega Drive/Genesis
-- **SN76489** (DCSG) - 4 PSG channels (3 square + 1 noise), used in Sega Master System/Mega Drive
+### ✅ Fully Implemented (codegen + emulation)
+- **YM2612** (OPN2) - 6 FM channels, Sega Mega Drive/Genesis — golden-master validated
+- **SN76489** (DCSG) - 4 PSG channels, Sega Master System/Mega Drive
 
-### 🚧 Placeholder Implementation (Register cache only)
-- **YM2151** (OPM) - 8 FM channels
-- **YM2608** (OPNA) - 6 FM + 3 SSG + Rhythm + ADPCM
-- **RF5C164** - Mega CD PCM (8 channels)
+### 🚧 Partially Implemented
+- **YM2608** (OPNA) - FM + SSG + ADPCM-A/B; register routing complete, ADPCM-A start/end addresses wired, ADPCM-B limit/prescaler wired
+- **RF5C164** - recognized; dispatches to emulator stub
+- **SegaPCM** - recognized; disambiguated from RF5C164 via VGM header `segapcm_clock`
+- **YM2610B** - recognized; dispatches to YM2608 emulator as proxy
 
-### ⏳ Not Yet Implemented
-- YM2203, YM3526, Y8950, YM3812, YMF262
-- SegaPCM, C140, C352
-- AY8910, YM2413, YM2609, YM2610B
+### ⏳ Register-cache stubs only
+- YM2151, YM2203, YM3526, Y8950, YM3812, YMF262, YM2413
+- C140, C352, AY8910, YM2609, YM2610
 
 See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
 

@@ -159,58 +159,55 @@ impl SoundChipEmulator for YMF262 {
         *self = Self::with_clock_rate(self.clock_rate);
     }
 
-    fn write(&mut self, addr: u8, data: u8) {
-        self.regs[addr as usize] = data;
-
-        // Handle addresses for both OPL2 cores
-        let core = 0; // Simplified: map all to first core for now
-        let ch_base = core * 9;
+    fn write_port(&mut self, port: u8, addr: u8, data: u8) {
+        let bank = (port & 1) as usize;
+        self.regs[bank * 0x100 + addr as usize] = data;
+        let ch_base = bank * 9;
 
         match addr {
-            // Channel frequency number
             0x00..=0x08 => {
-                let ch = ch_base + (addr as usize);
+                let ch = ch_base + addr as usize;
                 if ch < 18 {
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x300) | (data as u16);
+                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x300) | data as u16;
                 }
             }
-            // Channel key on, block, frequency high
             0x10..=0x18 => {
-                let ch = ch_base + ((addr - 0x10) as usize);
+                let ch = ch_base + (addr - 0x10) as usize;
                 if ch < 18 {
                     self.channels[ch].key_on = (data & 0x20) != 0;
                     self.channels[ch].block = (data & 0x1C) >> 2;
                     self.channels[ch].frequency = (self.channels[ch].frequency & 0x0FF) | (((data as u16) & 0x03) << 8);
                 }
             }
-            // Operator 1 volume
             0x30..=0x38 => {
-                let ch = ch_base + ((addr - 0x30) as usize);
+                let ch = ch_base + (addr - 0x30) as usize;
                 if ch < 18 {
                     self.channels[ch].operators[0].volume = (data >> 2) & 0x3F;
                 }
             }
-            // Operator 2 volume
             0x40..=0x48 => {
-                let ch = ch_base + ((addr - 0x40) as usize);
+                let ch = ch_base + (addr - 0x40) as usize;
                 if ch < 18 {
                     self.channels[ch].operators[1].volume = (data >> 2) & 0x3F;
                 }
             }
-            // Panning
             0x50..=0x58 => {
-                let ch = ch_base + ((addr - 0x50) as usize);
+                let ch = ch_base + (addr - 0x50) as usize;
                 if ch < 18 {
                     self.channels[ch].left_enable = (data & 0x10) != 0;
                     self.channels[ch].right_enable = (data & 0x20) != 0;
                 }
             }
-            // OPL3 mode enable
-            0x04 => {
+            // OPL3 mode enable — only in bank 0
+            0x04 if bank == 0 => {
                 self.opl3_mode = (data & 0x01) != 0;
             }
             _ => {}
         }
+    }
+
+    fn write(&mut self, addr: u8, data: u8) {
+        self.write_port(0, addr, data);
     }
 
     fn read(&self, _addr: u8) -> u8 {
