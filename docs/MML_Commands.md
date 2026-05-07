@@ -2,6 +2,140 @@
 
 **Original Source:** MUSIC LALF MML Command Memo
 
+## CLI Quickstart (mml2vgm-rs)
+
+`mml2vgm-rs` is the Rust command-line compiler. It reads `.gwi` MML files and
+produces `.vgm`, `.xgm`, `.xgm2`, or `.zgm` output.
+
+### Installation
+
+```sh
+cargo install --path mml2vgm-rs
+# or build in-place:
+cd mml2vgm-rs && cargo build --release
+```
+
+### Basic Usage
+
+```sh
+# Compile to VGM (default)
+mml2vgm-rs song.gwi
+
+# Choose output format
+mml2vgm-rs song.gwi --format xgm
+mml2vgm-rs song.gwi --format zgm
+
+# Explicit output path
+mml2vgm-rs song.gwi --output /tmp/song.vgm
+
+# Validate only (no output written)
+mml2vgm-rs song.gwi --check
+
+# Compile and play immediately
+mml2vgm-rs song.gwi --play
+
+# Export rendered audio as WAV
+mml2vgm-rs song.gwi --export-wav song.wav
+
+# Play a pre-compiled VGM without recompiling
+mml2vgm-rs song.vgm --play
+```
+
+### Target Chip Selection
+
+By default the compiler infers chips from the part names in the MML file (or
+falls back to YM2612 + SN76489). Pass `--chip` once per chip to override:
+
+```sh
+mml2vgm-rs song.gwi --chip YM2151 --chip SN76489
+```
+
+List all supported chips and their support tier with:
+
+```sh
+mml2vgm-rs --list-chips
+```
+
+### Verbose / Debug Output
+
+```sh
+mml2vgm-rs song.gwi --verbose    # info-level messages
+mml2vgm-rs song.gwi --debug      # debug-level messages
+mml2vgm-rs song.gwi --trace      # write trace log
+```
+
+### Understanding Error Messages
+
+Compile errors are displayed in Rust-style diagnostic format:
+
+```
+error[E0001]: unexpected token 'q' at position 3
+  --> song.gwi:12:3
+    |
+ 12 | 'F1 cdeq
+    |    ^
+  = help: notes are A-G (or a-g), rests are 'r'; commands: t (tempo), v (volume), ...
+```
+
+- The first line shows the error code and message.
+- `file:line:col` locates the error in your source file.
+- The source line is printed with a `^` caret under the offending character.
+- `= help:` lines give hints on common mistakes.
+
+### Minimal Example .gwi File
+
+```
+{
+Title=Hello World
+Composer=YK-2
+ClockCount=192
+}
+
+'@ F 001 "sine"
+   AR  DR  SR  RR  SL  TL  KS  ML  DT
+'@ 031,000,000,007,000,000,000,001,000
+'@ 031,000,000,007,000,000,000,001,000
+'@ 031,000,000,007,000,000,000,001,000
+'@ 031,000,000,007,000,000,000,042,000
+   AL  FB
+'@ 004,000
+
+'F1 t120 @1 o4 l8 cdefgab>c r1
+'S1 t120 o3 l4 c e g >c r1
+```
+
+Compile it:
+
+```sh
+mml2vgm-rs hello.gwi --play
+```
+
+### All Options
+
+```
+mml2vgm-rs [OPTIONS] [INPUT]
+
+Arguments:
+  [INPUT]   Input .gwi file (reads stdin if omitted)
+
+Options:
+  -o, --output <PATH>        Output file path
+  -f, --format <FMT>         Output format: vgm (default), xgm, xgm2, zgm
+  -c, --chip <CHIP>          Target chip (repeatable)
+      --clock-count <N>      Clock ticks per whole note (default: 192)
+  -I, --include <PATH>       Add include search path (repeatable)
+  -p, --play                 Play audio after compilation
+  -w, --export-wav <PATH>    Export rendered audio to WAV
+      --check                Validate only, do not write output
+      --list-chips           List all supported chips
+      --list-formats         List all supported output formats
+  -v, --verbose              Show informational messages
+      --debug                Show debug messages
+      --trace                Write trace log
+      --version              Show version
+  -h, --help                 Show help
+```
+
 ## File Creation Procedure for .vgm/.xgm/.zgm
 
 ### 1. Create the MML File

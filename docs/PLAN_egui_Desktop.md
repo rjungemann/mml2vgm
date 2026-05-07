@@ -110,8 +110,8 @@ serde_json = "1"          # Phase 8
 - [x] Code editor — `egui::TextEdit` monospace with `code_editor()`, scroll area
 - [x] Undo/redo — built into `egui::TextEdit`
 - [x] Status bar: file name, modified indicator, compile status
-- [ ] Cursor position display in status bar
-- [ ] Find/replace — egui overlay panel
+- ~~[ ] Cursor position display in status bar~~ — deferred; `TextEditState` row/col not surfaced without patching egui internals; not needed for v1
+- ~~[ ] Find/replace — egui overlay panel~~ — deferred; out of scope for v1
 
 ### Compilation
 
@@ -119,9 +119,9 @@ serde_json = "1"          # Phase 8
 - [x] Auto-compile on change (debounced 500 ms)
 - [x] Chip selector (14 chips + auto)
 - [x] Format selector (VGM / XGM / XGM2 / ZGM)
-- [x] Error list panel — `CompileError { line, col, message }`, click-to-jump (jump logic pending)
+- [x] Error list panel — `CompileError { line, col, message }`, click-to-jump
 - [x] Compilation status in status bar
-- [ ] Click error → jump editor to that line
+- [x] Click error → jump editor to that line — `error_list::show()` return wired into `Document::jump_to_line`; `editor::show()` sets cursor via `TextEditState`
 
 ### Playback
 
@@ -131,16 +131,16 @@ serde_json = "1"          # Phase 8
 - [x] Volume slider
 - [x] Inline progress bar + MM:SS display
 - [x] Waveform panel (512-point peak display, auto-built at compile time)
-- [ ] Streaming waveform (live during playback — deferred; current waveform is static)
-- [ ] Part counter panel
+- ~~[ ] Streaming waveform (live during playback — deferred; current waveform is static)~~ — deferred; static pre-render is sufficient for v1
+- ~~[ ] Part counter panel~~ — deferred; out of scope for v1
 
 ### MIDI
 
-- [ ] MIDI input port selector — enumerate with `midir`
-- [ ] MIDI keyboard panel — 3-octave on-screen piano, lit keys from input
-- [ ] Click-to-play — send NoteOn/Off via selected MIDI output port
-- [ ] MIDI input → key highlight + optional audio preview
-- [ ] Settings: persist preferred port names; reconnect on startup
+- [x] MIDI input port selector — enumerate with `midir`; combo in MIDI panel + Settings window
+- [x] MIDI keyboard panel — 3-octave on-screen piano, lit keys from `active_notes`
+- [x] Click-to-play — click sends `NoteOn`/`NoteOff` via selected MIDI output port
+- [x] MIDI input → key highlight + optional audio preview — `poll_midi()` drives `active_notes`
+- [x] Settings: persist preferred port names; reconnect on startup — `preferred_midi_input/output` in `settings.toml`; `reconnect_midi_if_needed()` called each frame
 
 ### File Management
 
@@ -156,17 +156,17 @@ serde_json = "1"          # Phase 8
 - [x] Default format + chip persisted
 - [x] Auto-compile toggle + debounce delay persisted
 - [x] Recent files persisted
-- [ ] Settings panel UI (theme toggle, font size, MIDI port prefs)
-- [ ] Theme selector (dark / light) applied to egui visuals
-- [ ] Font size applied to egui style
+- [x] Settings panel UI (theme toggle, font size, MIDI port prefs) — `panels/settings_panel.rs`; Edit → Settings… / Ctrl+,
+- [x] Theme selector (dark / light) applied to egui visuals — `apply_theme()` called on change and at startup
+- [x] Font size applied to egui style — `apply_font_size()` sets Body/Button/Monospace sizes; called on change and at startup
 
 ### Misc
 
 - [x] Keyboard shortcuts: Ctrl+O, Ctrl+S, Ctrl+N, Ctrl+B, Space
 - [x] Menu bar: File, Build, Playback, View
 - [x] Output tab: hex dump of compiled bytes
-- [ ] Debug panel: register trace / chip state
-- [ ] Mixer panel: per-channel volume/mute/solo
+- ~~[ ] Debug panel: register trace / chip state~~ — deferred; no chip state surface in current emulator API
+- ~~[ ] Mixer panel: per-channel volume/mute/solo~~ — deferred; out of scope for v1
 
 ---
 
@@ -269,31 +269,32 @@ Request (newline-delimited JSON):
 - [x] `panels/waveform.rs` — bar-graph via `egui::Painter`, background fill, centre line
 - [x] Space bar → play/pause; Playback menu entry; Playback toolbar strip
 
-### Phase 5: MIDI 🚧 IN PROGRESS
+### Phase 5: MIDI ✅ COMPLETED
 
-Goal: real MIDI input, on-screen keyboard, click-to-play via MIDI output.
+- [x] `midir = "0.10"` in `egui-app/Cargo.toml`
+- [x] `midi.rs` — `MidiManager`: enumerate input/output ports, connect, parse raw bytes,
+      dispatch `MidiEvent { NoteOn, NoteOff, CC }` via internal mpsc; `send_note_on/off`,
+      `disconnect_input/output`, `refresh_ports()`
+- [x] `panels/midi_keyboard.rs` — 3-octave piano (C3–B5), lit keys from `active_notes[128]`,
+      click sends NoteOn/Off to MIDI output port; black/white key hit-testing
+- [x] Wire `MidiManager` into `MmlApp`: `poll_midi()` called each frame, `active_notes` updated
+- [x] Settings: persist `preferred_midi_input` / `preferred_midi_output` by name;
+      `reconnect_midi_if_needed()` called every frame; auto-connect at startup in `MmlApp::new`
+- [x] MIDI panel in bottom tabs — `show_midi_panel()` with port selectors, refresh button,
+      on-screen keyboard
 
-- [ ] Add `midir = "0.10"` to `egui-app/Cargo.toml`
-- [ ] `midi.rs` — `MidiManager`: enumerate input/output ports, connect, parse raw bytes,
-      dispatch `MidiEvent { NoteOn, NoteOff, CC }` via internal mpsc
-- [ ] `panels/midi_keyboard.rs` — 3-octave piano (C3–B5), lit keys from `active_notes[128]`,
-      click sends NoteOn/Off to MIDI output port
-- [ ] Wire `MidiManager` into `MmlApp`: poll events each frame, update `active_notes`
-- [ ] Settings: persist `preferred_midi_input` / `preferred_midi_output` by name;
-      auto-reconnect on startup
-- [ ] MIDI panel in bottom tabs
+### Phase 6: Settings + Polish ✅ COMPLETED
 
-### Phase 6: Settings + Polish 🚧 IN PROGRESS (partial)
-
-Already done:
 - [x] `settings.rs` load/save `~/.config/mml2vgm/settings.toml`
-- [x] Keyboard shortcuts (Ctrl+B, Ctrl+O, Ctrl+S, Ctrl+N, Space)
-
-Remaining:
-- [ ] `panels/settings_panel.rs` — `egui::Window` with theme toggle, font size, MIDI port selectors
-- [ ] Apply theme (dark/light) to `egui::Context::set_visuals()`
-- [ ] Apply font size to `egui::Context::set_style()`
-- [ ] Settings menu entry (Edit → Settings…)
+- [x] Keyboard shortcuts (Ctrl+B, Ctrl+O, Ctrl+S, Ctrl+N, Space, Ctrl+,)
+- [x] `panels/settings_panel.rs` — `egui::Window` with theme toggle, font size slider,
+      auto-compile toggle + delay, MIDI input/output combo boxes, Save button
+- [x] Apply theme (dark/light) to `egui::Context::set_visuals()` — `apply_theme()` at startup
+      and on change each frame
+- [x] Apply font size to `egui::Context::set_style()` — `apply_font_size()` sets Body/Button/
+      Monospace sizes at startup and on change each frame
+- [x] Settings menu entry (Edit → Settings… / Ctrl+,)
+- [x] Click error → jump editor to that line — `Document::jump_to_line` + `editor::show()` cursor wiring
 
 ### Phase 7: Tauri Freeze + Migration ✅ COMPLETED
 
@@ -355,8 +356,8 @@ Remaining:
 
 ## Success Criteria
 
-- `cargo build -p egui-app` on macOS, Linux, Windows (CI)
-- Open `.gwi`, compile, hear audio within 5 s of startup
-- MIDI input selectable; pressed keys light up on-screen keyboard
-- `just egui-smoke` passes end-to-end
-- `tauri-app/` removed
+- [x] `cargo build -p egui-app` on macOS, Linux, Windows (CI)
+- [x] Open `.gwi`, compile, hear audio within 5 s of startup
+- [x] MIDI input selectable; pressed keys light up on-screen keyboard
+- [x] `just egui-smoke` passes end-to-end
+- [ ] `tauri-app/` removed — pending explicit user confirmation

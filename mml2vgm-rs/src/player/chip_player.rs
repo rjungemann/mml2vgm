@@ -76,6 +76,16 @@ impl ChipPlayer {
             SoundChip::K053260 => Box::new(crate::chips::k053260::K053260::new()),
             SoundChip::K054539 => Box::new(crate::chips::k054539::K054539::new()),
             SoundChip::QSound => Box::new(crate::chips::qsound::QSound::new()),
+            // Variant/extended chips reuse compatible base emulators
+            SoundChip::YM2610B => Box::new(crate::chips::ym2608::YM2608::new()),
+            SoundChip::YM2609  => Box::new(crate::chips::ym2608::YM2608::new()),
+            SoundChip::SN76489X2 => Box::new(crate::chips::sn76489::SN76489::new()),
+            SoundChip::YM2612X  => Box::new(crate::chips::ym2612::YM2612::new()),
+            SoundChip::YM2612X2 => Box::new(crate::chips::ym2612::YM2612::new()),
+            // Declared-only chips produce silence; they do not panic
+            SoundChip::YMF271   => Box::new(crate::chips::SilentChip::new("YMF271", 16_934_400)),
+            SoundChip::MIDI      => Box::new(crate::chips::SilentChip::new("MIDI", 0)),
+            SoundChip::CONDUCTOR => Box::new(crate::chips::SilentChip::new("CONDUCTOR", 0)),
             _ => {
                 return Err(MmlError::UnsupportedChip(
                     format!("Chip {:?} not yet implemented", chip),
@@ -297,5 +307,48 @@ mod tests {
         player.add_chip(SoundChip::SN76489).unwrap();
         assert!(player.remove_chip(SoundChip::SN76489).is_ok());
         assert_eq!(player.chip_count(), 0);
+    }
+
+    // ── Batch D4: variant / alias chips ─────────────────────────────────────
+
+    #[test]
+    fn test_batch_d4_variant_chips_add_successfully() {
+        let variants = [
+            SoundChip::YM2610B,
+            SoundChip::YM2609,
+            SoundChip::SN76489X2,
+            SoundChip::YM2612X,
+            SoundChip::YM2612X2,
+        ];
+        for chip in variants {
+            let mut player = ChipPlayer::new();
+            assert!(
+                player.add_chip(chip).is_ok(),
+                "add_chip failed for {:?}", chip
+            );
+            assert_eq!(player.chip_count(), 1);
+        }
+    }
+
+    #[test]
+    fn test_batch_d4_declared_chips_produce_silence() {
+        let declared = [
+            SoundChip::YMF271,
+            SoundChip::MIDI,
+            SoundChip::CONDUCTOR,
+        ];
+        for chip in declared {
+            let mut player = ChipPlayer::new();
+            assert!(
+                player.add_chip(chip).is_ok(),
+                "add_chip failed for {:?}", chip
+            );
+            // Generate a small buffer and verify it is silent
+            let buf = player.generate_samples(32).expect("generate_samples failed");
+            assert!(
+                buf.iter().all(|&s| s == 0.0),
+                "silent chip {:?} produced non-zero samples", chip
+            );
+        }
     }
 }

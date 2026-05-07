@@ -25,7 +25,7 @@ pub mod k053260;
 pub mod k054539;
 pub mod qsound;
 
-use crate::{MmlError, MmlResult};
+use crate::MmlResult;
 
 /// Trait for all sound chips
 pub trait SoundChipEmulator {
@@ -42,6 +42,30 @@ pub trait SoundChipEmulator {
     }
     fn is_initialized(&self) -> bool { true }
     fn load_pcm_data(&mut self, _block_type: u8, _data: &[u8]) {}
+}
+
+/// A no-op chip emulator for declared-but-not-yet-emulated chips.
+/// Accepts all register writes and produces silence.
+pub struct SilentChip {
+    chip_name: &'static str,
+    chip_clock: u32,
+}
+
+impl SilentChip {
+    pub fn new(name: &'static str, clock: u32) -> Self {
+        Self { chip_name: name, chip_clock: clock }
+    }
+}
+
+impl SoundChipEmulator for SilentChip {
+    fn name(&self) -> &'static str { self.chip_name }
+    fn clock_rate(&self) -> u32 { self.chip_clock }
+    fn reset(&mut self) {}
+    fn write(&mut self, _addr: u8, _data: u8) {}
+    fn clock(&mut self) {}
+    fn generate_samples(&mut self, buffer: &mut [f32], _sample_rate: u32) {
+        buffer.fill(0.0);
+    }
 }
 
 /// Clock the chip for a specific number of cycles

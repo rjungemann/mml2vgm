@@ -254,6 +254,60 @@ fn is_compiled_audio_file(path: &Path) -> bool {
     }
 }
 
+/// Print a compiler error with source-context (line + caret) when position info is available.
+fn print_diagnostic(path: Option<&Path>, err: &mml2vgm::MmlError) {
+    match err {
+        mml2vgm::MmlError::Parse { line, column, message } => {
+            eprintln!("error[E0001]: {}", message);
+            if let Some(p) = path {
+                eprintln!("  --> {}:{}:{}", p.display(), line, column);
+                if let Ok(source) = std::fs::read_to_string(p) {
+                    let lines: Vec<&str> = source.lines().collect();
+                    if let Some(src_line) = lines.get(line.saturating_sub(1)) {
+                        let ln_width = format!("{}", line).len();
+                        eprintln!("  {:width$} |", "", width = ln_width);
+                        eprintln!(" {:>width$} | {}", line, src_line, width = ln_width);
+                        let caret_col = column.saturating_sub(1);
+                        eprintln!("  {:width$} | {}^", "", " ".repeat(caret_col), width = ln_width);
+                    }
+                }
+            }
+            if let Some(hint) = parse_error_hint(message) {
+                eprintln!("  = help: {}", hint);
+            }
+        }
+        mml2vgm::MmlError::UnsupportedChip(name) => {
+            eprintln!("error: unknown chip '{}'", name);
+            eprintln!("  = help: valid chip names include YM2612, SN76489, YM2608, YM2151, YM3812,");
+            eprintln!("           AY8910, HuC6280, YM2413, K051649, NES, DMG, POKEY, VRC6, QSound");
+            eprintln!("           (use --list-chips for the full list with support tiers)");
+        }
+        mml2vgm::MmlError::FileNotFound(p) => {
+            eprintln!("error: file not found: {}", p.display());
+            eprintln!("  = help: check the path and that the file has a .gwi extension");
+        }
+        other => {
+            eprintln!("error: {}", other);
+        }
+    }
+}
+
+/// Return a contextual hint for a parse error message, if one is known.
+fn parse_error_hint(message: &str) -> Option<&'static str> {
+    let m = message.to_ascii_lowercase();
+    if m.contains("unexpected") || m.contains("expected") {
+        Some("notes are A-G (or a-g), rests are 'r'; commands: t (tempo), v (volume), o (octave), l (default length), @ (instrument)")
+    } else if m.contains("duration") || m.contains("invalid number") {
+        Some("note durations must be 1, 2, 4, 8, 16, 32, or 64 — optionally followed by '.' for dotted")
+    } else if m.contains("octave") {
+        Some("octave range is o0 through o8; use '>' to step up and '<' to step down")
+    } else if m.contains("instrument") || m.contains("@") {
+        Some("FM instruments are defined with '@N' followed by TL/DR/AR/RR parameters on subsequent lines")
+    } else {
+        None
+    }
+}
+
 /// Print compilation statistics
 fn print_stats(info: &CompileInfo) {
     println!();
@@ -404,7 +458,10 @@ fn main() {
     if args.check {
         match run_validate(&args) {
             Ok(()) => { info!("Validation successful"); process::exit(0); }
-            Err(e) => { error!("Validation error: {}", e); process::exit(1); }
+            Err(e) => {
+                print_diagnostic(args.input.as_deref(), &e);
+                process::exit(1);
+            }
         }
     } else {
         match run_compile(&args) {
@@ -427,7 +484,7 @@ fn main() {
                 process::exit(0);
             }
             Err(e) => {
-                error!("Error: {}", e);
+                print_diagnostic(args.input.as_deref(), &e);
                 process::exit(1);
             }
         }

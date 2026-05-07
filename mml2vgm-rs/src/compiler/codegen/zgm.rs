@@ -239,6 +239,7 @@ impl ZgmGenerator {
             SoundChip::YM3526 => Some(0x0000_0054),
             SoundChip::Y8950 => Some(0x0000_0058),
             SoundChip::YMF262 => Some(0x0000_005c),
+            SoundChip::YMF271 => Some(0x0000_0060),
             SoundChip::RF5C164 => Some(0x0000_006c),
             SoundChip::AY8910 => Some(0x0000_0074),
             SoundChip::DMG => Some(0x0000_0080),

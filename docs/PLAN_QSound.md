@@ -342,12 +342,50 @@ This phase is optional for game music accuracy — the perceptual difference is 
 
 | Feature | Status | Notes |
 |---|---|---|
-| 16-voice PCM playback | ✅ Partial | Wrong pitch format and register layout |
-| ROM loading | ⚠️ Bug | Block type 0x88 should be 0x8F |
-| Pitch accumulator | ⚠️ Bug | Q8.8 should be Q4.12 |
-| Register layout | ⚠️ Bug | Invented layout; needs full rewrite |
-| Banking (24-bit addr) | ❌ Missing | Needed for ROMs > 64K words |
-| Pan lookup table | ❌ Missing | Linear approx only |
-| Echo/reverb | ❌ Missing | |
-| ADPCM channels | ❌ Missing | |
-| Q1 FIR filter | ❌ Optional | |
+| 16-voice PCM playback | ✅ Complete | Q4.12 pitch, documented register layout, 24-bit banking |
+| ROM loading | ✅ Fixed | Block type 0x8F accepted; 0x88 correctly rejected |
+| Pitch accumulator | ✅ Fixed | Q4.12 with 12-bit fractional carry |
+| Register layout | ✅ Fixed | Full rewrite: bank/addr/rate/phase/loop/end/volume per voice |
+| Banking (24-bit addr) | ✅ Complete | pending_bank applied on next tick |
+| Pan lookup table | ✅ Complete | 33-entry sqrt equal-power table; hard-left/centre/right decoded |
+| Echo/reverb | ✅ Complete | Circular delay buffer; per-voice send; feedback with one-pole LP |
+| ADPCM channels | ✅ Complete | IMA-ADPCM 4-bit decode; 3 one-shot channels at ~8012 Hz |
+| Q1 FIR filter | ❌ Optional | Not required for recognisable output |
+
+## Phase Implementation Log
+
+### Phase 1 — Correctness fixes ✅ COMPLETED
+
+- `load_pcm_data` now guards on `0x8F` (was `0x88`)
+- `QSoundVoice` fully rewritten: bank, pending_bank, addr, rate, phase, loop_len, end_addr, volume, pan, active
+- `write_reg` dispatches all documented registers including pan (0x80–0x8F) and ADPCM
+- Q4.12 pitch accumulator: `(rate >> 12)` integer advance + 12-bit fractional carry
+- `pending_bank` applied at the start of each native tick (one-tick latency)
+- `read_word_static` free function avoids borrow conflict inside `iter_mut` loop
+- Tests: `test_qsound_register_layout_voice0`, `test_qsound_addr_write_activates_voice`, `test_qsound_pitch_unity_rate`, `test_qsound_pitch_half_rate`, `test_qsound_write_port_decodes_16bit`, `test_qsound_load_pcm_data_accepts_0x8f`, `test_qsound_load_pcm_data_rejects_0x88`
+
+### Phase 2 — Pan lookup table ✅ COMPLETED
+
+- `build_pan_table()` generates 33-entry `[u8; 33]` at init
+- `pan_gains(pan_word, tbl)` decodes `0x0110+n` (left), `0x0120` (centre), `0x0130+n` (right)
+- Tests: `test_qsound_pan_table_endpoints`, `test_qsound_pan_centre_equal_power`, `test_qsound_pan_hard_left`, `test_qsound_pan_hard_right`, `test_qsound_pan_register_written`
+
+### Phase 3 — Echo/reverb unit ✅ COMPLETED
+
+- `EchoUnit` struct: circular stereo-interleaved delay buffer (capacity 0x2000 samples), write head, delay_len, feedback, per-voice send levels, one-pole LP state
+- `EchoUnit::process()` reads from delay, applies LP feedback, writes new entry
+- `set_delay()` clamps to hardware-valid range 0x055A–0x0FFF
+- Register wiring: 0x93 → feedback, 0xBA–0xC9 → per-voice send, 0xD9 → delay length
+- Tests: `test_qsound_echo_default_state`, `test_qsound_echo_delay_register`, `test_qsound_echo_feedback_register`, `test_qsound_echo_send_register`, `test_qsound_echo_decay_produces_tail`, `test_qsound_echo_no_leakage_when_zeroed`
+
+### Phase 4 — ADPCM channels ✅ COMPLETED
+
+- `AdpcmVoice` struct with IMA-ADPCM state (predictor, step_index, nibble_hi, phase_acc, last_sample)
+- `IMA_STEP_TABLE[89]` and `IMA_INDEX_TABLE[16]` standard tables
+- `ima_decode()` 4-bit nibble decoder
+- ADPCM registers: start/end/bank/volume per channel (0xCA–0xD5), key-on 0xD6–0xD8
+- Bug fixed: key-on registers were dead code due to `offset < 16` guard; corrected to `offset < 12`
+- Playback rate: NATIVE_RATE / ADPCM_RATE ≈ 3 native ticks per ADPCM sample
+- Tests: `test_qsound_adpcm_key_on_activates`, `test_qsound_adpcm_silence_on_empty_rom`, `test_qsound_adpcm_registers_written`
+
+**Total QSound tests: 26 / 26 passing. Full lib test suite: 415 / 415 passing.**

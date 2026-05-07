@@ -190,6 +190,35 @@ fn test_file_compilation() {
     }
 }
 
+/// All files in `examples/` must compile to valid VGM.
+#[test]
+fn test_compile_bundled_examples() {
+    let examples_dir = PathBuf::from("../examples");
+
+    if !examples_dir.exists() {
+        eprintln!("Skipping: examples directory not found at {:?}", examples_dir);
+        return;
+    }
+
+    let mut entries: Vec<_> = fs::read_dir(&examples_dir)
+        .expect("failed to read examples dir")
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map(|x| x == "gwi").unwrap_or(false))
+        .collect();
+    entries.sort_by_key(|e| e.path());
+
+    assert!(!entries.is_empty(), "expected at least one .gwi in examples/");
+
+    for entry in entries {
+        let path = entry.path();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let compiler = MmlCompiler::new(CompileOptions { format: OutputFormat::VGM, ..Default::default() });
+        let result = compiler.compile(&path)
+            .unwrap_or_else(|e| panic!("examples/{} failed to compile: {}", name, e));
+        assert_valid_vgm_output(&result.data);
+    }
+}
+
 #[test]
 fn test_browser_sample_comment_lines_compile_from_source() {
     use std::time::Instant;

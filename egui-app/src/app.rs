@@ -64,6 +64,7 @@ impl MmlApp {
         let audio = AudioEngine::new();
 
         apply_theme(&cc.egui_ctx, &settings);
+        apply_font_size(&cc.egui_ctx, settings.font_size);
 
         let mut midi = MidiManager::new();
         // Auto-connect preferred ports from settings.
@@ -410,12 +411,15 @@ impl eframe::App for MmlApp {
 
         // ── settings window ───────────────────────────────────────────────────
         let prev_theme = self.settings.theme.clone();
+        let prev_font_size = self.settings.font_size;
         let midi_inputs  = self.midi.input_port_names.clone();
         let midi_outputs = self.midi.output_port_names.clone();
         crate::panels::settings_panel::show(ctx, &mut self.settings_open, &mut self.settings, &midi_inputs, &midi_outputs);
-        // Apply theme if it changed.
         if self.settings.theme != prev_theme {
             apply_theme(ctx, &self.settings);
+        }
+        if (self.settings.font_size - prev_font_size).abs() > f32::EPSILON {
+            apply_font_size(ctx, self.settings.font_size);
         }
         // Apply MIDI port changes (reconnect when preferred port changed).
         reconnect_midi_if_needed(&mut self.midi, &self.settings);
@@ -564,7 +568,11 @@ impl eframe::App for MmlApp {
                         let errors = self.docs.active()
                             .and_then(|d| if let CompileStatus::Errors(ref e) = d.compile_status { Some(e.clone()) } else { None })
                             .unwrap_or_default();
-                        crate::panels::error_list::show(ui, &errors);
+                        if let Some(line) = crate::panels::error_list::show(ui, &errors) {
+                            if let Some(doc) = self.docs.active_mut() {
+                                doc.jump_to_line = Some(line);
+                            }
+                        }
                     }
                     BottomTab::Output => {
                         let preview: Option<String> = self.docs.active()
@@ -595,7 +603,8 @@ impl eframe::App for MmlApp {
             if self.docs.has_any() {
                 if let Some(id) = self.docs.active_id() {
                     let doc = self.docs.get_mut(id).unwrap();
-                    let changed = crate::editor::show(ui, &mut doc.content);
+                    let jump = doc.jump_to_line.take();
+                    let changed = crate::editor::show(ui, &mut doc.content, jump);
                     if changed { doc.mark_edited(now); }
                 }
             } else {
@@ -706,6 +715,16 @@ fn apply_theme(ctx: &Context, settings: &Settings) {
         Theme::Dark  => ctx.set_visuals(egui::Visuals::dark()),
         Theme::Light => ctx.set_visuals(egui::Visuals::light()),
     }
+}
+
+fn apply_font_size(ctx: &Context, size: f32) {
+    let mut style = (*ctx.style()).clone();
+    for text_style in [egui::TextStyle::Body, egui::TextStyle::Button, egui::TextStyle::Monospace] {
+        if let Some(font_id) = style.text_styles.get_mut(&text_style) {
+            font_id.size = size;
+        }
+    }
+    ctx.set_style(style);
 }
 
 fn reconnect_midi_if_needed(midi: &mut MidiManager, settings: &Settings) {

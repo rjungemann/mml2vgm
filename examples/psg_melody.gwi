@@ -1,0 +1,22 @@
+'{
+
+    TitleName   = PSG Melody
+    Composer    = Example
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Three-voice SN76489 PSG — melody, counter-melody, bass
+
+; Channel 1: melody
+'B1 T140
+'B1 v100 l8 o4 c e g >c < b g e c r4
+
+; Channel 2: counter-melody (offset by one beat)
+'B2 T140
+'B2 v80 l8 o3 r4 e g b >e d b g e

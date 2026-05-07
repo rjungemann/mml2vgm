@@ -1,0 +1,34 @@
+'{
+
+    TitleName   = FM Chord Progression
+    Composer    = Example
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+
+}
+
+; FM instrument 1: pad/string-like tone (algorithm 7, no feedback)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,000,000,001,000,000,000
+   AL  FB
+'@ 007,000
+
+; Channel 1: root voice
+'A1 T90
+'A1 @1 v100 l2 o4 c f g c
+
+; Channel 2: third above root
+'A2 T90
+'A2 @1 v90 l2 o4 e a b e
+
+; Channel 3: fifth above root
+'A3 T90
+'A3 @1 v80 l2 o4 g >c d g

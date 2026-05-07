@@ -488,16 +488,16 @@ Listed below by priority and category.
 ## Implementation Dependencies
 
 ### Core Infrastructure (Required First)
-- [ ] Document state management with unsaved changes tracking
-- [ ] localStorage/IndexedDB persistence layer
-- [ ] Dialog/modal component framework
-- [ ] File I/O abstraction
+- [x] Document state management with unsaved changes tracking
+- [x] localStorage/IndexedDB persistence layer
+- [x] Dialog/modal component framework
+- [x] File I/O abstraction
 
 ### Supporting Features (Build as Needed)
-- [ ] Editor command system (delegate to Monaco)
-- [ ] Web Audio API audio device enumeration
-- [ ] WASM format metadata consumption
-- [ ] Settings persistence system
+- [x] Editor command system (delegate to Monaco)
+- [x] Web Audio API audio device enumeration
+- [x] WASM format metadata consumption
+- [x] Settings persistence system
 
 ---
 

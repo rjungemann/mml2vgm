@@ -25,6 +25,8 @@ pub struct Document {
     pub compiled_bytes: Option<Vec<u8>>,
     /// Pending auto-compile: time (via egui's time) when content was last changed.
     pub last_edit_time: Option<f64>,
+    /// If set, the editor will scroll to and place the cursor at this 1-based line on the next frame.
+    pub jump_to_line: Option<usize>,
 }
 
 impl Document {
@@ -37,6 +39,7 @@ impl Document {
             compile_status: CompileStatus::Idle,
             compiled_bytes: None,
             last_edit_time: None,
+            jump_to_line: None,
         }
     }
 
@@ -49,6 +52,7 @@ impl Document {
             compile_status: CompileStatus::Idle,
             compiled_bytes: None,
             last_edit_time: None,
+            jump_to_line: None,
         }
     }
 

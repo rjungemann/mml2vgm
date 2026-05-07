@@ -158,6 +158,8 @@ pub enum SoundChip {
     Y8950,
     YM3812,
     YMF262,
+    // OPL4 (declared only — VGM opcodes 0x60/0x61)
+    YMF271,
     
     // OPLL
     YM2413,
@@ -195,7 +197,7 @@ pub enum SoundChip {
 }
 
 /// All sound chips exposed by the public API.
-pub const ALL_SOUND_CHIPS: [SoundChip; 31] = [
+pub const ALL_SOUND_CHIPS: [SoundChip; 32] = [
     SoundChip::YM2612,
     SoundChip::YM2612X,
     SoundChip::YM2612X2,
@@ -209,6 +211,7 @@ pub const ALL_SOUND_CHIPS: [SoundChip; 31] = [
     SoundChip::Y8950,
     SoundChip::YM3812,
     SoundChip::YMF262,
+    SoundChip::YMF271,
     SoundChip::YM2413,
     SoundChip::YM2203,
     SoundChip::RF5C164,
@@ -246,6 +249,7 @@ impl SoundChip {
             SoundChip::Y8950 => "Y8950",
             SoundChip::YM3812 => "YM3812 (OPL2)",
             SoundChip::YMF262 => "YMF262 (OPL3)",
+            SoundChip::YMF271 => "YMF271 (OPL4)",
             SoundChip::YM2413 => "YM2413 (OPLL)",
             SoundChip::YM2203 => "YM2203 (OPN)",
             SoundChip::RF5C164 => "RF5C164",
@@ -280,6 +284,7 @@ impl SoundChip {
             SoundChip::Y8950 => 3579545,
             SoundChip::YM3812 => 3579545,
             SoundChip::YMF262 => 14318180,
+            SoundChip::YMF271 => 16934400,
             SoundChip::YM2413 => 3579545,
             SoundChip::YM2203 => 3993600,
             SoundChip::RF5C164 => 12500000,
@@ -316,8 +321,8 @@ impl SoundChip {
             SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2
                 | SoundChip::YM2608 | SoundChip::YM2609 | SoundChip::YM2610B
                 | SoundChip::YM2151 | SoundChip::YM3526 | SoundChip::Y8950
-                | SoundChip::YM3812 | SoundChip::YMF262 | SoundChip::YM2413
-                | SoundChip::YM2203
+                | SoundChip::YM3812 | SoundChip::YMF262 | SoundChip::YMF271
+                | SoundChip::YM2413 | SoundChip::YM2203
         )
     }
 
@@ -358,7 +363,8 @@ impl SoundChip {
             | SoundChip::DMG
             | SoundChip::VRC6
             | SoundChip::K053260
-            | SoundChip::K054539 => SupportTier::Partial,
+            | SoundChip::K054539
+            | SoundChip::QSound => SupportTier::Partial,
             _ => SupportTier::Declared,
         }
     }
@@ -408,6 +414,8 @@ impl std::str::FromStr for SoundChip {
             Ok(SoundChip::YM3812)
         } else if s_upper == "YMF262" || s_upper == "OPL3" {
             Ok(SoundChip::YMF262)
+        } else if s_upper == "YMF271" || s_upper == "OPL4" {
+            Ok(SoundChip::YMF271)
         } else if s_upper == "YM2413" || s_upper == "OPLL" {
             Ok(SoundChip::YM2413)
         } else if s_upper == "YM2203" || s_upper == "OPN" {

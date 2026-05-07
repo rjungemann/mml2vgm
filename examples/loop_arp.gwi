@@ -1,0 +1,31 @@
+'{
+
+    TitleName   = Loop and Arpeggio
+    Composer    = Example
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; FM instrument 0: bright lead
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,005,000,010,000,000,000,002,000,000,000
+'@ 031,005,000,010,000,000,000,002,001,000,000
+'@ 031,010,002,010,002,030,000,001,000,000,000
+'@ 031,005,000,010,000,042,001,001,000,000,000
+   AL  FB
+'@ 005,004
+
+; FM lead: arpeggio pattern using finite loop (body)N syntax
+'A1 T160
+'A1 @0 v100 l16 o4 (c e g >c)4 (f a >c f)4 (g b >d g)4 (c e g >c)4
+
+; PSG bass: repeated bass note on each chord root
+'B1 T160
+'B1 v100 l4 o2 (c)4 (f)4 (g)4 (c)4

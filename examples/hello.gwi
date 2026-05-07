@@ -1,0 +1,31 @@
+'{
+
+    TitleName   = Hello World
+    Composer    = Example
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; FM instrument 0: simple sine-like tone (algorithm 4, feedback 0)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,042,000,001,000,000
+   AL  FB
+'@ 004,000
+
+; FM Channel 1: C major scale, quarter notes, octave 4
+'A1 T120
+'A1 @0 v100 l4 o4 c d e f g a b >c r1
+
+; PSG Channel 1: root note bass, half notes, octave 2
+'B1 T120
+'B1 v100 l2 o2 c g f c
