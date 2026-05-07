@@ -234,15 +234,11 @@ impl<'a> Lexer<'a> {
         if c_upper == 'C' || c_upper == 'D' || c_upper == 'E' || c_upper == 'F' || 
            c_upper == 'G' || c_upper == 'A' || c_upper == 'B' {
             let letter = c_upper;
-            // Check if this is followed by a sharp or flat
+            // Check if this is followed by a sharp
             if let Some(next_c) = self.next_char() {
                 if next_c == '#' {
                     self.advance(); // Consume the note letter
                     self.advance(); // Consume the #
-                    return Ok(Token::Note(letter));
-                } else if next_c == 'b' {
-                    self.advance(); // Consume the note letter
-                    self.advance(); // Consume the b
                     return Ok(Token::Note(letter));
                 }
             }
@@ -380,16 +376,22 @@ impl<'a> Lexer<'a> {
                 self.next_token()
             }
             
-            // Whitespace (other)
+            // Whitespace or unrecognised character (advance past it to avoid infinite loop)
             _ => {
                 let mut ws = String::new();
+                let mut advanced = false;
                 while let Some(c) = self.current_char() {
                     if c.is_whitespace() && c != '\n' && c != '\r' {
                         ws.push(c);
                         self.advance();
+                        advanced = true;
                     } else {
                         break;
                     }
+                }
+                if !advanced {
+                    // Unrecognised character: skip it so the tokenizer never stalls.
+                    self.advance();
                 }
                 Ok(Token::Whitespace(ws))
             }

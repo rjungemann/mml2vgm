@@ -112,6 +112,16 @@ pub struct InstrumentSelection {
     pub number: usize,
 }
 
+/// Quantize / gate time
+/// - q (lowercase): absolute, silence = value/48 of note duration
+/// - Q (uppercase): proportional, note sounds for value/8 of duration (Q8 = full note)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Quantize {
+    pub value: u8,
+    /// true = uppercase Q (GatetimeDiv, proportional), false = lowercase q (Gatetime, absolute)
+    pub proportional: bool,
+}
+
 /// Loop structure
 #[derive(Debug, Clone, PartialEq)]
 pub struct Loop {
@@ -207,6 +217,8 @@ pub enum MmlNode {
     OctaveShift(OctaveShift),
     /// Instrument selection
     InstrumentSelection(InstrumentSelection),
+    /// Quantize / gate time
+    Quantize(Quantize),
     /// Loop
     Loop(Loop),
     /// Bar line

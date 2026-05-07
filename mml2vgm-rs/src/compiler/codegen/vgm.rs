@@ -102,6 +102,11 @@ struct PartCodegenState {
     init_done: bool,
     /// Whether a key-on is in effect
     keyed_on: bool,
+    /// Quantize/gate value
+    quantize: u8,
+    /// true = uppercase Q (proportional: note plays value/8 of duration)
+    /// false = lowercase q (absolute: silence = value/48 of duration)
+    quantize_proportional: bool,
 }
 
 impl PartCodegenState {
@@ -117,6 +122,8 @@ impl PartCodegenState {
             instrument_num: None,
             init_done: false,
             keyed_on: false,
+            quantize: 0,
+            quantize_proportional: false,
         }
     }
 }
@@ -132,6 +139,8 @@ pub struct VgmGenerator {
     fm_instruments: HashMap<u32, Vec<u32>>,
     /// Next YM2612 absolute channel to allocate (0-5)
     next_ym2612_channel: u8,
+    /// When true, add_wait is a no-op (used during parallel part processing)
+    suppress_waits: bool,
 }
 
 impl VgmGenerator {
@@ -145,6 +154,7 @@ impl VgmGenerator {
             gd3_tag: None,
             fm_instruments: HashMap::new(),
             next_ym2612_channel: 0,
+            suppress_waits: false,
         };
 
         generator.header.version = 0x00000171;
@@ -154,7 +164,6 @@ impl VgmGenerator {
         for (num, inst) in &ast.fm_instruments {
             generator.fm_instruments.insert(*num, inst.parameters.clone());
         }
-
         generator.convert_ast_to_commands(ast)?;
         generator.build_gd3_tag(ast);
         generator.calculate_header();
@@ -209,21 +218,101 @@ impl VgmGenerator {
         }
     }
 
-    fn convert_ast_to_commands(&mut self, ast: &MmlAst) -> MmlResult<()> {
-        let mut current_time: u64 = 0;
+    /// Write the standard YM2612 power-on reset sequence expected by every VGM.
+    ///
+    /// Sets LFO off, Timer off, DAC off, then for each of the 6 channels:
+    /// key-off, mute all operators (TL=127), and (for active channels only)
+    /// B4=0xC0 (stereo enable). B4 is interleaved per-channel, matching the
+    /// C# reference ordering.
+    fn ym2612_global_init(&mut self, num_active: u8) {
+        let t = 0u64;
+        // Global: LFO off, Timer off, DAC off
+        self.ym2612_write_reg(0, 0x22, 0x00, t);
+        self.ym2612_write_reg(0, 0x27, 0x00, t);
+        self.ym2612_write_reg(0, 0x2B, 0x00, t);
 
-        for node in &ast.global_settings {
-            self.process_node_global(node, &mut current_time)?;
+        for abs_ch in 0u8..6 {
+            let port = abs_ch / 3;
+            let ch = abs_ch % 3;
+            // Key-off
+            let key_byte = ((port & 0x1) << 2) | (ch & 0x3);
+            self.ym2612_write_reg(0, 0x28, key_byte, t);
+            // Mute all 4 operators (TL=127) in slot write order S1,S2,S3,S4
+            for &op_mul in &[0u8, 2, 1, 3] {
+                let op_off = ch + op_mul * 4;
+                self.ym2612_write_reg(port, 0x40 + op_off, 0x7F, t);
+            }
+            // Stereo enable immediately after TL mutes, only for active channels
+            if abs_ch < num_active {
+                self.ym2612_write_reg(port, 0xB4 + ch, 0xC0, t);
+            }
         }
+    }
 
-        // Sort parts by name for deterministic output order
+    fn convert_ast_to_commands(&mut self, ast: &MmlAst) -> MmlResult<()> {
+        // Count active YM2612 channels (parts that target YM2612, in sorted name order)
         let mut part_names: Vec<String> = ast.parts.keys().cloned().collect();
         part_names.sort();
+        let num_ym2612_active = part_names
+            .iter()
+            .filter(|n| ast.parts[*n].chip.as_deref() == Some("YM2612"))
+            .count() as u8;
 
+        // Emit YM2612 global initialisation at time 0 if the song uses the chip
+        if num_ym2612_active > 0 {
+            self.ym2612_global_init(num_ym2612_active);
+        }
+
+        // Process global settings (tempo, etc.) — these don't emit chip writes
+        let mut global_time: u64 = 0;
+        for node in &ast.global_settings {
+            self.process_node_global(node, &mut global_time)?;
+        }
+
+        // Process each part independently from time=0 (parallel/simultaneous playback).
+        // During part processing, waits are suppressed — only write commands with
+        // their absolute timestamps accumulate. After all parts are done, write
+        // commands are sorted by time and waits are re-inserted between time-steps.
+        let init_len = self.commands.len();
+        let mut max_part_time: u64 = 0;
+
+        self.suppress_waits = true;
         for name in &part_names {
             if let Some(part) = ast.parts.get(name) {
-                self.process_part(part, &mut current_time)?;
+                let mut part_time: u64 = 0;
+                self.process_part(part, &mut part_time)?;
+                if part_time > max_part_time {
+                    max_part_time = part_time;
+                }
             }
+        }
+        self.suppress_waits = false;
+
+        // Collect and sort write commands emitted by all parts
+        let mut part_cmds: Vec<VgmCommand> = self.commands.drain(init_len..).collect();
+        // Filter out any waits (shouldn't exist, but guard just in case)
+        part_cmds.retain(|c| {
+            !matches!(
+                c.command_type,
+                VgmCommandType::Wait | VgmCommandType::Wait1 | VgmCommandType::Wait2
+            )
+        });
+        // Stable sort preserves relative order of simultaneous writes
+        part_cmds.sort_by_key(|c| c.time);
+
+        // Re-insert waits between time-steps
+        let mut last_time: u64 = 0;
+        for cmd in part_cmds {
+            if cmd.time > last_time {
+                self.add_wait((cmd.time - last_time) as u32, cmd.time);
+                last_time = cmd.time;
+            }
+            self.commands.push(cmd);
+        }
+
+        // Add trailing wait from last register write to end of song
+        if max_part_time > last_time {
+            self.add_wait((max_part_time - last_time) as u32, max_part_time);
         }
 
         Ok(())
@@ -309,8 +398,12 @@ impl VgmGenerator {
                 let new_num = sel.number as u32;
                 if state.instrument_num != Some(new_num) {
                     state.instrument_num = Some(new_num);
-                    state.init_done = false; // re-init when instrument changes
+                    state.init_done = false;
                 }
+            }
+            MmlNode::Quantize(q) => {
+                state.quantize = q.value;
+                state.quantize_proportional = q.proportional;
             }
             MmlNode::Note(note) => {
                 self.process_chip_note(note, state, time)?;
@@ -355,7 +448,7 @@ impl VgmGenerator {
                 if !state.init_done {
                     let params = state.instrument_num
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
-                    self.ym2612_write_init(state.ym2612_port, state.ym2612_ch, params.as_deref(), *time);
+                    self.ym2612_write_init(state.ym2612_port, state.ym2612_ch, params.as_deref(), state.volume, *time);
                     state.init_done = true;
                 }
                 // Key off any previous note
@@ -369,12 +462,30 @@ impl VgmGenerator {
                 // Key on
                 self.ym2612_key_on(state, time);
                 state.keyed_on = true;
-                // Wait for note duration
-                *time += samples as u64;
-                self.add_wait(samples, *time);
-                // Key off after the note
+                // Apply quantize/gate:
+                // Q (proportional): note_on = floor(dur * value / 8), gap = dur - note_on
+                // q (absolute):     note_on = floor(dur * (48-value) / 48), gap = floor(dur * value / 48)
+                let (note_on_samples, gap) = if state.quantize == 0 {
+                    (samples, 0u32)
+                } else if state.quantize_proportional {
+                    let note_on = (samples as u64 * state.quantize as u64 / 8) as u32;
+                    (note_on, samples.saturating_sub(note_on))
+                } else {
+                    let gap = (samples as u64 * state.quantize as u64 / 48) as u32;
+                    let note_on = (samples as u64 * (48 - state.quantize as u64) / 48) as u32;
+                    (note_on, gap)
+                };
+                // Wait for note-on portion
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                // Key off at end of note-on
                 self.ym2612_key_off(state, time);
                 state.keyed_on = false;
+                // Wait for gap (silence between notes)
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
             }
             Some("SN76489") | None => {
                 self.process_psg_note(note, state, time);
@@ -440,64 +551,87 @@ impl VgmGenerator {
 
     /// Write all YM2612 operator and channel setup registers.
     ///
-    /// `params` is the flat parameter Vec from `FmInstrument.parameters`:
-    ///   ops 0-3 at indices [op*11 .. op*11+11], then ALG at [44], FB at [45].
-    fn ym2612_write_init(&mut self, port: u8, ch: u8, params: Option<&[u32]>, time: u64) {
-        // Unpack ALG/FB
+    /// `params` is the flat parameter Vec from `FmInstrument.parameters`.
+    /// M-type: 11 params/op → 46 total (alg at [44], fb at [45]).
+    /// F-type:  9 params/op → 38 total (alg at [36], fb at [37]).
+    fn ym2612_write_init(&mut self, port: u8, ch: u8, params: Option<&[u32]>, volume: u8, time: u64) {
+        // Detect stride: 46+ params = M-type (stride 11, has AM+SSG-EG), else F-type (stride 9)
+        let op_stride = params.map_or(11, |p| if p.len() >= 46 { 11 } else { 9 });
+        let alg_idx = op_stride * 4;
+
         let (alg, fb) = if let Some(p) = params {
-            let alg = p.get(44).copied().unwrap_or(7) as u8;
-            let fb = p.get(45).copied().unwrap_or(0) as u8;
+            let alg = p.get(alg_idx).copied().unwrap_or(7) as u8;
+            let fb = p.get(alg_idx + 1).copied().unwrap_or(0) as u8;
             (alg, fb)
         } else {
             (7, 0)
         };
 
-        // 0xB0+ch: feedback [5:3] | algorithm [2:0]
-        self.ym2612_write_reg(port, 0xB0 + ch, ((fb & 0x7) << 3) | (alg & 0x7), time);
-        // 0xB4+ch: LR=both (0xC0), AMS=0, FMS=0
-        self.ym2612_write_reg(port, 0xB4 + ch, 0xC0, time);
+        // MML op index → hardware slot offset multiplier:
+        //   MML op0 → S1 (offset 0), op1 → S2 (offset 8), op2 → S3 (offset 4), op3 → S4 (offset 12)
+        let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
 
-        // Operator registers: 4 operators, each at ch + op*4 offset within the register bank
-        for op in 0..4u8 {
-            let op_off = ch + op * 4;
+        // Write 6 registers per op (DT/ML, KS/AR, AMS/DR, SR, SL/RR, SSG-EG) in MML op order.
+        // TL is written separately below.
+        for op_idx in 0..4usize {
+            let op_off = ch + mml_to_hw[op_idx] * 4;
+            let b = op_idx * op_stride;
 
-            let (ar, dr, sr, rr, sl, tl, ks, ml, dt, am, ssg_eg) = if let Some(p) = params {
-                let b = (op as usize) * 11;
-                if p.len() > b + 10 {
-                    (
-                        p[b] as u8,
-                        p[b + 1] as u8,
-                        p[b + 2] as u8,
-                        p[b + 3] as u8,
-                        p[b + 4] as u8,
-                        p[b + 5] as u8,
-                        p[b + 6] as u8,
-                        p[b + 7] as u8,
-                        p[b + 8] as u8,
-                        p[b + 9] as u8,
-                        p[b + 10] as u8,
-                    )
+            let (ar, dr, sr, rr, sl, ks, ml, dt, am, ssg_eg) = if let Some(p) = params {
+                if p.len() > b + 8 {
+                    let am  = if op_stride >= 11 { p.get(b + 9).copied().unwrap_or(0) as u8  } else { 0 };
+                    let ssg = if op_stride >= 11 { p.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+                    (p[b] as u8, p[b+1] as u8, p[b+2] as u8, p[b+3] as u8, p[b+4] as u8,
+                     p[b+6] as u8, p[b+7] as u8, p[b+8] as u8, am, ssg)
                 } else {
-                    (31, 0, 0, 7, 0, 0, 0, 1, 0, 0, 0)
+                    (31, 0, 0, 7, 0, 0, 1, 0, 0, 0)
                 }
             } else {
-                (31, 0, 0, 7, 0, 0, 0, 1, 0, 0, 0)
+                (31, 0, 0, 7, 0, 0, 1, 0, 0, 0)
             };
 
-            // 0x30: DT[6:4] | ML[3:0]
             self.ym2612_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
-            // 0x40: TL[6:0]
-            self.ym2612_write_reg(port, 0x40 + op_off, tl & 0x7F, time);
-            // 0x50: KS[7:6] | AR[4:0]
             self.ym2612_write_reg(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
-            // 0x60: AM[7] | DR[4:0]
             self.ym2612_write_reg(port, 0x60 + op_off, ((am & 0x1) << 7) | (dr & 0x1F), time);
-            // 0x70: SR[4:0]
             self.ym2612_write_reg(port, 0x70 + op_off, sr & 0x1F, time);
-            // 0x80: SL[7:4] | RR[3:0]
             self.ym2612_write_reg(port, 0x80 + op_off, ((sl & 0xF) << 4) | (rr & 0xF), time);
-            // 0x90: SSG-EG[3:0]
             self.ym2612_write_reg(port, 0x90 + op_off, ssg_eg & 0xF, time);
+        }
+
+        // 0xB0: feedback[5:3] | algorithm[2:0] — written after all op regs
+        self.ym2612_write_reg(port, 0xB0 + ch, ((fb & 0x7) << 3) | (alg & 0x7), time);
+
+        // TL writes in hardware register order (hw_mul 0,1,2,3 → offsets 0,4,8,12).
+        // Map from hardware offset mul back to MML op: hw_mul→mml_op = [0,2,1,3]
+        let hw_to_mml: [usize; 4] = [0, 2, 1, 3];
+        for hw_mul in 0u8..4 {
+            let op_off = ch + hw_mul * 4;
+            let mml_op = hw_to_mml[hw_mul as usize];
+            let b = mml_op * op_stride;
+            let tl = params.and_then(|p| p.get(b + 5)).copied().unwrap_or(127) as u8;
+            self.ym2612_write_reg(port, 0x40 + op_off, tl & 0x7F, time);
+        }
+
+        // Volume-adjusted TL for carrier operators only.
+        // Carriers per algorithm (by hw_mul = slot-1, where S1=hw0,S2=hw2,S3=hw1,S4=hw3):
+        //   ALG 0-3: S4 (hw_mul=3)
+        //   ALG 4:   S2,S4 (hw_muls 2,3)
+        //   ALG 5,6: S3,S2,S4 (hw_muls 1,2,3)
+        //   ALG 7:   all (hw_muls 0,1,2,3)
+        let carrier_hw_muls: &[u8] = match alg {
+            0 | 1 | 2 | 3 => &[3],
+            4             => &[2, 3],
+            5 | 6         => &[1, 2, 3],
+            _             => &[0, 1, 2, 3],
+        };
+        let vol_adjust = (127u16).saturating_sub(volume as u16);
+        for &hw_mul in carrier_hw_muls {
+            let op_off = ch + hw_mul * 4;
+            let mml_op = hw_to_mml[hw_mul as usize];
+            let b = mml_op * op_stride;
+            let base_tl = params.and_then(|p| p.get(b + 5)).copied().unwrap_or(127) as u16;
+            let adj_tl = (base_tl + vol_adjust).min(127) as u8;
+            self.ym2612_write_reg(port, 0x40 + op_off, adj_tl, time);
         }
     }
 
@@ -523,23 +657,19 @@ impl VgmGenerator {
 
     /// Compute YM2612 block and F-number from a MIDI note number.
     ///
-    /// Formula: F-number = freq × 2^(20 − block) × 144 / ym2612_clock
-    /// Block is chosen to keep F-number in [0, 2047].
+    /// Uses the reference FNUM_YM2612.txt TYPE-C table, with block = octave - 1
+    /// (matching the C# mml2vgm reference compiler exactly).
     fn midi_note_to_ym2612_freq(midi_note: u8) -> (u8, u16) {
-        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
-        // YM2612 master clock from VgmHeader default = 7,670,453 Hz → /144 ≈ 53,267 Hz
-        let f_clk = 7_670_453.0_f64 / 144.0;
-
-        let mut block = 0u8;
-        let mut f_num = (freq * ((1u32 << 20) as f64) / f_clk).round() as u32;
-
-        while f_num > 2047 && block < 7 {
-            block += 1;
-            let shift = 20u32.saturating_sub(block as u32);
-            f_num = (freq * ((1u32 << shift) as f64) / f_clk).round() as u32;
-        }
-
-        (block, f_num.min(2047) as u16)
+        // From FNUM_YM2612.txt TYPE-C: C C# D D# E F F# G G# A A# B
+        const FNUM_TABLE: [u16; 12] = [
+            0x283, 0x2A8, 0x2D2, 0x2FD, 0x32A, 0x35B,
+            0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4BF,
+        ];
+        let note_index = (midi_note % 12) as usize;
+        // MIDI C4=60: octave = 60/12 - 1 = 4; block = octave - 1 = 3
+        let octave = (midi_note / 12) as i32 - 1;
+        let block = ((octave - 1).clamp(0, 7)) as u8;
+        (block, FNUM_TABLE[note_index])
     }
 
     /// Convert a note duration to 44100 Hz sample count.
@@ -556,6 +686,9 @@ impl VgmGenerator {
 
     /// Emit a Wait command with the correct 16-bit LE format, splitting if > 65535.
     fn add_wait(&mut self, mut samples: u32, time: u64) {
+        if self.suppress_waits || samples == 0 {
+            return;
+        }
         while samples > 0 {
             let chunk = samples.min(65535) as u16;
             self.commands.push(VgmCommand {
@@ -648,6 +781,9 @@ impl VgmGenerator {
         output.push(self.header.sn76489_flags);
         output.extend_from_slice(&self.header.ym2612_clock.to_le_bytes());
         output.extend_from_slice(&self.header.ym2151_clock.to_le_bytes());
+        // 0x34: VGM data offset (relative from 0x34).  Data starts at 0x100 → 0x100 − 0x34 = 0xCC.
+        let data_offset_rel = self.header.data_offset.saturating_sub(0x34);
+        output.extend_from_slice(&data_offset_rel.to_le_bytes());
         while output.len() < 0x100 {
             output.push(0);
         }

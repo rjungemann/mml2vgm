@@ -971,6 +971,35 @@ impl Parser {
                         args: Vec::new(),
                     }))
                 }
+
+                // Quantize / gate time: q<value> or q (0-48, silence = value/48 of note duration)
+                // The lexer may produce "q1" as a single Identifier, or "q" + Number separately.
+                Token::Identifier(cmd)
+                    if (cmd.starts_with('q') || cmd.starts_with('Q'))
+                        && (cmd.len() == 1
+                            || cmd[1..].chars().all(|c| c.is_ascii_digit())) =>
+                {
+                    let proportional = cmd.starts_with('Q');
+                    let embedded_value = if cmd.len() > 1 {
+                        cmd[1..].parse::<u32>().ok()
+                    } else {
+                        None
+                    };
+                    self.advance();
+                    let value = if let Some(v) = embedded_value {
+                        v as u8
+                    } else if let Some(Token::Number(n)) = self.current_token() {
+                        let v = n as u8;
+                        self.advance();
+                        v
+                    } else {
+                        1
+                    };
+                    Ok(Some(MmlNode::Quantize(crate::compiler::ast::Quantize {
+                        value,
+                        proportional,
+                    })))
+                }
                 
                 Token::Comment(text) => {
                     self.advance();
@@ -978,7 +1007,6 @@ impl Parser {
                 }
                 
                 _ => {
-                    self.advance();
                     Ok(None)
                 }
             }

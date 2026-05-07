@@ -87,6 +87,8 @@ impl MmlCompiler {
 
     /// Normalize source before tokenization.
     fn normalize_source(&self, source: &str) -> String {
+        // Strip UTF-8 BOM if present; without this the lexer loops forever on it.
+        let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
         source
             .replace("\r\n", "\n")
             .split('\n')
@@ -193,11 +195,17 @@ impl MmlCompiler {
 
     /// Apply chip assignments from the header's `Part*` mappings to parsed parts.
     fn apply_chip_assignments(&self, ast: &mut MmlAst, chip_map: &HashMap<char, String>) {
+        let forced_ym2612 = ast.metadata
+            .get("ForcedMonoPartYM2612")
+            .map_or(false, |v| v == "true");
+
         for (name, part) in &mut ast.parts {
             if part.chip.is_none() {
                 if let Some(first_char) = name.chars().next() {
                     if let Some(chip) = chip_map.get(&first_char.to_ascii_uppercase()) {
                         part.chip = Some(chip.clone());
+                    } else if forced_ym2612 {
+                        part.chip = Some("YM2612".to_string());
                     }
                 }
             }
