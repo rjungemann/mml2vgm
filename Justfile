@@ -167,18 +167,27 @@ test-parity-generate-reference:
     fi
 
     mkdir -p tests/parity/reference
-    # C# format test fixtures (non-PCM, no external WAV dependencies).
+    # VGM format test fixtures (non-PCM, no external WAV dependencies).
+    # T0001_SongInfoDef2 is XGM format — excluded until XGM support is added.
     # Update this list as more fixtures are validated.
     samples=(
         T0000_SongInfoDef
-        T0001_SongInfoDef2
         T0100_YM2612_Ch
     )
     for base in "${samples[@]}"; do
         gwi="/tmp/mml2vgm-csharp/mml2vgm/samples/test/${base}.gwi"
+        out="tests/parity/reference/${base}.vgm"
         echo "Compiling (C# reference): $base"
-        dotnet "$ref_mvc" "$gwi" "tests/parity/reference/${base}.vgm"
-        echo "  -> tests/parity/reference/${base}.vgm"
+        # The C# compiler may exit non-zero when a GWI references unused chip types
+        # (e.g. PartYM2612X) that are not supported in VGM format, even though the
+        # output file is still written correctly.  Accept the non-zero exit as long as
+        # the output file was actually produced.
+        dotnet "$ref_mvc" "$gwi" "$out" || true
+        if [[ ! -f "$out" ]]; then
+            echo "ERROR: C# compiler did not produce $out" >&2
+            exit 1
+        fi
+        echo "  -> $out"
     done
 
 # Generate current VGMs from the Rust compiler (current build).
@@ -195,9 +204,9 @@ test-parity-generate-current:
 
     mkdir -p tests/parity/current
     # Must match the fixture list in test-parity-generate-reference.
+    # T0001_SongInfoDef2 is XGM format — excluded until XGM support is added.
     samples=(
         T0000_SongInfoDef
-        T0001_SongInfoDef2
         T0100_YM2612_Ch
     )
     for base in "${samples[@]}"; do

@@ -17,7 +17,7 @@ compile the **same MML format** — the single format defined by the C# codebase
 | C# compiler produces correct VGM | ✅ `T0100_YM2612_Ch.gwi` → 895-byte VGM, 8 s of music |
 | `scripts/compare_vgm.mjs` | ✅ Done |
 | `scripts/compare_wav.mjs` | ✅ Done |
-| Justfile parity recipes scaffolded | ✅ Done — BLOCKED until Rust codegen is fixed |
+| Justfile parity recipes | ✅ Done — `just test-parity` runs clean |
 | Browser-IDE sample files in correct C# format | ✅ Done — `hello_world.gwi`, `arpeggio.gwi`, `chord_progression.gwi`, `ay8910_test.gwi`, `drum_pattern.gwi` rewritten |
 | Rust parser: `'{...}` song info block | ✅ Pre-processed as raw text before tokenisation |
 | Rust parser: `PartYM2612 = A` chip mappings | ✅ Extracted into chip_map, applied to parts post-parse |
@@ -25,7 +25,14 @@ compile the **same MML format** — the single format defined by the C# codebase
 | Rust parser: non-PCM C# files compile without hang | ✅ Verified by `csharp_format_song_info_no_hang` unit test |
 | Rust parser: FM instrument param rows accumulated | ✅ `'@ M`/`'@ F` header + 4 op rows + ALG/FB row stored |
 | Rust codegen: YM2612 register writes | ✅ key-init, F-number, key-on/off, BPM timing |
-| Reference VGMs in `tests/parity/reference/` | ❌ Phase 4 — run `just test-parity-generate-reference` |
+| Rust codegen: multi-part time-domain interleaving | ✅ Timestamp-sorted writes with checkpoint-split waits |
+| Rust codegen: F-type two-phase TL writes | ✅ Non-carriers at `@` time, carriers updated at `v` time |
+| Rust codegen: EON (envelope mode) | ✅ Key-off suppressed when `state.eon_mode` is true |
+| Rust codegen: KEY-ON sort ordering | ✅ KEY-ON writes (reg 0x28 val ≥ 0xF0) sorted last at same timestamp |
+| Rust codegen: B4 conditional on allocated channels | ✅ Stereo enable only written for channels assigned to parts |
+| Reference VGMs in `tests/parity/reference/` | ✅ Committed — `just test-parity-generate-reference` works |
+| `T0000_SongInfoDef` parity | ✅ PASS — 97 writes, 235192 samples |
+| `T0100_YM2612_Ch` parity | ✅ PASS — 102 writes, 352800 samples |
 
 ---
 
@@ -77,7 +84,7 @@ written as `'A1`, `'A2`, etc., one line per "statement" (tempo set, then note da
 | C# CLI compiler (`mvc`) | Builds and runs on macOS with .NET 10 |
 | Browser-IDE samples | Now in correct C# format in `browser-ide/public/samples/` |
 | Rust parser | Handles `'{...}` headers, chip mappings, and note-letter part names |
-| Rust codegen | Emits SN76489 commands only; YM2612 writes not implemented |
+| Rust codegen | YM2612 and SN76489 writes; multi-part interleaving; F-type two-phase TL; EON mode |
 | `vgmstream-cli` | Available via Homebrew for VGM→WAV conversion |
 
 ---
@@ -196,58 +203,48 @@ For each note on a YM2612 part:
 
 SN76489 notes still emit the simplified tone+volume register writes.
 
-**Note:** Parts are currently processed sequentially (all of part A, then part B, …), not
-interleaved. Multi-channel polyphony requires time-domain interleaving which is Phase 4
-follow-up work. The register writes themselves are correct.
+### Phase 4 — Build the Fixture Set from C# Test Files ✅ DONE
 
-### Phase 4 — Build the Fixture Set from C# Test Files ❌ NEXT
-
-Use the non-PCM C# test fixtures as the golden master corpus. These compile without
+The initial VGM fixture set is in place and passing. Both fixtures compile without
 external WAV file dependencies:
 
-| File | Chips | Notes |
+| File | Chips | Status |
 |---|---|---|
-| `T0000_SongInfoDef.gwi` | YM2612, SN76489 | Metadata + part mapping; one melody line |
-| `T0001_SongInfoDef2.gwi` | YM2612, SN76489 | Metadata variant |
-| `T0100_YM2612_Ch.gwi` | YM2612 | All six FM channels; two EX-channel tracks |
+| `T0000_SongInfoDef.gwi` | YM2612 | ✅ PASS — 97 writes, 235192 samples |
+| `T0100_YM2612_Ch.gwi` | YM2612 | ✅ PASS — 102 writes, 352800 samples |
 
-PCM-dependent fixtures are a second tier (WAV files are present in
-`/tmp/mml2vgm-csharp/mml2vgm/samples/test/`):
+`T0001_SongInfoDef2.gwi` targets **XGM format** (not VGM) — the C# compiler produces
+XGM output for it, not a `.vgm` file. It is excluded from the VGM parity list until XGM
+format support is added to the Rust compiler.
+
+PCM-dependent fixtures remain a second tier (WAV files are present in
+`/tmp/mml2vgm-csharp/mml2vgm/samples/test/`). Enabling them requires Gap A (PCM chip
+name parsing) to be fixed first:
 - `T0101_YM2612_PCMCh.gwi` — YM2612 + DAC channel
 - Files requiring `muteGuitar.wav`, `Guitar.wav`, `SD.wav`, `BD.wav`, `piano.wav`, `str.wav`
 
 > Do not create new `.gwi` test fixtures in an invented format. Source all fixtures from
 > the C# test suite.
 
-### Phase 5 — Update Justfile Recipes
+### Phase 5 — Update Justfile Recipes ✅ DONE
 
-The Justfile `test-parity-generate-reference` and `test-parity-generate-current` recipes
-are already scaffolded for the C# test files and are marked BLOCKED. Once Phase 3c is
-complete, remove the BLOCKED comment and run:
+All three recipes work:
 
 ```sh
 just test-parity-generate-reference   # C# compiler → tests/parity/reference/
 just test-parity-generate-current     # Rust compiler → tests/parity/current/
 just test-parity-compare              # diff and report
+just test-parity                      # generate-current + compare (one step)
 ```
 
-C# compiler invocation:
-```sh
-dotnet /tmp/mml2vgm-csharp/mml2vgm/mvc/bin/Debug/net10.0/mvc.dll "$gwi" "$out_vgm"
-```
+The reference recipe uses `|| true` + file-existence check to tolerate the C# compiler's
+non-fatal exit code when a GWI declares unused chip types (e.g. `PartYM2612X`) that are
+not valid in VGM format — the output file is still written correctly in those cases.
 
-### Phase 6 — Generate and Commit Golden Master Reference VGMs
+### Phase 6 — Generate and Commit Golden Master Reference VGMs ✅ DONE
 
-1. Run `just test-parity-generate-reference` to produce C#-compiled reference VGMs
-2. Run `just test-parity-generate-current` with the fixed Rust compiler
-3. Run `just test-parity-compare` — investigate and fix any differences
-4. Once all fixtures PASS, commit `tests/parity/reference/`:
-   ```sh
-   git add tests/parity/reference/
-   git commit -m "chore: add golden master reference VGMs for parity testing"
-   ```
-
-After this, `just test-parity` runs in CI on every Rust compiler change.
+Reference VGMs are committed to `tests/parity/reference/`. `just test-parity` runs
+clean: 2 passed, 0 failed.
 
 ---
 
@@ -307,31 +304,15 @@ and assert `ast.pcm_instruments[1].chip == "C140"`.
 
 ---
 
-### Gap B — Multi-part time-domain interleaving (polyphony)
+### Gap B — Multi-part time-domain interleaving (polyphony) ✅ RESOLVED
 
-**File:** `mml2vgm-rs/src/compiler/codegen/vgm.rs` → `convert_ast_to_commands`
-
-**Problem:** Parts are currently processed sequentially: all commands for part A are
-emitted, then all commands for part B, and so on. This produces correct register writes
-but incorrect timing — wait commands are not interleaved across parts. The resulting VGM
-plays each part's notes back-to-back instead of simultaneously.
-
-**Fix:** Replace the sequential loop with a tick-scheduler:
-
-1. Build a `Vec<(part_name, commands, state)>` for all parts.
-2. Maintain a global `current_tick: u64 = 0` and a per-part `part_tick: u64`.
-3. At each step, pick the part with the smallest `part_tick ≤ current_tick`, emit its
-   next command (register writes + key-on/off), advance that part's tick by the note
-   duration, and insert a single shared wait command to advance `current_tick`.
-4. When a part has no more commands, it no longer contributes ticks.
-
-The simplest correct approach is a sorted priority queue (BinaryHeap) keyed on next-event
-sample position, one entry per part. Emit all register writes for a given sample position
-before emitting the wait to advance to the next event.
-
-**Test to add:** `two_part_interleaved` — two YM2612 parts each with two quarter notes at
-T120; assert that the output VGM command sequence interleaves key-on events for both
-channels before the first wait rather than serializing them.
+**Resolved in Phase 4.** Each part is processed independently from `time=0` with waits
+suppressed. Every write command carries an absolute timestamp. After all parts are
+processed, writes are collected, stable-sorted by timestamp (with KEY-ON writes as a
+secondary key so they appear after TL/freq writes at the same timestamp), and waits are
+re-inserted between consecutive time-steps. Waits are split at per-event checkpoints
+recorded during part processing so the chunking matches the C# compiler's one-wait-per-
+note/rest style — validated by the T0100 six-channel parity test.
 
 ---
 
