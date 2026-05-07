@@ -229,36 +229,50 @@ impl<'a> Lexer<'a> {
             return Ok(Token::Apostrophe);
         }
         
-        // Check for notes first (C, D, E, F, G, A, B) - these take priority
+        // Check for notes first (C, D, E, F, G, A, B) - these take priority.
+        // Exception: if the note letter is UPPERCASE and followed by an UPPERCASE non-note letter
+        // (e.g. "EON", "EX2"), fall through to the identifier check.
+        // Lowercase note letters always produce a Note token (e.g. 'c', 'e', 'g' in music).
         let c_upper = c.to_ascii_uppercase();
-        if c_upper == 'C' || c_upper == 'D' || c_upper == 'E' || c_upper == 'F' || 
+        if c_upper == 'C' || c_upper == 'D' || c_upper == 'E' || c_upper == 'F' ||
            c_upper == 'G' || c_upper == 'A' || c_upper == 'B' {
             let letter = c_upper;
-            // Check if this is followed by a sharp
             if let Some(next_c) = self.next_char() {
                 if next_c == '#' {
                     self.advance(); // Consume the note letter
                     self.advance(); // Consume the #
                     return Ok(Token::Note(letter));
                 }
+                // Only fall through to identifier if BOTH this letter and the next are uppercase.
+                // This lets "EON", "EX2" etc. parse as identifiers while 'c','e' in music stay as notes.
+                let next_upper = next_c.to_ascii_uppercase();
+                let next_is_note = next_upper == 'C' || next_upper == 'D' || next_upper == 'E'
+                    || next_upper == 'F' || next_upper == 'G' || next_upper == 'A'
+                    || next_upper == 'B';
+                if c.is_uppercase() && next_c.is_uppercase() && next_c.is_alphabetic() && !next_is_note {
+                    // Fall through to identifier check below
+                } else {
+                    self.advance();
+                    return Ok(Token::Note(letter));
+                }
+            } else {
+                self.advance();
+                return Ok(Token::Note(letter));
             }
-            self.advance();
-            return Ok(Token::Note(letter));
         }
         
         // Check for identifiers (including commands like INCLUDE, alias, etc.)
-        // This must come before single-letter command checks
-        // But we need to be careful: o4 should be OctaveCommand + Number, not Identifier("o4")
-        if c.is_alphabetic() || c == '_' {
-            // Check if this could be a multi-letter identifier (letters only, no digits)
-            // If the next character is a digit, this is likely a command followed by a number
+        // Lowercase single-letter MML command chars must NOT be combined into a multi-letter
+        // identifier — they fall through to the command match below. Uppercase variants are
+        // left unrestricted so that documentation headers like "RR SL TL" tokenize as
+        // identifiers rather than command tokens.
+        let c_is_lowercase_mml_cmd = matches!(c, 'r' | 'v' | 't' | 'l' | 'o');
+        if !c_is_lowercase_mml_cmd && (c.is_alphabetic() || c == '_') {
             let next_c = self.next_char();
             if next_c.map_or(false, |nc| nc.is_alphabetic() || nc == '_' || nc == '-' || nc == '=') {
-                // It's a multi-letter identifier, read it all
                 let ident = self.read_identifier();
                 return Ok(Token::Identifier(ident));
             }
-            // Single letter or letter followed by digit - fall through to command checks
         }
         
         // Single character tokens

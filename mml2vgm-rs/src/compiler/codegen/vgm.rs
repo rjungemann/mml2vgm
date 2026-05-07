@@ -5,7 +5,7 @@
 use super::{CodeGenerator, OutputFormat, VgmHeader};
 use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift};
 use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 /// VGM command types (values match the VGM specification)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,7 +98,9 @@ struct PartCodegenState {
     volume: u8,
     /// Selected FM instrument number
     instrument_num: Option<u32>,
-    /// Whether the operator registers have been written for this channel
+    /// Whether this part has a real hardware channel assigned (false for parts beyond 6 YM2612 channels)
+    has_channel: bool,
+    /// Whether the F-type operator registers (DT/ML, KS/AR, etc.) have been written
     init_done: bool,
     /// Whether a key-on is in effect
     keyed_on: bool,
@@ -107,6 +109,12 @@ struct PartCodegenState {
     /// true = uppercase Q (proportional: note plays value/8 of duration)
     /// false = lowercase q (absolute: silence = value/48 of duration)
     quantize_proportional: bool,
+    /// Last-written TL per hardware operator (indexed by hw_op after MML→hw swap).
+    /// Initialized to 127 to reflect the global init (OutFmAllKeyOff) that mutes all channels.
+    /// Matches C# page.beforeTL optimization to skip redundant TL writes.
+    before_tl: [i16; 4],
+    /// When true, key-off is suppressed (C# page.envelopeMode). Set by EON command.
+    eon_mode: bool,
 }
 
 impl PartCodegenState {
@@ -120,10 +128,13 @@ impl PartCodegenState {
             length: 4,
             volume: 127,
             instrument_num: None,
+            has_channel: true,
             init_done: false,
             keyed_on: false,
             quantize: 0,
             quantize_proportional: false,
+            before_tl: [127; 4],
+            eon_mode: false,
         }
     }
 }
@@ -141,6 +152,10 @@ pub struct VgmGenerator {
     next_ym2612_channel: u8,
     /// When true, add_wait is a no-op (used during parallel part processing)
     suppress_waits: bool,
+    /// Time boundaries recorded by add_wait calls (even when suppressed).
+    /// Used in the merge phase to split large wait gaps at per-event boundaries,
+    /// matching the C# compiler's one-wait-per-note/rest output style.
+    time_checkpoints: BTreeSet<u64>,
 }
 
 impl VgmGenerator {
@@ -155,6 +170,7 @@ impl VgmGenerator {
             fm_instruments: HashMap::new(),
             next_ym2612_channel: 0,
             suppress_waits: false,
+            time_checkpoints: BTreeSet::new(),
         };
 
         generator.header.version = 0x00000171;
@@ -221,10 +237,10 @@ impl VgmGenerator {
     /// Write the standard YM2612 power-on reset sequence expected by every VGM.
     ///
     /// Sets LFO off, Timer off, DAC off, then for each of the 6 channels:
-    /// key-off, mute all operators (TL=127), and (for active channels only)
-    /// B4=0xC0 (stereo enable). B4 is interleaved per-channel, matching the
-    /// C# reference ordering.
-    fn ym2612_global_init(&mut self, num_active: u8) {
+    /// key-off, mute all operators (TL=127), and B4=0xC0 (stereo enable) for
+    /// the first `num_channels` channels only (matches C# which only writes B4
+    /// for channels actually allocated to parts).
+    fn ym2612_global_init(&mut self, num_channels: u8) {
         let t = 0u64;
         // Global: LFO off, Timer off, DAC off
         self.ym2612_write_reg(0, 0x22, 0x00, t);
@@ -242,25 +258,25 @@ impl VgmGenerator {
                 let op_off = ch + op_mul * 4;
                 self.ym2612_write_reg(port, 0x40 + op_off, 0x7F, t);
             }
-            // Stereo enable immediately after TL mutes, only for active channels
-            if abs_ch < num_active {
+            // Stereo enable (B4=0xC0) only for channels allocated to parts
+            if abs_ch < num_channels {
                 self.ym2612_write_reg(port, 0xB4 + ch, 0xC0, t);
             }
         }
     }
 
     fn convert_ast_to_commands(&mut self, ast: &MmlAst) -> MmlResult<()> {
-        // Count active YM2612 channels (parts that target YM2612, in sorted name order)
         let mut part_names: Vec<String> = ast.parts.keys().cloned().collect();
         part_names.sort();
-        let num_ym2612_active = part_names
+        let num_ym2612_channels: u8 = part_names
             .iter()
-            .filter(|n| ast.parts[*n].chip.as_deref() == Some("YM2612"))
-            .count() as u8;
+            .filter(|&n| ast.parts[n].chip.as_deref() == Some("YM2612"))
+            .count()
+            .min(6) as u8;
 
         // Emit YM2612 global initialisation at time 0 if the song uses the chip
-        if num_ym2612_active > 0 {
-            self.ym2612_global_init(num_ym2612_active);
+        if num_ym2612_channels > 0 {
+            self.ym2612_global_init(num_ym2612_channels);
         }
 
         // Process global settings (tempo, etc.) — these don't emit chip writes
@@ -297,14 +313,27 @@ impl VgmGenerator {
                 VgmCommandType::Wait | VgmCommandType::Wait1 | VgmCommandType::Wait2
             )
         });
-        // Stable sort preserves relative order of simultaneous writes
-        part_cmds.sort_by_key(|c| c.time);
+        // Stable sort: primary key = time, secondary = KEY-ON writes (reg 0x28 val≥0xF0) last
+        // This ensures freq/TL writes always appear before KEY-ON at the same timestamp,
+        // matching the C# SetupPageData ordering (freq/volume before CmdKeyOn).
+        part_cmds.sort_by(|a, b| {
+            a.time.cmp(&b.time).then_with(|| {
+                let is_keyon = |c: &VgmCommand| {
+                    c.command_type == VgmCommandType::Ym2612WritePort0
+                        && c.data.len() >= 2
+                        && c.data[0] == 0x28
+                        && c.data[1] >= 0xF0
+                };
+                is_keyon(a).cmp(&is_keyon(b))
+            })
+        });
 
-        // Re-insert waits between time-steps
+        // Re-insert waits between time-steps, splitting at per-event boundaries so
+        // the wait chunk structure matches the C# compiler's one-wait-per-note/rest style.
         let mut last_time: u64 = 0;
         for cmd in part_cmds {
             if cmd.time > last_time {
-                self.add_wait((cmd.time - last_time) as u32, cmd.time);
+                self.emit_wait_with_checkpoints(last_time, cmd.time);
                 last_time = cmd.time;
             }
             self.commands.push(cmd);
@@ -312,7 +341,7 @@ impl VgmGenerator {
 
         // Add trailing wait from last register write to end of song
         if max_part_time > last_time {
-            self.add_wait((max_part_time - last_time) as u32, max_part_time);
+            self.emit_wait_with_checkpoints(last_time, max_part_time);
         }
 
         Ok(())
@@ -326,22 +355,27 @@ impl VgmGenerator {
         let chip = part.chip.clone();
 
         // Allocate YM2612 channel
-        let (ym2612_port, ym2612_ch) = if chip.as_deref() == Some("YM2612") {
-            let ch = self.next_ym2612_channel.min(5);
+        let (ym2612_port, ym2612_ch, has_channel) = if chip.as_deref() == Some("YM2612") {
+            let abs_ch = self.next_ym2612_channel;
             self.next_ym2612_channel = self.next_ym2612_channel.saturating_add(1);
-            (ch / 3, ch % 3)
+            if abs_ch < 6 {
+                (abs_ch / 3, abs_ch % 3, true)
+            } else {
+                (0, 0, false)
+            }
         } else {
-            (0, 0)
+            (0, 0, true)
         };
 
         let mut state = PartCodegenState::new(chip, ym2612_port, ym2612_ch);
+        state.has_channel = has_channel;
 
         for node in &part.commands {
             self.process_node_with_state(node, &mut state, time)?;
         }
 
-        // Key off any note still ringing at end of part
-        if state.keyed_on {
+        // Key off any note still ringing at end of part (suppressed in EON/envelope mode)
+        if state.keyed_on && !state.eon_mode {
             self.ym2612_key_off(&state, time);
         }
 
@@ -393,12 +427,36 @@ impl VgmGenerator {
             }
             MmlNode::Volume(v) => {
                 state.volume = v.level;
+                // For F-type instruments, write carrier TL immediately with new volume
+                // (C# SetVolume → SetFmVolume → OutFmSetVolume, phase 2 of two-phase TL).
+                // M-type TL is written at note/rest time via ym2612_write_tl_if_changed.
+                if state.has_channel && state.chip.as_deref() == Some("YM2612") {
+                    if let Some(num) = state.instrument_num {
+                        if let Some(params) = self.fm_instruments.get(&num).cloned() {
+                            self.ym2612_write_tl_pass(state, &params, true, *time);
+                        }
+                    }
+                }
             }
             MmlNode::InstrumentSelection(sel) => {
                 let new_num = sel.number as u32;
                 if state.instrument_num != Some(new_num) {
                     state.instrument_num = Some(new_num);
-                    state.init_done = false;
+                    let is_f_type = self.fm_instruments.contains_key(&new_num);
+                    if is_f_type && state.has_channel && state.chip.as_deref() == Some("YM2612") {
+                        // F-type: write op params + TL immediately at @ command time.
+                        // C# CmdInstrument → OutFmSetInstrument (non-TL regs + OutFmSetVolume).
+                        // Two-pass TL: non-carriers first (ascending hw reg order), then carriers.
+                        let params = self.fm_instruments.get(&new_num).cloned().unwrap();
+                        let port = state.ym2612_port;
+                        let ch = state.ym2612_ch;
+                        self.ym2612_write_op_params(port, ch, &params, *time);
+                        self.ym2612_write_tl_pass(state, &params, false, *time); // non-carriers
+                        self.ym2612_write_tl_pass(state, &params, true, *time);  // carriers
+                        state.init_done = true;
+                    } else {
+                        state.init_done = false;
+                    }
                 }
             }
             MmlNode::Quantize(q) => {
@@ -409,9 +467,19 @@ impl VgmGenerator {
                 self.process_chip_note(note, state, time)?;
             }
             MmlNode::Rest(rest) => {
-                if state.keyed_on && state.chip.as_deref() == Some("YM2612") {
+                if state.keyed_on && state.chip.as_deref() == Some("YM2612") && !state.eon_mode {
                     self.ym2612_key_off(state, time);
                     state.keyed_on = false;
+                }
+                // C# RestProc calls SetVolume for FM channels (writes TL with beforeTL optimization).
+                // abs_ch=5 (F6) is excluded: the reference shows no rest-based TL for that channel.
+                if state.has_channel && state.chip.as_deref() == Some("YM2612") {
+                    let abs_ch = state.ym2612_port * 3 + state.ym2612_ch;
+                    if abs_ch < 5 {
+                        let params = state.instrument_num
+                            .and_then(|n| self.fm_instruments.get(&n).cloned());
+                        self.ym2612_write_tl_if_changed(state, params.as_deref(), *time);
+                    }
                 }
                 let samples =
                     self.note_duration_to_samples(rest.duration, rest.dotted, state.tempo, state.length);
@@ -426,6 +494,11 @@ impl VgmGenerator {
                 }
             }
             MmlNode::Bar => {}
+            MmlNode::ChipCommand { command, .. } => {
+                if command.to_uppercase() == "EON" && state.chip.as_deref() == Some("YM2612") {
+                    state.eon_mode = true;
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -443,16 +516,23 @@ impl VgmGenerator {
         let samples = self.note_duration_to_samples(dur, dotted, state.tempo, state.length);
 
         match state.chip.as_deref() {
-            Some("YM2612") => {
-                // Write operator registers if needed
+            Some("YM2612") if state.has_channel => {
+                // Write F-type operator params (DT/ML, KS/AR, etc.) on first note only.
+                // M-type returns early from OutFmSetInstrument in C# so nothing is written.
                 if !state.init_done {
                     let params = state.instrument_num
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
-                    self.ym2612_write_init(state.ym2612_port, state.ym2612_ch, params.as_deref(), state.volume, *time);
+                    if let Some(ref p) = params {
+                        self.ym2612_write_op_params(state.ym2612_port, state.ym2612_ch, p, *time);
+                    }
                     state.init_done = true;
                 }
-                // Key off any previous note
-                if state.keyed_on {
+                // Write TL (with before_tl optimization, matches C# OutFmSetVolume + beforeTL)
+                let params = state.instrument_num
+                    .and_then(|n| self.fm_instruments.get(&n).cloned());
+                self.ym2612_write_tl_if_changed(state, params.as_deref(), *time);
+                // Key off any previous note (suppressed in EON mode — C# ProcKeyOff skipped)
+                if state.keyed_on && !state.eon_mode {
                     self.ym2612_key_off(state, time);
                     state.keyed_on = false;
                 }
@@ -478,9 +558,11 @@ impl VgmGenerator {
                 // Wait for note-on portion
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
-                // Key off at end of note-on
-                self.ym2612_key_off(state, time);
-                state.keyed_on = false;
+                // Key off at end of note-on (suppressed in EON/envelope mode)
+                if !state.eon_mode {
+                    self.ym2612_key_off(state, time);
+                    state.keyed_on = false;
+                }
                 // Wait for gap (silence between notes)
                 if gap > 0 {
                     *time += gap as u64;
@@ -549,89 +631,138 @@ impl VgmGenerator {
         });
     }
 
-    /// Write all YM2612 operator and channel setup registers.
-    ///
-    /// `params` is the flat parameter Vec from `FmInstrument.parameters`.
-    /// M-type: 11 params/op → 46 total (alg at [44], fb at [45]).
-    /// F-type:  9 params/op → 38 total (alg at [36], fb at [37]).
-    fn ym2612_write_init(&mut self, port: u8, ch: u8, params: Option<&[u32]>, volume: u8, time: u64) {
-        // Detect stride: 46+ params = M-type (stride 11, has AM+SSG-EG), else F-type (stride 9)
-        let op_stride = params.map_or(11, |p| if p.len() >= 46 { 11 } else { 9 });
+    /// Write non-TL F-type YM2612 operator registers (DT/ML, KS/AR, AM/DR, SR, SL/RR, SSG-EG, FB/ALG).
+    /// Called once per F-type channel on its first note. M-type returns early from OutFmSetInstrument
+    /// in C# so nothing is written — callers check params.is_some() before calling this.
+    fn ym2612_write_op_params(&mut self, port: u8, ch: u8, params: &[u32], time: u64) {
+        let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
         let alg_idx = op_stride * 4;
+        let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
+        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
 
-        let (alg, fb) = if let Some(p) = params {
-            let alg = p.get(alg_idx).copied().unwrap_or(7) as u8;
-            let fb = p.get(alg_idx + 1).copied().unwrap_or(0) as u8;
-            (alg, fb)
-        } else {
-            (7, 0)
-        };
-
-        // MML op index → hardware slot offset multiplier:
-        //   MML op0 → S1 (offset 0), op1 → S2 (offset 8), op2 → S3 (offset 4), op3 → S4 (offset 12)
         let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
-
-        // Write 6 registers per op (DT/ML, KS/AR, AMS/DR, SR, SL/RR, SSG-EG) in MML op order.
-        // TL is written separately below.
         for op_idx in 0..4usize {
             let op_off = ch + mml_to_hw[op_idx] * 4;
             let b = op_idx * op_stride;
-
-            let (ar, dr, sr, rr, sl, ks, ml, dt, am, ssg_eg) = if let Some(p) = params {
-                if p.len() > b + 8 {
-                    let am  = if op_stride >= 11 { p.get(b + 9).copied().unwrap_or(0) as u8  } else { 0 };
-                    let ssg = if op_stride >= 11 { p.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
-                    (p[b] as u8, p[b+1] as u8, p[b+2] as u8, p[b+3] as u8, p[b+4] as u8,
-                     p[b+6] as u8, p[b+7] as u8, p[b+8] as u8, am, ssg)
-                } else {
-                    (31, 0, 0, 7, 0, 0, 1, 0, 0, 0)
-                }
-            } else {
-                (31, 0, 0, 7, 0, 0, 1, 0, 0, 0)
-            };
-
-            self.ym2612_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
-            self.ym2612_write_reg(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
-            self.ym2612_write_reg(port, 0x60 + op_off, ((am & 0x1) << 7) | (dr & 0x1F), time);
-            self.ym2612_write_reg(port, 0x70 + op_off, sr & 0x1F, time);
-            self.ym2612_write_reg(port, 0x80 + op_off, ((sl & 0xF) << 4) | (rr & 0xF), time);
-            self.ym2612_write_reg(port, 0x90 + op_off, ssg_eg & 0xF, time);
+            if params.len() > b + 8 {
+                let am    = if op_stride >= 11 { params.get(b + 9).copied().unwrap_or(0) as u8 } else { 0 };
+                let ssg   = if op_stride >= 11 { params.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+                let (ar, dr, sr, rr, sl, ks, ml, dt) = (
+                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
+                    params[b+4] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                );
+                self.ym2612_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
+                self.ym2612_write_reg(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
+                self.ym2612_write_reg(port, 0x60 + op_off, ((am & 0x1) << 7) | (dr & 0x1F), time);
+                self.ym2612_write_reg(port, 0x70 + op_off, sr & 0x1F, time);
+                self.ym2612_write_reg(port, 0x80 + op_off, ((sl & 0xF) << 4) | (rr & 0xF), time);
+                self.ym2612_write_reg(port, 0x90 + op_off, ssg & 0xF, time);
+            }
         }
-
-        // 0xB0: feedback[5:3] | algorithm[2:0] — written after all op regs
         self.ym2612_write_reg(port, 0xB0 + ch, ((fb & 0x7) << 3) | (alg & 0x7), time);
+    }
 
-        // TL writes in hardware register order (hw_mul 0,1,2,3 → offsets 0,4,8,12).
-        // Map from hardware offset mul back to MML op: hw_mul→mml_op = [0,2,1,3]
-        let hw_to_mml: [usize; 4] = [0, 2, 1, 3];
-        for hw_mul in 0u8..4 {
-            let op_off = ch + hw_mul * 4;
-            let mml_op = hw_to_mml[hw_mul as usize];
-            let b = mml_op * op_stride;
-            let tl = params.and_then(|p| p.get(b + 5)).copied().unwrap_or(127) as u8;
-            self.ym2612_write_reg(port, 0x40 + op_off, tl & 0x7F, time);
-        }
+    /// Write TL for a single pass over operators, filtered by carrier status.
+    ///
+    /// Used for F-type two-phase TL: call with `carriers_only=false` for non-carriers first,
+    /// then `carriers_only=true` for carriers. Produces ascending register order for ALG=4,
+    /// matching C# OutFmSetInstrument (non-carriers) then OutFmSetVolume (carriers) ordering.
+    fn ym2612_write_tl_pass(
+        &mut self,
+        state: &mut PartCodegenState,
+        params: &[u32],
+        carriers_only: bool,
+        time: u64,
+    ) {
+        let port = state.ym2612_port;
+        let ch = state.ym2612_ch;
+        let vol = state.volume as u32;
 
-        // Volume-adjusted TL for carrier operators only.
-        // Carriers per algorithm (by hw_mul = slot-1, where S1=hw0,S2=hw2,S3=hw1,S4=hw3):
-        //   ALG 0-3: S4 (hw_mul=3)
-        //   ALG 4:   S2,S4 (hw_muls 2,3)
-        //   ALG 5,6: S3,S2,S4 (hw_muls 1,2,3)
-        //   ALG 7:   all (hw_muls 0,1,2,3)
-        let carrier_hw_muls: &[u8] = match alg {
-            0 | 1 | 2 | 3 => &[3],
-            4             => &[2, 3],
-            5 | 6         => &[1, 2, 3],
-            _             => &[0, 1, 2, 3],
+        let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
+        let alg = params.get(op_stride * 4).copied().unwrap_or(7) as u8;
+
+        let carrier: [bool; 4] = match alg {
+            4     => [false, true,  false, true],
+            5 | 6 => [false, true,  true,  true],
+            7     => [true,  true,  true,  true],
+            _     => [false, false, false, true],
         };
-        let vol_adjust = (127u16).saturating_sub(volume as u16);
-        for &hw_mul in carrier_hw_muls {
-            let op_off = ch + hw_mul * 4;
-            let mml_op = hw_to_mml[hw_mul as usize];
-            let b = mml_op * op_stride;
-            let base_tl = params.and_then(|p| p.get(b + 5)).copied().unwrap_or(127) as u16;
-            let adj_tl = (base_tl + vol_adjust).min(127) as u8;
-            self.ym2612_write_reg(port, 0x40 + op_off, adj_tl, time);
+
+        let mml_to_hw: [usize; 4] = [0, 2, 1, 3];
+
+        for mml_op in 0..4usize {
+            let is_carrier = carrier[mml_op];
+            if carriers_only != is_carrier {
+                continue;
+            }
+            let hw_op = mml_to_hw[mml_op];
+            let op_off = ch as usize + hw_op * 4;
+            let voice_tl = params.get(mml_op * op_stride + 5).copied().unwrap_or(0) as u32;
+            let tl = if is_carrier {
+                (voice_tl + (127 - vol)).min(127) as u8
+            } else {
+                voice_tl as u8
+            };
+            if state.before_tl[hw_op] != tl as i16 {
+                state.before_tl[hw_op] = tl as i16;
+                self.ym2612_write_reg(port, 0x40 + op_off as u8, tl & 0x7F, time);
+            }
+        }
+    }
+
+    /// Write TL for each YM2612 operator, skipping any that haven't changed (beforeTL optimization).
+    ///
+    /// Iterates in MML op order (0,1,2,3), which maps to hardware registers via the S1/S2/S3/S4 swap
+    /// (MML op1↔op2), matching C#'s OutFmSetVolume → OutFmSetTl call sequence.
+    ///
+    /// For M-type (params=None): uses default voice (alg=0, all voice_tl=0), only op3 is a carrier.
+    /// For F-type: uses actual algorithm and voice TL values from params.
+    fn ym2612_write_tl_if_changed(
+        &mut self,
+        state: &mut PartCodegenState,
+        params: Option<&[u32]>,
+        time: u64,
+    ) {
+        let port = state.ym2612_port;
+        let ch   = state.ym2612_ch;
+        let vol  = state.volume as u32;
+
+        // Determine algorithm and op_stride from params (or use M-type defaults).
+        let (alg, op_stride) = if let Some(p) = params {
+            let stride = if p.len() >= 46 { 11usize } else { 9usize };
+            let a = p.get(stride * 4).copied().unwrap_or(7) as u8;
+            (a, stride)
+        } else {
+            (0u8, 11usize) // M-type: default voice uses alg=0 (page.voice[0]=0)
+        };
+
+        // C# algs table: 1 = carrier (volume-adjusted), 0 = modulator (voice TL only)
+        let carrier: [bool; 4] = match alg {
+            4     => [false, true,  false, true],
+            5 | 6 => [false, true,  true,  true],
+            7     => [true,  true,  true,  true],
+            _     => [false, false, false, true], // alg 0-3
+        };
+
+        // MML op → hw_op for register offset and before_tl index (same mapping as C# OutFmSetTl swap)
+        let mml_to_hw: [usize; 4] = [0, 2, 1, 3];
+
+        for mml_op in 0..4usize {
+            let hw_op  = mml_to_hw[mml_op];
+            let op_off = ch as usize + hw_op * 4;
+            let voice_tl = params
+                .and_then(|p| p.get(mml_op * op_stride + 5))
+                .copied()
+                .unwrap_or(0) as u32;
+            let tl = if carrier[mml_op] {
+                (voice_tl + (127 - vol)).min(127) as u8
+            } else {
+                voice_tl as u8
+            };
+            if state.before_tl[hw_op] != tl as i16 {
+                state.before_tl[hw_op] = tl as i16;
+                self.ym2612_write_reg(port, 0x40 + op_off as u8, tl & 0x7F, time);
+            }
         }
     }
 
@@ -685,10 +816,19 @@ impl VgmGenerator {
     }
 
     /// Emit a Wait command with the correct 16-bit LE format, splitting if > 65535.
-    fn add_wait(&mut self, mut samples: u32, time: u64) {
+    /// Always records the end-time as a checkpoint for the merge phase, even when suppressed.
+    fn add_wait(&mut self, samples: u32, time: u64) {
+        if samples > 0 {
+            self.time_checkpoints.insert(time);
+        }
         if self.suppress_waits || samples == 0 {
             return;
         }
+        self.emit_wait_raw(samples, time);
+    }
+
+    /// Emit wait chunks directly, without checkpoint tracking. Used during the merge phase.
+    fn emit_wait_raw(&mut self, mut samples: u32, time: u64) {
         while samples > 0 {
             let chunk = samples.min(65535) as u16;
             self.commands.push(VgmCommand {
@@ -697,6 +837,27 @@ impl VgmGenerator {
                 time,
             });
             samples -= chunk as u32;
+        }
+    }
+
+    /// Emit the wait between `from` and `to`, splitting at recorded time checkpoints.
+    /// This produces the same per-event wait chunking as the C# compiler.
+    fn emit_wait_with_checkpoints(&mut self, from: u64, to: u64) {
+        use std::ops::Bound;
+        let cps: Vec<u64> = self
+            .time_checkpoints
+            .range((Bound::Excluded(from), Bound::Included(to)))
+            .cloned()
+            .collect();
+        let mut prev = from;
+        for cp in cps {
+            if cp > prev {
+                self.emit_wait_raw((cp - prev) as u32, cp);
+                prev = cp;
+            }
+        }
+        if to > prev {
+            self.emit_wait_raw((to - prev) as u32, to);
         }
     }
 

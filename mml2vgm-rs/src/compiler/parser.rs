@@ -27,8 +27,9 @@ pub struct Parser {
     current_tempo: u32,
     /// Whether we're in a definition context (after apostrophe)
     in_definition_context: bool,
-    /// FM instrument being accumulated row-by-row: (instrument_number, rows_collected)
-    pending_fm_instrument: Option<(u32, Vec<Vec<u32>>)>,
+    /// FM instrument being accumulated row-by-row: (instrument_number, rows_collected, is_m_type)
+    /// M-type instruments are NOT stored in ast.fm_instruments (they go in instOPM in C#).
+    pending_fm_instrument: Option<(u32, Vec<Vec<u32>>, bool)>,
 }
 
 impl Parser {
@@ -382,8 +383,10 @@ impl Parser {
             Some(Token::Identifier(ref s)) => {
                 let s_upper = s.to_uppercase();
                 self.advance(); // consume the type letter
-                if s_upper.starts_with('M') || s_upper.starts_with('F') {
-                    self.start_fm_instrument(ast)?;
+                if s_upper.starts_with('M') {
+                    self.start_fm_instrument(ast, true)?;
+                } else if s_upper.starts_with('F') {
+                    self.start_fm_instrument(ast, false)?;
                 } else if s_upper.starts_with('P') {
                     self.parse_pcm_instrument(ast)?;
                 } else if s_upper.starts_with('E') {
@@ -399,7 +402,7 @@ impl Parser {
                 let letter_upper = letter.to_ascii_uppercase();
                 self.advance(); // consume the note-letter type token
                 match letter_upper {
-                    'F' => self.start_fm_instrument(ast)?,
+                    'F' => self.start_fm_instrument(ast, false)?,
                     'E' => self.parse_envelope_definition(ast)?,
                     'A' => self.parse_arpeggio_definition(ast)?,
                     _ => {
@@ -425,9 +428,9 @@ impl Parser {
 
     /// Begin accumulating a new FM instrument definition.
     ///
-    /// Called after `'@ M NNN` or `'@ F NNN` is seen.  Reads the instrument number,
-    /// skips any trailing content on the same line, and arms `pending_fm_instrument`.
-    fn start_fm_instrument(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
+    /// Called after `'@ M NNN` (is_m_type=true) or `'@ F NNN` (is_m_type=false).
+    /// M-type instruments are NOT stored in ast.fm_instruments (matching C# instOPM behavior).
+    fn start_fm_instrument(&mut self, ast: &mut MmlAst, is_m_type: bool) -> MmlResult<()> {
         // Commit any previously started but not-yet-complete instrument
         self.finalize_pending_fm_instrument(ast);
 
@@ -456,7 +459,7 @@ impl Parser {
             }
         }
 
-        self.pending_fm_instrument = Some((number, Vec::new()));
+        self.pending_fm_instrument = Some((number, Vec::new(), is_m_type));
         Ok(())
     }
 
@@ -481,14 +484,14 @@ impl Parser {
             }
         }
 
-        if let Some((_, rows)) = &mut self.pending_fm_instrument {
+        if let Some((_, rows, _)) = &mut self.pending_fm_instrument {
             rows.push(row);
         }
 
         // Finalise after 5 rows: 4 operator rows + 1 ALG/FB row
         let ready = self.pending_fm_instrument
             .as_ref()
-            .map_or(false, |(_, rows)| rows.len() >= 5);
+            .map_or(false, |(_, rows, _)| rows.len() >= 5);
         if ready {
             self.finalize_pending_fm_instrument(ast);
         }
@@ -497,14 +500,17 @@ impl Parser {
     }
 
     /// Commit a pending FM instrument (even if incomplete) into the AST.
+    /// M-type instruments are NOT stored in fm_instruments (matches C# instOPM behavior).
     fn finalize_pending_fm_instrument(&mut self, ast: &mut MmlAst) {
-        if let Some((number, rows)) = self.pending_fm_instrument.take() {
-            let mut parameters: Vec<u32> = Vec::new();
-            for row in rows {
-                parameters.extend(row);
+        if let Some((number, rows, is_m_type)) = self.pending_fm_instrument.take() {
+            if !is_m_type {
+                let mut parameters: Vec<u32> = Vec::new();
+                for row in rows {
+                    parameters.extend(row);
+                }
+                let inst = FmInstrument { number, name: String::new(), parameters };
+                ast.fm_instruments.insert(number, inst);
             }
-            let inst = FmInstrument { number, name: String::new(), parameters };
-            ast.fm_instruments.insert(number, inst);
         }
     }
 
