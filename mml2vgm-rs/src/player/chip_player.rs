@@ -75,6 +75,7 @@ impl ChipPlayer {
             SoundChip::VRC6 => Box::new(crate::chips::vrc6::VRC6::new()),
             SoundChip::K053260 => Box::new(crate::chips::k053260::K053260::new()),
             SoundChip::K054539 => Box::new(crate::chips::k054539::K054539::new()),
+            SoundChip::QSound => Box::new(crate::chips::qsound::QSound::new()),
             _ => {
                 return Err(MmlError::UnsupportedChip(
                     format!("Chip {:?} not yet implemented", chip),

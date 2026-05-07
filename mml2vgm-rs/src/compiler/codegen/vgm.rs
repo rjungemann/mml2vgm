@@ -561,6 +561,12 @@ impl VgmGenerator {
             MmlNode::Length(l) => { *default_length = l.value.max(1); }
             MmlNode::Rest(rest) => {
                 let samples = self.note_duration_to_samples(rest.duration, rest.dotted, *tempo, *default_length);
+                // Silence SN76489 ch0 during a rest (max attenuation = 0x9F)
+                self.commands.push(VgmCommand {
+                    command_type: VgmCommandType::Sn76489Write,
+                    data: vec![0x9F],
+                    time: *time,
+                });
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -655,6 +661,14 @@ impl VgmGenerator {
                         _ => {}
                     }
                     state.keyed_on = false;
+                }
+                // Silence SN76489 ch0 during a rest (max attenuation = 0x9F)
+                if matches!(state.chip.as_deref(), Some("SN76489") | Some("SN76489X2") | None) {
+                    self.commands.push(VgmCommand {
+                        command_type: VgmCommandType::Sn76489Write,
+                        data: vec![0x9F],
+                        time: *time,
+                    });
                 }
                 // C# RestProc calls SetVolume for FM channels (writes TL with beforeTL optimization).
                 // abs_ch=5 (F6) is excluded: the reference shows no rest-based TL for that channel.

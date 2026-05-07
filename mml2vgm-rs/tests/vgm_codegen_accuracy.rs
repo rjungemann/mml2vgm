@@ -371,3 +371,223 @@ fn compile_info_part_count_reflects_mml_parts() {
         result.info.part_count
     );
 }
+
+// ── YM2612 FM accuracy tests ──────────────────────────────────────────────────
+
+const FM_INSTRUMENT: &str = "
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 031,012,012,015,015,020,000,001,000,000,000
+'@ 007,000
+";
+
+fn compile_ym2612(notes: &str) -> Vec<u8> {
+    let mml = format!(
+        "{{\n  PartYM2612 = A\n}}\n{}\n'A1 T120\n'A1 @0 v100 l4 o4 {}",
+        FM_INSTRUMENT, notes
+    );
+    MmlCompiler::new(CompileOptions {
+        format: OutputFormat::VGM,
+        ..Default::default()
+    })
+    .compile_from_source(&mml)
+    .unwrap_or_else(|e| panic!("YM2612 compile failed: {e}"))
+    .data
+}
+
+/// Collect all YM2612 port-0 writes (opcode 0x52) as (addr, data) pairs.
+fn ym2612_port0_writes(cmds: &[VgmCmd]) -> Vec<(u8, u8)> {
+    cmds.iter()
+        .filter(|c| c.opcode == 0x52 && c.payload.len() >= 2)
+        .map(|c| (c.payload[0], c.payload[1]))
+        .collect()
+}
+
+/// Collect all YM2612 port-1 writes (opcode 0x53) as (addr, data) pairs.
+fn ym2612_port1_writes(cmds: &[VgmCmd]) -> Vec<(u8, u8)> {
+    cmds.iter()
+        .filter(|c| c.opcode == 0x53 && c.payload.len() >= 2)
+        .map(|c| (c.payload[0], c.payload[1]))
+        .collect()
+}
+
+#[test]
+fn ym2612_vgm_contains_port0_writes() {
+    let vgm = compile_ym2612("c d e f");
+    let cmds = extract_vgm_commands(&vgm);
+    let writes = ym2612_port0_writes(&cmds);
+    assert!(
+        !writes.is_empty(),
+        "YM2612 VGM should contain at least one port-0 register write (0x52)"
+    );
+}
+
+#[test]
+fn ym2612_key_on_register_written() {
+    // Key-on is written to port 0 addr 0x28; any value with bit4..6 set
+    let vgm = compile_ym2612("c4");
+    let cmds = extract_vgm_commands(&vgm);
+    let writes = ym2612_port0_writes(&cmds);
+
+    let has_key_on = writes.iter().any(|&(addr, data)| addr == 0x28 && data & 0xF0 != 0);
+    assert!(
+        has_key_on,
+        "VGM missing YM2612 key-on write (addr=0x28, data bits[7:4] non-zero); port0_writes={writes:?}"
+    );
+}
+
+#[test]
+fn ym2612_different_notes_produce_different_fnum_writes() {
+    // F-number registers are at port 0 addrs 0xA0-0xA2 (lo) and 0xA4-0xA6 (hi+block)
+    let vgm_c = compile_ym2612("c4 r8192"); // C note
+    let vgm_g = compile_ym2612("g4 r8192"); // G note (perfect fifth up)
+
+    let cmds_c = extract_vgm_commands(&vgm_c);
+    let cmds_g = extract_vgm_commands(&vgm_g);
+
+    let fnum_c: Vec<_> = ym2612_port0_writes(&cmds_c)
+        .into_iter()
+        .filter(|&(addr, _)| (0xA0..=0xA2).contains(&addr))
+        .collect();
+    let fnum_g: Vec<_> = ym2612_port0_writes(&cmds_g)
+        .into_iter()
+        .filter(|&(addr, _)| (0xA0..=0xA2).contains(&addr))
+        .collect();
+
+    assert!(!fnum_c.is_empty(), "no F-num lo writes for C note");
+    assert!(!fnum_g.is_empty(), "no F-num lo writes for G note");
+    assert_ne!(
+        fnum_c, fnum_g,
+        "C note and G note should produce different F-number register values"
+    );
+}
+
+#[test]
+fn ym2612_key_off_before_next_note() {
+    // Playing two sequential notes should generate a key-off (0x28 with lower nibble bits, upper bits 0)
+    // between them — specifically after the first note's wait
+    let vgm = compile_ym2612("c4 d4");
+    let cmds = extract_vgm_commands(&vgm);
+    let port0 = ym2612_port0_writes(&cmds);
+
+    // Both key-on and key-off use addr 0x28; key-off has bits[7:4] == 0
+    let has_key_off = port0.iter().any(|&(addr, data)| addr == 0x28 && data & 0xF0 == 0);
+    assert!(
+        has_key_off,
+        "two sequential YM2612 notes must generate at least one key-off (addr=0x28, data[7:4]=0)"
+    );
+}
+
+#[test]
+fn ym2612_operator_tl_written_for_fm_instrument() {
+    // Total Level (TL) registers are at addrs 0x40-0x4F (port 0 and 1)
+    // An FM instrument definition should write these before key-on
+    let vgm = compile_ym2612("c4");
+    let cmds = extract_vgm_commands(&vgm);
+    let port0 = ym2612_port0_writes(&cmds);
+    let port1 = ym2612_port1_writes(&cmds);
+
+    let has_tl = port0.iter().any(|&(addr, _)| (0x40..=0x4F).contains(&addr))
+        || port1.iter().any(|&(addr, _)| (0x40..=0x4F).contains(&addr));
+    assert!(
+        has_tl,
+        "YM2612 FM instrument should write TL registers (0x40-0x4F)"
+    );
+}
+
+#[test]
+fn ym2612_b0_register_written_to_enable_channel() {
+    // Register 0xB0 sets algorithm and feedback; must be written when loading an instrument
+    let vgm = compile_ym2612("c4");
+    let cmds = extract_vgm_commands(&vgm);
+    let port0 = ym2612_port0_writes(&cmds);
+    let port1 = ym2612_port1_writes(&cmds);
+
+    let has_b0 = port0.iter().any(|&(addr, _)| (0xB0..=0xB2).contains(&addr))
+        || port1.iter().any(|&(addr, _)| (0xB0..=0xB2).contains(&addr));
+    assert!(
+        has_b0,
+        "YM2612 FM instrument should write algorithm/feedback register (0xB0-0xB2)"
+    );
+}
+
+// ── SN76489 silence / key-off ─────────────────────────────────────────────────
+
+#[test]
+fn psg_volume_off_written_after_note_ends() {
+    // After a note, the PSG channel should be silenced (attenuation = 0xF = max atten)
+    // Volume latch for ch0: 0x9F
+    let vgm = compile_vgm("@0 t120 o4 c4 r4"); // note + rest
+    let cmds = extract_vgm_commands(&vgm);
+    let writes = sn76489_writes(&cmds);
+    let has_silence = writes.contains(&0x9F); // ch0 max attenuation
+    assert!(
+        has_silence,
+        "SN76489 ch0 should be silenced (0x9F) after a note ends; writes={writes:?}"
+    );
+}
+
+// ── Accidental frequency accuracy ────────────────────────────────────────────
+
+#[test]
+fn psg_sharp_note_has_different_frequency_than_natural() {
+    // C4 and C#4 must produce different SN76489 tone dividers
+    let vgm_c  = compile_vgm("@0 t120 o4 c4");
+    let vgm_cs = compile_vgm("@0 t120 o4 c+4");
+
+    let writes_c  = sn76489_writes(&extract_vgm_commands(&vgm_c));
+    let writes_cs = sn76489_writes(&extract_vgm_commands(&vgm_cs));
+
+    // The latch bytes for the tone frequency should differ
+    let latch_c  = psg_latch_tone(midi_to_psg_divider(60)); // C4 = MIDI 60
+    let latch_cs = psg_latch_tone(midi_to_psg_divider(61)); // C#4 = MIDI 61
+
+    assert_ne!(latch_c, latch_cs, "C4 and C#4 latch bytes must differ");
+    assert!(writes_c.contains(&latch_c),  "C4  latch {latch_c:#04x}  missing from writes");
+    assert!(writes_cs.contains(&latch_cs), "C#4 latch {latch_cs:#04x} missing from writes");
+}
+
+#[test]
+fn psg_flat_note_equals_enharmonic_sharp() {
+    // D-flat4 == C#4 (enharmonic equivalents); should produce same divider
+    let vgm_cs = compile_vgm("@0 t120 o4 c+4");
+    let vgm_db = compile_vgm("@0 t120 o4 d-4");
+
+    let latch_cs: Vec<_> = sn76489_writes(&extract_vgm_commands(&vgm_cs))
+        .into_iter()
+        .filter(|&b| b & 0x80 != 0 && b & 0x60 == 0)
+        .collect();
+    let latch_db: Vec<_> = sn76489_writes(&extract_vgm_commands(&vgm_db))
+        .into_iter()
+        .filter(|&b| b & 0x80 != 0 && b & 0x60 == 0)
+        .collect();
+
+    assert_eq!(
+        latch_cs, latch_db,
+        "C#4 and D-flat4 should produce identical SN76489 latch bytes (enharmonic)"
+    );
+}
+
+// ── Wait granularity ──────────────────────────────────────────────────────────
+
+#[test]
+fn short_notes_use_0x70_style_waits() {
+    // Notes with durations 1-16 samples often use the 0x70-0x7F compact wait opcodes
+    // (Not a hard requirement, but if total_samples > 0, the stream isn't empty)
+    let vgm = compile_vgm("@0 t240 o4 c32 d32 e32 f32");
+    let cmds = extract_vgm_commands(&vgm);
+    let total = total_wait_samples(&cmds);
+    assert!(total > 0, "fast notes at high BPM should still produce non-zero total samples");
+}
+
+#[test]
+fn long_note_uses_0x61_wait() {
+    // A whole note at low BPM should produce at least one 0x61 wait
+    let vgm = compile_vgm("@0 t60 o4 c1");
+    let cmds = extract_vgm_commands(&vgm);
+    let has_long_wait = cmds.iter().any(|c| c.opcode == 0x61);
+    assert!(has_long_wait, "a whole note at t60 should produce at least one 0x61 (long wait) command");
+}

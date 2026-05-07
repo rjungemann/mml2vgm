@@ -420,6 +420,14 @@ impl VgmPlayer {
                     }
                 }
             }
+            // QSound: 0xC4 data_hi addr data_lo — 16-bit write to register addr
+            0xC4 if cmd_data.len() >= 4 => {
+                for (chip, emu) in &mut self.chips {
+                    if *chip == SoundChip::QSound {
+                        emu.write_port(cmd_data[1], cmd_data[2], cmd_data[3]); break;
+                    }
+                }
+            }
             0xD4 if cmd_data.len() >= 4 => {
                 for (chip, emu) in &mut self.chips {
                     if *chip == SoundChip::C140 { emu.write_port(cmd_data[1], cmd_data[2], cmd_data[3]); break; }
@@ -494,6 +502,7 @@ impl VgmPlayer {
         let mut has_vrc6 = false;
         let mut has_k053260 = false;
         let mut has_k054539 = false;
+        let mut has_qsound = false;
 
         for (_, cmd) in &self.commands {
             match cmd.first().copied() {
@@ -518,6 +527,7 @@ impl VgmPlayer {
                 Some(0xBA) => has_k053260 = true,
                 Some(0xD2) => has_k051649 = true,
                 Some(0xD3) => has_k054539 = true,
+                Some(0xC4) => has_qsound = true,
                 Some(0xD4) => has_c140 = true,
                 Some(0xE1) => has_c352 = true,
                 _ => {}
@@ -550,6 +560,7 @@ impl VgmPlayer {
         if has_vrc6 { self.chips.push((SoundChip::VRC6, Box::new(crate::chips::vrc6::VRC6::new()))); }
         if has_k053260 { self.chips.push((SoundChip::K053260, Box::new(crate::chips::k053260::K053260::new()))); }
         if has_k054539 { self.chips.push((SoundChip::K054539, Box::new(crate::chips::k054539::K054539::new()))); }
+        if has_qsound  { self.chips.push((SoundChip::QSound,  Box::new(crate::chips::qsound::QSound::new()))); }
         if has_c0_opcode {
             if has_segapcm_clock {
                 self.chips.push((SoundChip::SegaPCM, Box::new(crate::chips::segapcm::SegaPCM::new())));

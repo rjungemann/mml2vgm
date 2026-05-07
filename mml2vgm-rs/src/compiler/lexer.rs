@@ -238,11 +238,6 @@ impl<'a> Lexer<'a> {
            c_upper == 'G' || c_upper == 'A' || c_upper == 'B' {
             let letter = c_upper;
             if let Some(next_c) = self.next_char() {
-                if next_c == '#' {
-                    self.advance(); // Consume the note letter
-                    self.advance(); // Consume the #
-                    return Ok(Token::Note(letter));
-                }
                 // Only fall through to identifier if BOTH this letter and the next are uppercase.
                 // This lets "EON", "EX2" etc. parse as identifiers while 'c','e' in music stay as notes.
                 let next_upper = next_c.to_ascii_uppercase();
@@ -393,6 +388,19 @@ impl<'a> Lexer<'a> {
                 self.next_token()
             }
             
+            // '+' is an alternative sharp symbol (MML C# format: c+4 = C-sharp quarter note)
+            '+' => {
+                self.advance();
+                Ok(Token::Sharp)
+            }
+            // '-' is an alternative flat symbol (MML C# format: e-4 = E-flat quarter note).
+            // Note: this only triggers for standalone '-'; hyphens inside identifier names are
+            // consumed by read_identifier() before reaching here.
+            '-' => {
+                self.advance();
+                Ok(Token::Flat)
+            }
+
             // Whitespace or unrecognised character (advance past it to avoid infinite loop)
             _ => {
                 let mut ws = String::new();

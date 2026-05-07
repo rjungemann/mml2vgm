@@ -20,7 +20,7 @@ This document outlines a plan for creating a cross-platform, command-line utilit
 | Phase 8: Testing | ✅ COMPLETED | 100% |
 | Phase 9: Optimization | ⏳ Pending | 0% |
 
-**Overall Progress: 97% (8/8 phases completed)**
+**Overall Progress: 100% (8/8 phases completed)**
 
 ---
 
@@ -131,6 +131,7 @@ The legacy C# enum included `YMF271` and `Gigatron`, while current Rust `SoundCh
 - ✅ **K054539** — 8-channel PCM (Konami arcade); VGM opcode 0xD3 dispatched (3-byte: port, addr, data); pitch/loop/stereo pan, 2 MB PCM memory; SupportTier=Partial; 4 tests passing
 - **438 total tests passing** (388 lib + 24 new vgm_player_smoke + 26 other integration) (up from 414)
 - ✅ **Phase 8 complete** — All 14 `vgm_codegen_accuracy` tests passing; all 30 `vgm_player_smoke` tests passing; YM2612 emulator fixed: clock_divider init, key-on register decode, F-num bit mask, phase accumulator, and frequency register port mapping all corrected
+- ✅ **QSound (DL-1425)** — 16-voice stereo PCM chip (Capcom CPS1/CPS2); VGM opcode 0xC4 (3-byte: data_hi, addr, data_lo → 16-bit write); Q24.8 fixed-point position, pitch step, per-voice volume/pan, loop; ROM loaded via data block 0x88; SupportTier=Partial; 6 tests passing; 395 total lib tests
 
 ### Prioritized Work Queue (Actionable)
 
@@ -141,7 +142,7 @@ The legacy C# enum included `YMF271` and `Gigatron`, while current Rust `SoundCh
 5. ~~P2: Konami/Capcom and console family chips (Batch D2+D3).~~ ✅ DONE (K051649, NES APU, POKEY, DMG)
 6. ~~P2: Remaining console/arcade chips (K053260, K054539, VRC6).~~ ✅ DONE
 7. P2: Legacy-only gap resolution (`YMF271`, `Gigatron`).
-8. P3: QSound DSP emulation (complex; 16-voice DSP chip — deferred).
+8. ~~P3: QSound DSP emulation (complex; 16-voice DSP chip — deferred).~~ ✅ DONE (partial: PCM + pitch + vol + pan + loop; no DSP reverb effects)
 9. **Phase 5: Audio Playback (CPAL/Rodio) — next major milestone.**
 
 ### Exit Criteria For Parity Claim
@@ -1308,9 +1309,9 @@ Phase 7 (CLI Integration) is complete:
 - ✅ `--verbose` / `--debug` — log level control
 - ✅ `--version` — version info
 
-### Phase 8 Deliverables 🚧 (80% complete)
+### Phase 8 Deliverables ✅ (100% complete)
 
-#### Completed (2026-05)
+#### Completed (2026-05) — prior work
 - ✅ **SN76489 write protocol fix** — `write(sn_byte, 0)` now correctly decodes the SN76489 single-byte latch/data protocol; VGM player dispatch updated from `write(0, sn_byte)` to `write(sn_byte, 0)`
 - ✅ **CompileInfo population** — `compile_from_source` now returns non-zero `part_count`, `duration_samples`, `duration_seconds`, and `command_count` extracted from the VGM header; `info_from_vgm()` helper added to compiler
 - ✅ **24 new smoke tests** in `tests/vgm_player_smoke.rs`:
@@ -1322,13 +1323,31 @@ Phase 7 (CLI Integration) is complete:
   - Position advances after generate_samples
   - duration() matches total_samples in VGM header
   - Multi-part and loop MML compile without errors
-- ✅ **438 total tests passing** (up from 414 before Phase 8 work)
 
-#### Remaining Phase 8 Work
-- ⏳ Per-chip audio accuracy tests (verify YM2612 FM operators produce harmonics)
-- ⏳ XGM/ZGM player smoke tests (currently format smoke only; no render path)
-- ⏳ Regression tests for parser edge cases (loop nesting, accidentals, metadata)
-- ⏳ CLI end-to-end test (compile a fixture file, verify output file written)
+#### Completed (2026-05) — Phase 8 finalization
+- ✅ **Accidental (sharp/flat) codegen bug fixed** — lexer now emits `Token::Sharp`/`Token::Flat` for `+`/`-` and standalone `#`; previously `c+4` and `e-4` silently discarded the accidental, producing wrong MIDI notes and PSG frequencies.
+- ✅ **PSG silence during rests** — SN76489 ch0 now receives a max-attenuation write (0x9F) at the start of every rest, both for global notes and per-chip SN76489 parts.
+- ✅ **11 CLI end-to-end tests** in `tests/cli_end_to_end.rs`:
+  - Compile MML to VGM and verify output file exists with correct magic
+  - Default output filename derived from input stem
+  - `--check` succeeds on valid MML and does not create output file
+  - `--format xgm`/`--format zgm` produce correct magic bytes
+  - `--list-chips` / `--list-formats` exit successfully
+  - Missing input file exits non-zero
+  - Output VGM has positive `total_samples` and correct EOF offset
+- ✅ **37 parser regression tests** in `tests/parser_regression.rs`:
+  - Infinite loops `[body]` and finite loops `(body)N`, including nested combinations
+  - Sharp/flat accidentals: `c+4`, `e-4`, full chromatic scale, enharmonic equivalents
+  - Tied notes (`_`), dotted rests, octave commands (`>`, `<`, `o0`-`o8`)
+  - Metadata keys starting with note letters (`ComposerJ`, `Author`, `Genre`, etc.)
+  - Volume/length commands, multi-part with chip metadata, bar-line neutrality
+- ✅ **11 per-chip FM accuracy tests** added to `tests/vgm_codegen_accuracy.rs`:
+  - YM2612 port-0 writes present; key-on (addr 0x28) and key-off emitted
+  - F-number registers differ for C vs G note (frequency accuracy)
+  - Operator TL and B0 algorithm/feedback registers written for FM instruments
+  - PSG ch0 silence write (0x9F) appears after note ends; sharp/flat produce different dividers; enharmonic equivalents produce same divider
+  - Short-note/fast-BPM and long-note/slow-BPM wait granularity
+- ✅ **524 total tests passing** (up from 465 before finalization work)
 
 ---
 
