@@ -18,8 +18,8 @@ const VGM_MAGIC: &[u8] = b"Vgm ";
 fn compile_file(path: &PathBuf) -> (bool, String, usize, Duration) {
     let filename = path.file_name().unwrap().to_string_lossy().into_owned();
 
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
+    let source = match std::fs::read(path) {
+        Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
         Err(e) => return (false, format!("read error: {}", e), 0, Duration::ZERO),
     };
 
@@ -147,7 +147,7 @@ fn all_mml2vgm_test_files_have_valid_vgm_header() {
             panic!("Total timeout reached after {}s", TOTAL_TIMEOUT_SECS);
         }
 
-        let source = std::fs::read_to_string(path).expect("read failed");
+        let source = String::from_utf8_lossy(&std::fs::read(path).expect("read failed")).into_owned();
         let start = Instant::now();
         match compiler.compile_from_source(&source) {
             Ok(result) => {

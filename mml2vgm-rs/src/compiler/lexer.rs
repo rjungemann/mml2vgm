@@ -249,8 +249,11 @@ impl<'a> Lexer<'a> {
                 let next_is_note = next_upper == 'C' || next_upper == 'D' || next_upper == 'E'
                     || next_upper == 'F' || next_upper == 'G' || next_upper == 'A'
                     || next_upper == 'B';
-                if c.is_uppercase() && next_c.is_uppercase() && next_c.is_alphabetic() && !next_is_note {
-                    // Fall through to identifier check below
+                if c.is_uppercase() && next_c.is_alphabetic() && !next_is_note {
+                    // Fall through to identifier check below:
+                    // uppercase note letter + non-note alphabetic char → multi-letter identifier
+                    // (e.g. "ComposerJ", "Coda"; music notes are single letters or
+                    //  uppercase + another note letter like "CD", "CE")
                 } else {
                     self.advance();
                     return Ok(Token::Note(letter));

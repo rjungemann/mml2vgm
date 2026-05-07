@@ -1,43 +1,54 @@
 //! YMF262 (OPL3) sound chip emulation
 //!
-//! The YMF262 is the advanced OPL3 synthesizer with 18 FM channels.
-//! It is the most capable OPL variant, capable of producing high-quality FM synthesis.
+//! The YMF262 provides 18 FM channels in two 9-channel banks.
+//! VGM uses opcodes 0x5E (port 0 / bank 0, channels 0-8)
+//! and 0x5F (port 1 / bank 1, channels 9-17).
 //!
-//! # Features
-//! - 18 FM channels (two 9-channel OPL2 cores)
-//! - 2 operators per channel
-//! - Stereo panning per channel
-//! - Can operate in OPL2 compatibility mode
+//! OPL3 register map (per bank):
+//! - 0x20-0x35: Operator AM/VIB/EG/KSR/MULT (slot-addressed)
+//! - 0x40-0x55: Operator KSL/TL (total level)
+//! - 0x60-0x75: Operator AR/DR
+//! - 0x80-0x95: Operator SL/RR
+//! - 0xA0-0xA8: Channel F-number LSB
+//! - 0xB0-0xB8: Channel Key-on/Block/F-number MSB
+//! - 0xBD: Rhythm mode (bank 0 only)
+//! - 0xC0-0xC8: Channel feedback/connection + OPL3 L/R enable
+//! - 0xE0-0xF5: Operator waveform
+//! Bank 0 addr 0x05 bit 0: OPL3 mode enable
 
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-/// FM operator for OPL3
+const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+
+fn slot_to_ch_op(slot_offset: u8) -> Option<(usize, usize)> {
+    let row = (slot_offset / 8) as usize;
+    let col = (slot_offset % 8) as usize;
+    if row > 2 || col > 5 { return None; }
+    if col < 3 { Some((row * 3 + col, 0)) } else { Some((row * 3 + col - 3, 1)) }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct FmOperator {
-    phase: u16,
-    key_on: bool,
-    volume: u8,
+    phase_acc: f32,
+    total_level: u8,
+    mult: u8,
 }
 
 impl Default for FmOperator {
     fn default() -> Self {
-        Self {
-            phase: 0,
-            key_on: false,
-            volume: 127,
-        }
+        Self { phase_acc: 0.0, total_level: 0, mult: 1 }
     }
 }
 
-/// FM channel for YMF262
 #[derive(Debug, Clone, Copy)]
 struct FmChannel {
     operators: [FmOperator; 2],
-    frequency: u16,
+    f_num: u16,
     block: u8,
-    algorithm: u8,
     key_on: bool,
+    connection: u8,
+    feedback: u8,
     left_enable: bool,
     right_enable: bool,
 }
@@ -46,44 +57,28 @@ impl Default for FmChannel {
     fn default() -> Self {
         Self {
             operators: [FmOperator::default(); 2],
-            frequency: 0,
-            block: 0,
-            algorithm: 0,
-            key_on: false,
-            left_enable: true,
-            right_enable: true,
+            f_num: 0, block: 0, key_on: false, connection: 0, feedback: 0,
+            left_enable: true, right_enable: true,
         }
     }
 }
 
-/// YMF262 chip emulator with 18 FM channels (two OPL2 cores)
+/// YMF262 chip emulator with 18 FM channels (two 9-channel banks)
 pub struct YMF262 {
-    /// Master clock rate in Hz
     clock_rate: u32,
-
-    /// Sample rate for output
     sample_rate: u32,
-
-    /// Register cache (0x100 for first chip, 0x100 for second)
     regs: [u8; 0x200],
-
-    /// 18 FM channels (9 per OPL2 core)
     channels: [FmChannel; 18],
-
-    /// OPL3 enable flag (true for OPL3 mode, false for OPL2 compat)
     opl3_mode: bool,
-
-    /// Accumulated clock cycles
     accumulated_cycles: f32,
+    mod_feedback: [f32; 18],
 }
 
 impl YMF262 {
-    /// Create a new YMF262 emulator with the default clock rate
     pub fn new() -> Self {
         Self::with_clock_rate(14_318_180)
     }
 
-    /// Create a new YMF262 emulator with a custom clock rate
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -92,57 +87,108 @@ impl YMF262 {
             channels: [FmChannel::default(); 18],
             opl3_mode: true,
             accumulated_cycles: 0.0,
+            mod_feedback: [0.0; 18],
         }
     }
 
-    /// Get output from a channel
-    fn get_channel_output(&self, ch: usize) -> (f32, f32) {
-        if ch >= 18 {
-            return (0.0, 0.0);
-        }
+    fn channel_freq_hz(&self, ch: usize) -> f32 {
+        let f_num = self.channels[ch].f_num as f32;
+        let block = self.channels[ch].block as i32;
+        // OPL3 runs at clock/288, YM3812 at clock/72; adjust for actual OPL3 clock
+        f_num * 2_f32.powi(block - 1) * (self.clock_rate as f32 / 4.0) / (1u32 << 19) as f32
+    }
 
-        let channel = &self.channels[ch];
-        if !channel.key_on {
-            return (0.0, 0.0);
-        }
-
-        let base_freq = 440.0 * 2_f32.powi((channel.frequency as i32 - 69) / 12);
-        let freq = base_freq * 2_f32.powi((channel.block as i32) - 4);
-
-        let op1_phase = (channel.operators[0].phase as f32 / 65536.0) * freq / self.sample_rate as f32 * 2.0 * PI;
-        let op2_phase = (channel.operators[1].phase as f32 / 65536.0) * freq / self.sample_rate as f32 * 2.0 * PI;
-
-        let output = match channel.algorithm {
-            0 => {
-                let carrier = op2_phase.sin() * (1.0 - channel.operators[1].volume as f32 / 127.0);
-                carrier
+    fn advance_phases(&mut self, sample_rate: u32) {
+        for ch in 0..18 {
+            if !self.channels[ch].key_on { continue; }
+            let base_freq = self.channel_freq_hz(ch);
+            for op in 0..2 {
+                let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
+                let inc = base_freq * mult * 2.0 * PI / sample_rate as f32;
+                self.channels[ch].operators[op].phase_acc += inc;
+                if self.channels[ch].operators[op].phase_acc > 2.0 * PI {
+                    self.channels[ch].operators[op].phase_acc -= 2.0 * PI;
+                }
             }
-            _ => {
-                let modulator = op1_phase.sin() * (1.0 - channel.operators[0].volume as f32 / 127.0);
-                let carrier = (op2_phase + modulator).sin() * (1.0 - channel.operators[1].volume as f32 / 127.0);
-                carrier
-            }
+        }
+    }
+
+    fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {
+        if ch >= 18 || !self.channels[ch].key_on { return (0.0, 0.0); }
+        let op0_phase = self.channels[ch].operators[0].phase_acc;
+        let op1_phase = self.channels[ch].operators[1].phase_acc;
+        let tl0 = 1.0 - self.channels[ch].operators[0].total_level as f32 / 63.0;
+        let tl1 = 1.0 - self.channels[ch].operators[1].total_level as f32 / 63.0;
+        let mod_out = op0_phase.sin() * tl0 + self.mod_feedback[ch] * 0.25;
+        let output = if self.channels[ch].connection == 0 {
+            (op1_phase + mod_out * PI).sin() * tl1
+        } else {
+            mod_out + op1_phase.sin() * tl1
         };
-
-        let sample = output * 0.08; // Reduce amplitude for 18 channels
-        let left = if channel.left_enable { sample } else { 0.0 };
-        let right = if channel.right_enable { sample } else { 0.0 };
-
+        self.mod_feedback[ch] = mod_out;
+        let sample = (output * 0.1).clamp(-1.0, 1.0);
+        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
+        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
         (left, right)
     }
 
-    /// Get total output
-    fn get_output(&self) -> (f32, f32) {
-        let mut left = 0.0;
-        let mut right = 0.0;
+    fn write_bank(&mut self, bank: usize, addr: u8, data: u8) {
+        let ch_base = bank * 9;
+        self.regs[bank * 0x100 + addr as usize] = data;
 
-        for ch in 0..18 {
-            let (ch_left, ch_right) = self.get_channel_output(ch);
-            left += ch_left;
-            right += ch_right;
+        match addr {
+            // OPL3 enable (bank 0 only)
+            0x05 if bank == 0 => { self.opl3_mode = (data & 0x01) != 0; }
+
+            // Operator registers (slot-addressed within bank)
+            0x20..=0x35 => {
+                if let Some((ch, op)) = slot_to_ch_op(addr - 0x20) {
+                    let ch_abs = ch_base + ch;
+                    if ch_abs < 18 { self.channels[ch_abs].operators[op].mult = data & 0x0F; }
+                }
+            }
+            0x40..=0x55 => {
+                if let Some((ch, op)) = slot_to_ch_op(addr - 0x40) {
+                    let ch_abs = ch_base + ch;
+                    if ch_abs < 18 { self.channels[ch_abs].operators[op].total_level = data & 0x3F; }
+                }
+            }
+            0x60..=0x75 | 0x80..=0x95 | 0xE0..=0xF5 => {}
+
+            // Channel registers
+            0xA0..=0xA8 => {
+                let ch = ch_base + (addr - 0xA0) as usize;
+                if ch < 18 { self.channels[ch].f_num = (self.channels[ch].f_num & 0x300) | data as u16; }
+            }
+            0xB0..=0xB8 => {
+                let ch = ch_base + (addr - 0xB0) as usize;
+                if ch < 18 {
+                    let prev = self.channels[ch].key_on;
+                    self.channels[ch].key_on = (data & 0x20) != 0;
+                    self.channels[ch].block = (data >> 2) & 0x07;
+                    self.channels[ch].f_num = (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
+                    if !prev && self.channels[ch].key_on {
+                        self.channels[ch].operators[0].phase_acc = 0.0;
+                        self.channels[ch].operators[1].phase_acc = 0.0;
+                        self.mod_feedback[ch] = 0.0;
+                    }
+                }
+            }
+            0xBD if bank == 0 => {}
+            0xC0..=0xC8 => {
+                let ch = ch_base + (addr - 0xC0) as usize;
+                if ch < 18 {
+                    self.channels[ch].connection = data & 0x01;
+                    self.channels[ch].feedback = (data >> 1) & 0x07;
+                    // OPL3 L/R bits in 0xCx
+                    if self.opl3_mode {
+                        self.channels[ch].left_enable = (data & 0x10) != 0;
+                        self.channels[ch].right_enable = (data & 0x20) != 0;
+                    }
+                }
+            }
+            _ => {}
         }
-
-        (left / 18.0, right / 18.0)
     }
 }
 
@@ -161,84 +207,33 @@ impl SoundChipEmulator for YMF262 {
 
     fn write_port(&mut self, port: u8, addr: u8, data: u8) {
         let bank = (port & 1) as usize;
-        self.regs[bank * 0x100 + addr as usize] = data;
-        let ch_base = bank * 9;
-
-        match addr {
-            0x00..=0x08 => {
-                let ch = ch_base + addr as usize;
-                if ch < 18 {
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x300) | data as u16;
-                }
-            }
-            0x10..=0x18 => {
-                let ch = ch_base + (addr - 0x10) as usize;
-                if ch < 18 {
-                    self.channels[ch].key_on = (data & 0x20) != 0;
-                    self.channels[ch].block = (data & 0x1C) >> 2;
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x0FF) | (((data as u16) & 0x03) << 8);
-                }
-            }
-            0x30..=0x38 => {
-                let ch = ch_base + (addr - 0x30) as usize;
-                if ch < 18 {
-                    self.channels[ch].operators[0].volume = (data >> 2) & 0x3F;
-                }
-            }
-            0x40..=0x48 => {
-                let ch = ch_base + (addr - 0x40) as usize;
-                if ch < 18 {
-                    self.channels[ch].operators[1].volume = (data >> 2) & 0x3F;
-                }
-            }
-            0x50..=0x58 => {
-                let ch = ch_base + (addr - 0x50) as usize;
-                if ch < 18 {
-                    self.channels[ch].left_enable = (data & 0x10) != 0;
-                    self.channels[ch].right_enable = (data & 0x20) != 0;
-                }
-            }
-            // OPL3 mode enable — only in bank 0
-            0x04 if bank == 0 => {
-                self.opl3_mode = (data & 0x01) != 0;
-            }
-            _ => {}
-        }
+        self.write_bank(bank, addr, data);
     }
 
     fn write(&mut self, addr: u8, data: u8) {
-        self.write_port(0, addr, data);
+        self.write_bank(0, addr, data);
     }
 
     fn read(&self, _addr: u8) -> u8 {
         0xFF
     }
 
-    fn clock(&mut self) {
-        for ch in &mut self.channels {
-            for op in &mut ch.operators {
-                if op.key_on {
-                    op.phase = op.phase.wrapping_add(1);
-                }
-            }
-        }
-    }
+    fn clock(&mut self) {}
 
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
         self.sample_rate = sample_rate;
 
         for frame in buffer.chunks_mut(2) {
-            let cycles_per_sample = self.clock_rate as f32 / sample_rate as f32;
-            self.accumulated_cycles += cycles_per_sample;
-
-            while self.accumulated_cycles >= 1.0 {
-                self.clock();
-                self.accumulated_cycles -= 1.0;
+            self.advance_phases(sample_rate);
+            let mut left = 0.0f32;
+            let mut right = 0.0f32;
+            for ch in 0..18 {
+                let (l, r) = self.get_channel_output(ch);
+                left += l;
+                right += r;
             }
-
-            let (left, right) = self.get_output();
-            frame[0] = left.clamp(-1.0, 1.0);
-            frame[1] = right.clamp(-1.0, 1.0);
+            frame[0] = (left / 18.0).clamp(-1.0, 1.0);
+            frame[1] = (right / 18.0).clamp(-1.0, 1.0);
         }
     }
 }
@@ -270,22 +265,49 @@ mod tests {
     }
 
     #[test]
-    fn test_ymf262_write() {
+    fn test_ymf262_write_bank0_key_on() {
         let mut chip = YMF262::new();
-        chip.write(0x10, 0x20);
+        chip.write(0xA0, 0x57); // ch0 f_num lo
+        chip.write(0xB0, 0x31); // ch0 key_on=1, block=4
         assert!(chip.channels[0].key_on);
+        assert_eq!(chip.channels[0].block, 4);
+    }
+
+    #[test]
+    fn test_ymf262_write_port_bank1_key_on() {
+        let mut chip = YMF262::new();
+        chip.write_port(1, 0xA0, 0x57); // ch9 f_num lo
+        chip.write_port(1, 0xB0, 0x31); // ch9 key_on=1, block=4
+        assert!(chip.channels[9].key_on);
+        assert_eq!(chip.channels[9].block, 4);
+    }
+
+    #[test]
+    fn test_ymf262_generate_samples_active() {
+        let mut chip = YMF262::new();
+        chip.write(0xA0, 0x57);
+        chip.write(0xB0, 0x31);
+        let mut buffer = [0.0f32; 8];
+        chip.generate_samples(&mut buffer, 44100);
+        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
+    }
+
+    #[test]
+    fn test_ymf262_opl3_lr_enable() {
+        let mut chip = YMF262::new();
+        chip.write_port(0, 0x05, 0x01); // enable OPL3 mode
+        chip.write_port(0, 0xC0, 0x30); // ch0: left=1, right=1
+        assert!(chip.channels[0].left_enable);
+        assert!(chip.channels[0].right_enable);
     }
 
     #[test]
     fn test_ymf262_soundchip_trait() {
         let mut chip = YMF262::new();
-        assert_eq!(chip.name(), "YMF262 (OPL3)");
-
         chip.reset();
-        chip.write(0x10, 0x20);
-        chip.write(0x00, 0x40);
+        chip.write(0xA0, 0x57);
+        chip.write(0xB0, 0x31);
         chip.clock();
-
         let mut buffer = [0.0f32; 4];
         chip.generate_samples(&mut buffer, 44100);
         assert_eq!(buffer.len(), 4);

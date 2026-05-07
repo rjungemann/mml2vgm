@@ -95,7 +95,33 @@ wasm-build-debug:
 wasm-build-release:
     cd mml2vgm-wasm && wasm-pack build --release
 
-# ============ TAURI DESKTOP COMMANDS ============
+# ============ EGUI DESKTOP COMMANDS ============
+
+# Run egui desktop app in dev mode
+egui-dev:
+    cd egui-app && cargo run
+
+# Build egui desktop app
+egui-build:
+    cd egui-app && cargo build
+
+# Build egui desktop app for release
+egui-build-release:
+    cd egui-app && cargo build --release
+
+# Run Clippy on egui app
+egui-lint:
+    cd egui-app && cargo clippy -- -D warnings
+
+# Run egui desktop app with socket server enabled (headless mode for CI)
+egui-socket:
+    cd egui-app && cargo run -- --socket --headless
+
+# Run egui smoke test suite (requires egui-app binary to be built)
+egui-smoke:
+    cd egui-app && cargo test --test smoke -- --test-threads=1
+
+# ============ TAURI DESKTOP COMMANDS (DEPRECATED) ============
 
 # Start Tauri dev
 tauri-dev:
@@ -111,20 +137,24 @@ tauri-build-release:
 
 # ============ COMBINED COMMANDS ============
 
-# Build everything (Rust + WASM + IDE + Tauri)
+# Build everything (Rust + WASM + IDE + egui)
 build-all:
     #!/usr/bin/env bash
     set -e
     just rust-build-release
     just wasm-build-release
     just ide-build
-    just tauri-build
+    just egui-build-release
 
-# Dev mode: Run IDE + Tauri watch (run in separate terminals)
+# Dev mode: Run IDE + egui desktop (run in separate terminals)
 dev:
     #!/usr/bin/env bash
     echo "Run in terminal 1: just ide-dev"
-    echo "Run in terminal 2: just tauri-dev"
+    echo "Run in terminal 2: just egui-dev"
+
+# Alias: launch the primary desktop app (egui)
+desktop:
+    just egui-dev
 
 # Full build and test
 ci:
@@ -132,10 +162,13 @@ ci:
     set -e
     just rust-lint
     just rust-test
+    just egui-lint
     just ide-lint
     just ide-test
     just rust-build-release
     just wasm-build-release
+    just egui-build-release
+    just egui-smoke
     echo "All checks passed!"
 
 # ============ GOLDEN MASTER PARITY COMMANDS ============

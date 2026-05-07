@@ -1,14 +1,19 @@
 //! Sega PCM sound chip emulation
 //!
 //! The Sega PCM chip is used in various Sega arcade systems for PCM sample playback.
-//! It provides 16 channels of 8-bit PCM playback with volume control and panning.
+//! It provides 16 channels of 8-bit PCM playback with independent volume and panning.
 //!
-//! # Features
-//! - 16 PCM channels
-//! - 8-bit PCM samples
-//! - Independent volume control per channel
-//! - Stereo panning
-//! - Adjustable playback rate per channel
+//! VGM register map (16-bit address):
+//! - 0x00-0x7F: 16 channels × 8 bytes each (ch * 8 + sub)
+//!   - sub 0: loop_start low
+//!   - sub 1: loop_start high
+//!   - sub 2: start address page (addr bit 16+)
+//!   - sub 3: end address page
+//!   - sub 4: delta low (playback rate)
+//!   - sub 5: delta high
+//!   - sub 6: left volume (0-127)
+//!   - sub 7: right volume (0-127), bit 7 = loop enable
+//! - 0x86: channel active bitmask (bit N = channel N)
 
 use super::SoundChipEmulator;
 
@@ -17,11 +22,12 @@ use super::SoundChipEmulator;
 struct PcmChannel {
     active: bool,
     position: u32,
-    playback_rate: u16,
-    volume: u8,
-    pan: u8,
+    delta: u16,
+    vol_left: u8,
+    vol_right: u8,
+    start_addr: u32,
+    end_addr: u32,
     loop_start: u32,
-    loop_end: u32,
     loop_enabled: bool,
 }
 
@@ -30,11 +36,12 @@ impl Default for PcmChannel {
         Self {
             active: false,
             position: 0,
-            playback_rate: 1,
-            volume: 0,
-            pan: 8,
+            delta: 1,
+            vol_left: 0,
+            vol_right: 0,
+            start_addr: 0,
+            end_addr: 0x10000,
             loop_start: 0,
-            loop_end: 0,
             loop_enabled: false,
         }
     }
@@ -60,8 +67,8 @@ pub struct SegaPCM {
     /// PCM data memory (256KB)
     pcm_memory: Vec<u8>,
 
-    /// Register cache
-    regs: [u8; 0x400],
+    /// Register cache (16-bit address space)
+    regs: Vec<u8>,
 }
 
 impl SegaPCM {
@@ -78,8 +85,8 @@ impl SegaPCM {
             clock_divider: clock_rate as f64 / 44100.0,
             accumulated_cycles: 0.0,
             channels: [Default::default(); 16],
-            pcm_memory: vec![0; 262_144], // 256KB
-            regs: [0; 0x400],
+            pcm_memory: vec![0; 262_144],
+            regs: vec![0; 0x100],
         }
     }
 
@@ -87,6 +94,38 @@ impl SegaPCM {
     pub fn set_sample_rate(&mut self, sample_rate: u32) {
         self.sample_rate = sample_rate;
         self.clock_divider = self.clock_rate as f64 / sample_rate as f64;
+    }
+
+    fn decode_register(&mut self, addr16: usize, data: u8) {
+        if addr16 == 0x86 {
+            for ch in 0..8usize {
+                self.channels[ch].active = (data & (1 << ch)) == 0; // active when bit is CLEAR (inverted)
+            }
+            return;
+        }
+
+        let ch = addr16 / 8;
+        if ch >= 16 {
+            return;
+        }
+
+        match addr16 % 8 {
+            0 => self.channels[ch].loop_start = (self.channels[ch].loop_start & 0xFF00) | data as u32,
+            1 => self.channels[ch].loop_start = (self.channels[ch].loop_start & 0x00FF) | ((data as u32) << 8),
+            2 => {
+                self.channels[ch].start_addr = (data as u32) << 16;
+                self.channels[ch].position = (data as u32) << 16;
+            }
+            3 => self.channels[ch].end_addr = (data as u32) << 16,
+            4 => self.channels[ch].delta = (self.channels[ch].delta & 0xFF00) | data as u16,
+            5 => self.channels[ch].delta = (self.channels[ch].delta & 0x00FF) | ((data as u16) << 8),
+            6 => self.channels[ch].vol_left = data & 0x7F,
+            7 => {
+                self.channels[ch].vol_right = data & 0x7F;
+                self.channels[ch].loop_enabled = (data & 0x80) != 0;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -104,44 +143,24 @@ impl SoundChipEmulator for SegaPCM {
     }
 
     fn write(&mut self, addr: u8, data: u8) {
-        self.regs[addr as usize] = data;
-
-        match addr {
-            // Channel select and control
-            0x00 => {
-                let ch = (data & 0x0F) as usize;
-                if ch < 16 {
-                    self.channels[ch].active = (data & 0x80) != 0;
-                }
-            }
-            // Volume
-            0x01 => {
-                if let Some(ch) = self.channels.iter_mut().find(|c| c.active) {
-                    ch.volume = data;
-                }
-            }
-            // Panning
-            0x02 => {
-                if let Some(ch) = self.channels.iter_mut().find(|c| c.active) {
-                    ch.pan = data & 0x0F;
-                }
-            }
-            // Playback rate
-            0x03..=0x04 => {
-                if let Some(ch) = self.channels.iter_mut().find(|c| c.active) {
-                    if addr == 0x03 {
-                        ch.playback_rate = (ch.playback_rate & 0xFF00) | (data as u16);
-                    } else {
-                        ch.playback_rate = (ch.playback_rate & 0x00FF) | ((data as u16) << 8);
-                    }
-                }
-            }
-            _ => {}
+        let addr16 = addr as usize;
+        if addr16 < self.regs.len() {
+            self.regs[addr16] = data;
         }
+        self.decode_register(addr16, data);
+    }
+
+    fn write_port(&mut self, port: u8, addr: u8, data: u8) {
+        let addr16 = ((port as usize) << 8) | addr as usize;
+        if addr16 < self.regs.len() {
+            self.regs[addr16] = data;
+        }
+        self.decode_register(addr16, data);
     }
 
     fn read(&self, addr: u8) -> u8 {
-        self.regs[addr as usize]
+        let idx = addr as usize;
+        if idx < self.regs.len() { self.regs[idx] } else { 0 }
     }
 
     fn load_pcm_data(&mut self, block_type: u8, data: &[u8]) {
@@ -153,12 +172,14 @@ impl SoundChipEmulator for SegaPCM {
 
     fn clock(&mut self) {
         for ch in &mut self.channels {
-            if ch.active && ch.playback_rate > 0 {
-                ch.position += ch.playback_rate as u32;
-                if ch.loop_enabled && ch.position >= ch.loop_end {
-                    ch.position = ch.loop_start;
-                } else if ch.position >= self.pcm_memory.len() as u32 {
-                    ch.active = false;
+            if ch.active && ch.delta > 0 {
+                ch.position += ch.delta as u32;
+                if ch.end_addr > 0 && ch.position >= ch.end_addr {
+                    if ch.loop_enabled {
+                        ch.position = ch.start_addr + ch.loop_start;
+                    } else {
+                        ch.active = false;
+                    }
                 }
             }
         }
@@ -169,6 +190,8 @@ impl SoundChipEmulator for SegaPCM {
             self.set_sample_rate(sample_rate);
         }
 
+        let mem_len = self.pcm_memory.len() as u32;
+
         for frame in buffer.chunks_mut(2) {
             self.accumulated_cycles += 1.0;
             while self.accumulated_cycles >= self.clock_divider {
@@ -176,35 +199,21 @@ impl SoundChipEmulator for SegaPCM {
                 self.accumulated_cycles -= self.clock_divider;
             }
 
-            let mut left = 0.0;
-            let mut right = 0.0;
+            let mut left = 0.0f32;
+            let mut right = 0.0f32;
 
             for ch in &self.channels {
-                if ch.active && ch.position < self.pcm_memory.len() as u32 {
+                if ch.active && ch.position < mem_len {
                     let sample_byte = self.pcm_memory[ch.position as usize];
                     let sample = ((sample_byte as i8) as f32) / 128.0;
 
-                    let volume = ch.volume as f32 / 255.0;
-                    let sample = sample * volume;
-
-                    let pan_left = if ch.pan < 8 {
-                        1.0
-                    } else {
-                        1.0 - ((ch.pan - 8) as f32 / 8.0)
-                    };
-                    let pan_right = if ch.pan > 8 {
-                        1.0
-                    } else {
-                        (ch.pan as f32 / 8.0)
-                    };
-
-                    left += sample * pan_left;
-                    right += sample * pan_right;
+                    left += sample * (ch.vol_left as f32 / 127.0);
+                    right += sample * (ch.vol_right as f32 / 127.0);
                 }
             }
 
-            frame[0] = (left / 16.0).clamp(-1.0, 1.0);
-            frame[1] = (right / 16.0).clamp(-1.0, 1.0);
+            frame[0] = (left / 8.0).clamp(-1.0, 1.0);
+            frame[1] = (right / 8.0).clamp(-1.0, 1.0);
         }
     }
 }
@@ -236,10 +245,25 @@ mod tests {
     }
 
     #[test]
-    fn test_segapcm_write() {
+    fn test_segapcm_write_port_channel_decode() {
         let mut chip = SegaPCM::new();
-        chip.write(0x00, 0x80);
-        assert!(chip.channels[0].active);
+        // Channel 0: set delta to 0x0100
+        chip.write_port(0x00, 0x04, 0x00); // ch0 delta_lo
+        chip.write_port(0x00, 0x05, 0x01); // ch0 delta_hi
+        assert_eq!(chip.channels[0].delta, 0x0100);
+
+        // Channel 1: set left vol
+        chip.write_port(0x00, 0x0E, 0x40); // ch1 (offset 8) vol_left = 0x40
+        assert_eq!(chip.channels[1].vol_left, 0x40);
+    }
+
+    #[test]
+    fn test_segapcm_write_port_loop_flag() {
+        let mut chip = SegaPCM::new();
+        // bit 7 of vol_right = loop enable
+        chip.write_port(0x00, 0x07, 0x80);
+        assert!(chip.channels[0].loop_enabled);
+        assert_eq!(chip.channels[0].vol_right, 0); // high bit stripped
     }
 
     #[test]
@@ -248,7 +272,7 @@ mod tests {
         assert_eq!(chip.name(), "SegaPCM");
 
         chip.reset();
-        chip.write(0x00, 0x80);
+        chip.write_port(0x00, 0x04, 0x01); // ch0 delta_lo
         chip.clock();
 
         let mut buffer = [0.0f32; 4];

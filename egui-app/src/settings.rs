@@ -6,9 +6,12 @@ pub struct Settings {
     pub theme: Theme,
     pub font_size: f32,
     pub default_format: String,
+    pub default_chip: String,
     pub auto_compile: bool,
     pub auto_compile_delay_ms: u64,
     pub recent_files: Vec<PathBuf>,
+    pub preferred_midi_input: Option<String>,
+    pub preferred_midi_output: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -23,9 +26,12 @@ impl Default for Settings {
             theme: Theme::Dark,
             font_size: 14.0,
             default_format: "vgm".to_string(),
+            default_chip: "auto".to_string(),
             auto_compile: true,
             auto_compile_delay_ms: 500,
             recent_files: Vec::new(),
+            preferred_midi_input: None,
+            preferred_midi_output: None,
         }
     }
 }

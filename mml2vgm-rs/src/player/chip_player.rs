@@ -65,6 +65,16 @@ impl ChipPlayer {
             SoundChip::SegaPCM => Box::new(crate::chips::segapcm::SegaPCM::new()),
             SoundChip::C140 => Box::new(crate::chips::c140::C140::new()),
             SoundChip::C352 => Box::new(crate::chips::c352::C352::new()),
+            SoundChip::AY8910 => Box::new(crate::chips::ay8910::AY8910::new()),
+            SoundChip::HuC6280 => Box::new(crate::chips::huc6280::HuC6280::new()),
+            SoundChip::YM2413 => Box::new(crate::chips::ym2413::YM2413::new()),
+            SoundChip::K051649 => Box::new(crate::chips::k051649::K051649::new()),
+            SoundChip::NES => Box::new(crate::chips::nes_apu::NesApu::new()),
+            SoundChip::POKEY => Box::new(crate::chips::pokey::Pokey::new()),
+            SoundChip::DMG => Box::new(crate::chips::dmg::Dmg::new()),
+            SoundChip::VRC6 => Box::new(crate::chips::vrc6::VRC6::new()),
+            SoundChip::K053260 => Box::new(crate::chips::k053260::K053260::new()),
+            SoundChip::K054539 => Box::new(crate::chips::k054539::K054539::new()),
             _ => {
                 return Err(MmlError::UnsupportedChip(
                     format!("Chip {:?} not yet implemented", chip),

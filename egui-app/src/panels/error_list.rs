@@ -11,7 +11,7 @@ pub fn show(ui: &mut Ui, errors: &[CompileError]) -> Option<usize> {
     }
 
     ScrollArea::vertical()
-        .id_source("error_list_scroll")
+        .id_salt("error_list_scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| {
             for err in errors {

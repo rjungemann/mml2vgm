@@ -4,7 +4,7 @@ use egui::{Response, ScrollArea, TextEdit, Ui};
 pub fn show(ui: &mut Ui, content: &mut String) -> bool {
     let mut changed = false;
     ScrollArea::both()
-        .id_source("editor_scroll")
+        .id_salt("editor_scroll")
         .auto_shrink([false, false])
         .show(ui, |ui| {
             let response: Response = ui.add(

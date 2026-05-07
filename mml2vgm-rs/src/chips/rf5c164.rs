@@ -179,6 +179,21 @@ impl SoundChipEmulator for RF5C164 {
         }
     }
 
+    fn write_port(&mut self, port: u8, addr: u8, data: u8) {
+        let addr16 = ((port as u16) << 8) | addr as u16;
+        match addr16 {
+            // PCM memory region: direct write to sample RAM
+            0x1000..=0xFFFF => {
+                let mem_addr = (addr16 - 0x1000) as usize;
+                if mem_addr < self.pcm_memory.len() {
+                    self.pcm_memory[mem_addr] = data;
+                }
+            }
+            // Control register region: delegate to write()
+            _ => self.write(addr, data),
+        }
+    }
+
     fn read(&self, addr: u8) -> u8 {
         // Return register cache
         self.regs[addr as usize]

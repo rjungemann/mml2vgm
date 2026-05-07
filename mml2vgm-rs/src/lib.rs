@@ -348,7 +348,17 @@ impl SoundChip {
             | SoundChip::YMF262
             | SoundChip::SegaPCM
             | SoundChip::C140
-            | SoundChip::C352 => SupportTier::Partial,
+            | SoundChip::C352
+            | SoundChip::AY8910
+            | SoundChip::HuC6280
+            | SoundChip::YM2413
+            | SoundChip::K051649
+            | SoundChip::NES
+            | SoundChip::POKEY
+            | SoundChip::DMG
+            | SoundChip::VRC6
+            | SoundChip::K053260
+            | SoundChip::K054539 => SupportTier::Partial,
             _ => SupportTier::Declared,
         }
     }
@@ -747,7 +757,7 @@ mod tests {
         assert_eq!(OutputFormat::XGM2.support_tier(), SupportTier::Partial);
         assert_eq!(SoundChip::YM2612.support_tier(), SupportTier::Full);
         assert_eq!(SoundChip::YM2608.support_tier(), SupportTier::Partial);
-        assert_eq!(SoundChip::AY8910.support_tier(), SupportTier::Declared);
+        assert_eq!(SoundChip::AY8910.support_tier(), SupportTier::Partial);
     }
 
     #[test]

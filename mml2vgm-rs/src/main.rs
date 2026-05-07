@@ -11,6 +11,7 @@ use mml2vgm::{
     CompileInfo, CompileOptions, CompileResult, MmlResult, OutputFormat, SoundChip,
     compiler::compiler::MmlCompiler,
     player::VgmPlayer,
+    utils::wav::write_wav,
 };
 
 /// mml2vgm-rs: MML to VGM/XGM/ZGM compiler and player
@@ -33,9 +34,13 @@ struct Args {
     #[arg(short, long, value_enum, default_value = "vgm")]
     format: FormatArg,
 
-    /// Play the output file after compilation
+    /// Play the output file after compilation (or play a .vgm file directly)
     #[arg(short, long)]
     play: bool,
+
+    /// Export rendered audio to a WAV file (can be combined with --play)
+    #[arg(short = 'w', long = "export-wav")]
+    export_wav: Option<PathBuf>,
 
     /// Show verbose output
     #[arg(short, long)]
@@ -200,6 +205,55 @@ fn determine_output_path(input: Option<&PathBuf>, output: Option<&PathBuf>, form
     Ok(PathBuf::from("-"))
 }
 
+/// Render VGM data to samples, optionally export WAV and/or play via rodio.
+fn render_and_play(vgm_data: &[u8], play: bool, export_wav: Option<&PathBuf>) {
+    let sample_rate = 44100u32;
+    let mut player = VgmPlayer::new();
+    if let Err(e) = player.load(vgm_data) {
+        error!("Failed to load VGM for playback: {}", e);
+        process::exit(1);
+    }
+    player.init_chips_from_header();
+    let samples = match player.render_to_pcm(sample_rate) {
+        Ok(s) => s,
+        Err(e) => { error!("Failed to render audio: {}", e); process::exit(1); }
+    };
+    if samples.is_empty() {
+        warn!("No audio samples generated — check MML content and chip driver.");
+        return;
+    }
+    if let Some(wav_path) = export_wav {
+        match write_wav(wav_path, &samples, sample_rate) {
+            Ok(()) => println!("WAV exported to: {}", wav_path.display()),
+            Err(e) => { error!("WAV export failed: {}", e); process::exit(1); }
+        }
+    }
+    if play {
+        match rodio::OutputStream::try_default() {
+            Ok((_stream, handle)) => {
+                match rodio::Sink::try_new(&handle) {
+                    Ok(sink) => {
+                        sink.append(rodio::buffer::SamplesBuffer::new(2, sample_rate, samples));
+                        println!("Playing... (Ctrl+C to stop)");
+                        sink.sleep_until_end();
+                        println!("Playback complete.");
+                    }
+                    Err(e) => { error!("Audio sink error: {}", e); process::exit(1); }
+                }
+            }
+            Err(e) => { error!("No audio output device: {}", e); process::exit(1); }
+        }
+    }
+}
+
+/// Returns true if the path looks like a pre-compiled VGM/XGM/ZGM file.
+fn is_compiled_audio_file(path: &Path) -> bool {
+    match path.extension().and_then(|e| e.to_str()).map(str::to_lowercase).as_deref() {
+        Some("vgm" | "xgm" | "xgm2" | "zgm" | "vgz") => true,
+        _ => false,
+    }
+}
+
 /// Print compilation statistics
 fn print_stats(info: &CompileInfo) {
     println!();
@@ -330,23 +384,29 @@ fn main() {
             process::exit(1);
         }
         debug!("Input file exists: {}", input.display());
+
+        // If the input is a pre-compiled VGM/XGM/ZGM file, skip compilation.
+        if is_compiled_audio_file(input) {
+            if !args.play && args.export_wav.is_none() {
+                error!("Input is a compiled audio file. Use --play or --export-wav.");
+                process::exit(1);
+            }
+            let vgm_data = match std::fs::read(input) {
+                Ok(d) => d,
+                Err(e) => { error!("Failed to read file: {}", e); process::exit(1); }
+            };
+            render_and_play(&vgm_data, args.play, args.export_wav.as_ref());
+            process::exit(0);
+        }
     }
 
     // Handle validation or compilation
     if args.check {
-        // Validate only, don't generate output
         match run_validate(&args) {
-            Ok(()) => {
-                info!("Validation successful");
-                process::exit(0);
-            }
-            Err(e) => {
-                error!("Validation error: {}", e);
-                process::exit(1);
-            }
+            Ok(()) => { info!("Validation successful"); process::exit(0); }
+            Err(e) => { error!("Validation error: {}", e); process::exit(1); }
         }
     } else {
-        // Run full compilation
         match run_compile(&args) {
             Ok(result) => {
                 info!("Compilation successful");
@@ -354,61 +414,14 @@ fn main() {
                 if !result.warnings.is_empty() {
                     warn!("Compilation completed with {} warnings", result.warnings.len());
                     for warning in &result.warnings {
-                        warn!(
-                            "Warning at {}: {}",
-                            warning.position,
-                            warning.message
-                        );
+                        warn!("Warning at {}: {}", warning.position, warning.message);
                     }
                 }
 
-                // Print statistics
                 print_stats(&result.info);
 
-                // Play if requested
-                if args.play && !result.data.is_empty() {
-                    info!("Playing output...");
-                    let mut player = VgmPlayer::new();
-                    if let Err(e) = player.load(&result.data) {
-                        error!("Failed to load VGM for playback: {}", e);
-                        process::exit(1);
-                    }
-                    player.init_chips_from_header();
-                    let sample_rate = 44100u32;
-                    let samples = match player.render_to_pcm(sample_rate) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("Failed to render audio: {}", e);
-                            process::exit(1);
-                        }
-                    };
-                    if samples.is_empty() {
-                        warn!("No audio samples generated — check MML content and chip driver.");
-                    } else {
-                        match rodio::OutputStream::try_default() {
-                            Ok((_stream, handle)) => {
-                                match rodio::Sink::try_new(&handle) {
-                                    Ok(sink) => {
-                                        let source = rodio::buffer::SamplesBuffer::new(
-                                            2, sample_rate, samples,
-                                        );
-                                        sink.append(source);
-                                        println!("Playing... (Ctrl+C to stop)");
-                                        sink.sleep_until_end();
-                                        println!("Playback complete.");
-                                    }
-                                    Err(e) => {
-                                        error!("Audio sink error: {}", e);
-                                        process::exit(1);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                error!("No audio output device: {}", e);
-                                process::exit(1);
-                            }
-                        }
-                    }
+                if (args.play || args.export_wav.is_some()) && !result.data.is_empty() {
+                    render_and_play(&result.data, args.play, args.export_wav.as_ref());
                 }
 
                 process::exit(0);

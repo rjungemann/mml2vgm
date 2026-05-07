@@ -16,7 +16,8 @@ The project consists of three main components:
 |-----------|--------|-------------|
 | **[Browser IDE](browser-ide/)** | ✅ Complete | Web-based IDE with Monaco Editor, WASM compilation |
 | **[Rust CLI](mml2vgm-rs/)** | 🚧 Active Development | Cross-platform CLI compiler in Rust |
-| **[Tauri Desktop](tauri-app/)** | ✅ Ready | Native desktop app wrapper |
+| **[egui Desktop](egui-app/)** | ✅ Active | Native Rust desktop IDE (egui + rodio + midir) |
+| **[Tauri Desktop](tauri-app/)** | ⚠️ Deprecated | Replaced by egui-app; retained until egui smoke tests pass |
 
 ---
 
@@ -52,9 +53,27 @@ npm run dev
 
 Then open `http://localhost:5173` in your browser.
 
-### Option 2: Tauri Desktop App
+### Option 2: egui Desktop App (Recommended)
 
-For a native desktop experience:
+For a fully native desktop experience (no Node.js or WASM required):
+
+```bash
+cd egui-app
+cargo run
+```
+
+Or via Justfile:
+
+```bash
+just egui-dev
+```
+
+Requires: Rust 1.70+
+
+### Option 3 (Deprecated): Tauri Desktop App
+
+> **Note:** The Tauri desktop app is deprecated and will be removed once the egui app
+> passes smoke tests. Use `egui-app` instead.
 
 ```bash
 cd tauri-app
@@ -120,7 +139,19 @@ mml2vgm/
 │   ├── src/lib.rs                # WASM export of mml2vgm-rs
 │   └── pkg/                       # Compiled WASM output
 │
-├── tauri-app/                    # Desktop application (Tauri)
+├── egui-app/                     # Native desktop IDE (egui + rodio + midir)
+│   ├── src/                      # Rust source code
+│   │   ├── main.rs               # Entry point (CLI flags, headless mode)
+│   │   ├── app.rs                # MmlApp (eframe::App)
+│   │   ├── compiler.rs           # Wraps mml2vgm-rs compile API
+│   │   ├── audio.rs              # AudioEngine (rodio)
+│   │   ├── midi.rs               # MidiManager (midir)
+│   │   ├── socket.rs             # TCP socket interface (--socket flag)
+│   │   └── panels/               # UI panels
+│   └── Cargo.toml                # Dependencies
+│
+├── tauri-app/                    # ⚠️ DEPRECATED — Desktop application (Tauri)
+│   │                             #   Replaced by egui-app; will be removed
 │   ├── src/                      # Frontend (loads browser-ide)
 │   ├── src-tauri/                # Rust backend
 │   │   └── src/main.rs           # Tauri entry point

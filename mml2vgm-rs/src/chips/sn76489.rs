@@ -259,76 +259,63 @@ impl SoundChipEmulator for SN76489 {
         *self = Self::with_clock_rate(self.clock_rate);
     }
 
-    fn write(&mut self, addr: u8, data: u8) {
-        // SN76489 register format:
-        // The SN76489 uses a simple register scheme:
-        // - 0x80: Channel 0 tone (first 6 bits, then next write is low 4 bits)
-        // - 0x81: Channel 0 volume
-        // - 0x82: Channel 1 tone
-        // - 0x83: Channel 1 volume
-        // - 0x84: Channel 2 tone
-        // - 0x85: Channel 2 volume
-        // - 0x86: Channel 3 noise period
-        // - 0x87: Channel 3 volume
-        // - 0x88-0x8F: Noise control
-        
-        // Check if this is a data register (bit 7 must be 1)
-        if (addr & 0x80) == 0 {
-            return;
-        }
+    fn write(&mut self, addr: u8, _data: u8) {
+        // SN76489 uses a single-byte serial interface.
+        // `addr` carries the SN76489 byte directly (as VGM opcode 0x50 passes it).
+        //
+        // Latch byte (bit 7 = 1):  1 CC T DDDD
+        //   CC   = channel (00=ch0, 01=ch1, 10=ch2, 11=noise)
+        //   T    = type (0=tone/freq, 1=attenuation/volume)
+        //   DDDD = low 4 bits of data
+        //
+        // Data byte (bit 7 = 0):  0 X HHHHHH
+        //   HHHHHH = high 6 bits of frequency for the last-latched channel
+        let byte = addr;
 
-        let lower_addr = addr & 0x7F;
-        let data_4bit = data & 0x0F;
+        if (byte & 0x80) != 0 {
+            // Latch byte
+            let channel = ((byte >> 5) & 0x03) as usize;
+            let is_volume = (byte & 0x10) != 0;
+            let data4 = byte & 0x0F;
+            self.last_register = byte; // remember for subsequent data byte
 
-        match lower_addr {
-            // Tone channels (0-2)
-            0x00 | 0x02 | 0x04 => {
-                // Tone frequency register (0x80, 0x82, 0x84)
-                let channel = (lower_addr / 2) as usize;
-                if self.last_register == addr {
-                    // Second write: low 4 bits
-                    self.channels[channel].tone_divider =
-                        (self.channels[channel].tone_divider & 0xFF0) | data_4bit as u16;
+            if is_volume {
+                if channel < 3 {
+                    self.channels[channel].volume = data4;
                 } else {
-                    // First write: high 6 bits
-                    self.channels[channel].tone_divider =
-                        ((data & 0x3F) as u16) << 4;
+                    self.noise_channel.volume = data4;
                 }
-                self.last_register = addr;
-            }
-            0x01 | 0x03 | 0x05 => {
-                // Volume register (0x81, 0x83, 0x85)
-                let channel = (lower_addr / 2) as usize;
-                self.channels[channel].volume = data_4bit;
-            }
-            
-            // Channel 3 (noise)
-            0x06 => {
-                // Noise period
-                self.noise_period = data_4bit;
-                self.noise_channel.tone_divider = (data_4bit as u16) << 4;
-            }
-            0x07 => {
-                // Noise volume
-                self.noise_channel.volume = data_4bit;
-            }
-            
-            // Noise control (0x88-0x8F, lower_addr = 0x08-0x0F)
-            0x08..=0x0F => {
-                // Noise mode/feedback
-                self.noise_mode = if (data & 0x04) != 0 {
+            } else if channel < 3 {
+                // Update low 4 bits of tone divider, preserve high bits
+                self.channels[channel].tone_divider =
+                    (self.channels[channel].tone_divider & 0x3F0) | data4 as u16;
+            } else {
+                // Noise control: bit 2 = white/periodic, bits 1:0 = period select
+                self.noise_mode = if (data4 & 0x04) != 0 {
                     NoiseMode::White
                 } else {
                     NoiseMode::Periodic
                 };
-                self.noise_feedback = match data & 0x03 {
-                    0 => 0x4000,
-                    1 => 0x2000,
-                    2 => 0x1000,
-                    _ => 0x8000,
+                self.noise_period = data4 & 0x03;
+                self.noise_channel.tone_divider = match self.noise_period {
+                    0 => 16,
+                    1 => 32,
+                    2 => 64,
+                    _ => self.channels[2].tone_divider, // follow ch2
                 };
+                self.noise_feedback = if (data4 & 0x04) != 0 { 0x8000 } else { 0x4000 };
             }
-            _ => {}
+        } else {
+            // Data byte: high 6 bits of frequency for the last-latched tone channel
+            let last = self.last_register;
+            let channel = ((last >> 5) & 0x03) as usize;
+            let is_volume = (last & 0x10) != 0;
+            if !is_volume && channel < 3 {
+                let data6 = (byte & 0x3F) as u16;
+                // Preserve low 4 bits, set high 6 bits
+                self.channels[channel].tone_divider =
+                    (data6 << 4) | (self.channels[channel].tone_divider & 0x0F);
+            }
         }
     }
 
@@ -398,7 +385,8 @@ mod tests {
     #[test]
     fn test_sn76489_reset() {
         let mut chip = SN76489::new();
-        chip.write(0x80, 0x10); // Write to channel 0 tone
+        // Latch byte: ch0 tone, data=0 → 1_00_0_0000 = 0x80
+        chip.write(0x80, 0);
         chip.reset();
         assert_eq!(chip.channels[0].tone_divider, 0);
     }
@@ -406,22 +394,19 @@ mod tests {
     #[test]
     fn test_sn76489_write_tone() {
         let mut chip = SN76489::new();
-        // The SN76489 uses a latch system
-        // First write to 0x80: high 6 bits of tone divider (bits 0-5 of data)
-        // Second write to 0x80: low 4 bits of tone divider (bits 0-3 of data)
-        // Result: (data1 & 0x3F) << 4 | (data2 & 0x0F)
-        chip.write(0x80, 0x01); // First write: high 6 bits = 0x01, tone = 0x010
-        chip.write(0x80, 0x02); // Second write: low 4 bits = 0x02, tone = 0x010 | 0x02 = 0x012
+        // Tone divider target: 0x012 = low4=0x2, high6=0x1
+        // Latch byte: ch0 tone, low4=2 → 1_00_0_0010 = 0x82
+        chip.write(0x82, 0);
+        // Data byte: high6=1 → 0_X_000001 = 0x01
+        chip.write(0x01, 0);
         assert_eq!(chip.channels[0].tone_divider, 0x012);
     }
 
     #[test]
     fn test_sn76489_write_volume() {
         let mut chip = SN76489::new();
-        // SN76489 uses latch-based addressing
-        // First write to 0x81 selects channel 0 volume register
-        // But our simplified implementation expects 0x81 to write directly
-        chip.write(0x81, 0x0A); // Channel 0 volume register, data = 0x0A, low 4 bits = 0x0A
+        // Latch byte: ch0 volume, data=0x0A → 1_00_1_1010 = 0x9A
+        chip.write(0x9A, 0);
         assert_eq!(chip.channels[0].volume, 0x0A);
     }
 
@@ -462,7 +447,7 @@ mod tests {
         assert_eq!(chip.clock_rate(), 3_579_545);
         
         chip.reset();
-        chip.write(0x80, 0x01);
+        chip.write(0x82, 0); // ch0 tone latch, low4=2
         chip.clock();
         
         let mut buffer = [0.0f32; 2];

@@ -3,6 +3,16 @@
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
+const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+
+/// OPN operator-address offset → (channel_within_bank, operator_index)
+fn opn_ch_op(offset: u8) -> Option<(usize, usize)> {
+    let ch = (offset % 4) as usize;
+    let op = (offset / 4) as usize;
+    if ch > 2 || op > 3 { return None; }
+    Some((ch, op))
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct SsgChannel {
     frequency: u16,
@@ -10,18 +20,40 @@ struct SsgChannel {
     phase: u32,
 }
 
+/// FM operator for OPN 4-operator synthesis
+#[derive(Debug, Clone, Copy)]
+struct FmOperator {
+    phase_acc: f32,
+    total_level: u8,
+    mult: u8,
+    key_on: bool,
+}
+
+impl Default for FmOperator {
+    fn default() -> Self {
+        Self { phase_acc: 0.0, total_level: 0, mult: 1, key_on: false }
+    }
+}
+
+/// FM channel — 4-operator OPN
 #[derive(Debug, Clone, Copy)]
 struct FmChannel {
-    frequency: u16,
-    octave: u8,
-    output_level: u8,
-    key_on: bool,
-    output_phase: u32,
+    operators: [FmOperator; 4],
+    f_num: u16,
+    block: u8,
+    algorithm: u8,
+    feedback: u8,
+    left_enable: bool,
+    right_enable: bool,
 }
 
 impl Default for FmChannel {
     fn default() -> Self {
-        Self { frequency: 0, octave: 0, output_level: 0, key_on: false, output_phase: 0 }
+        Self {
+            operators: [FmOperator::default(); 4],
+            f_num: 0, block: 0, algorithm: 0, feedback: 0,
+            left_enable: true, right_enable: true,
+        }
     }
 }
 
@@ -61,6 +93,7 @@ pub struct YM2608 {
     sample_rate: u32,
     regs: [u8; 0x400],
     fm_channels: [FmChannel; 6],
+    fm_op_feedback: [f32; 6],
     ssg_channels: [SsgChannel; 3],
     adpcm_a_channels: [AdpcmAChannel; 6],
     adpcm_a_master_vol: u8,
@@ -79,6 +112,7 @@ impl YM2608 {
             sample_rate: 44100,
             regs: [0; 0x400],
             fm_channels: [FmChannel::default(); 6],
+            fm_op_feedback: [0.0; 6],
             ssg_channels: [SsgChannel::default(); 3],
             adpcm_a_channels: [AdpcmAChannel::default(); 6],
             adpcm_a_master_vol: 63,
@@ -89,21 +123,67 @@ impl YM2608 {
         }
     }
 
-    fn get_fm_output(&self) -> (f32, f32) {
-        let mut left = 0.0f32;
-        let mut right = 0.0f32;
-        for ch in &self.fm_channels {
-            if ch.key_on && ch.frequency > 0 {
-                let shift = 21u32.saturating_sub(ch.octave.min(7) as u32);
-                let denom = 144.0 * (1u64 << shift) as f32;
-                let freq_hz = (ch.frequency as f32 * self.clock_rate as f32) / denom;
-                let phase = (ch.output_phase as f32 * freq_hz * 2.0 * PI) / self.clock_rate as f32;
-                let sample = phase.sin() * (1.0 - ch.output_level as f32 / 127.0) * 0.15;
-                left += sample;
-                right += sample;
+    fn channel_freq_hz(&self, ch: usize) -> f32 {
+        let f_num = self.fm_channels[ch].f_num as f32;
+        let block = self.fm_channels[ch].block as i32;
+        f_num * 2_f32.powi(block - 1) * self.clock_rate as f32 / (144.0 * (1u32 << 19) as f32)
+    }
+
+    fn advance_fm_phases(&mut self, sample_rate: u32) {
+        for ch in 0..6 {
+            let base_freq = self.channel_freq_hz(ch);
+            for op in 0..4 {
+                if !self.fm_channels[ch].operators[op].key_on { continue; }
+                let mult = FREQ_MULT[self.fm_channels[ch].operators[op].mult as usize & 0xF];
+                let inc = base_freq * mult * 2.0 * PI / sample_rate as f32;
+                self.fm_channels[ch].operators[op].phase_acc += inc;
+                if self.fm_channels[ch].operators[op].phase_acc > 2.0 * PI {
+                    self.fm_channels[ch].operators[op].phase_acc -= 2.0 * PI;
+                }
             }
         }
+    }
+
+    fn op_out(&self, ch: usize, op: usize, mod_in: f32) -> f32 {
+        if !self.fm_channels[ch].operators[op].key_on { return 0.0; }
+        let tl = 1.0 - self.fm_channels[ch].operators[op].total_level as f32 / 127.0;
+        (self.fm_channels[ch].operators[op].phase_acc + mod_in).sin() * tl
+    }
+
+    fn get_fm_channel_output(&mut self, ch: usize) -> (f32, f32) {
+        let any_on = self.fm_channels[ch].operators.iter().any(|op| op.key_on);
+        if !any_on { return (0.0, 0.0); }
+
+        let fb = self.fm_op_feedback[ch] * (self.fm_channels[ch].feedback as f32 / 7.0) * 0.25;
+        let m1 = self.op_out(ch, 0, fb);
+        self.fm_op_feedback[ch] = m1;
+
+        let output = match self.fm_channels[ch].algorithm {
+            0 => { let m2 = self.op_out(ch, 1, m1 * PI); let c1 = self.op_out(ch, 2, m2 * PI); self.op_out(ch, 3, c1 * PI) }
+            1 => { let m2 = self.op_out(ch, 1, 0.0); let c1 = self.op_out(ch, 2, (m1 + m2) * PI * 0.5); self.op_out(ch, 3, c1 * PI) }
+            2 => { let m2 = self.op_out(ch, 1, 0.0); let c1 = self.op_out(ch, 2, m2 * PI); self.op_out(ch, 3, (m1 + c1) * PI * 0.5) }
+            3 => { let m2 = self.op_out(ch, 1, m1 * PI); let c1 = self.op_out(ch, 2, m2 * PI); self.op_out(ch, 3, (m2 + c1) * PI * 0.5) }
+            4 => { let m2 = self.op_out(ch, 1, m1 * PI); let c1 = self.op_out(ch, 2, 0.0); (m2 + self.op_out(ch, 3, c1 * PI)) * 0.5 }
+            5 => { let m2 = self.op_out(ch, 1, m1 * PI); let c1 = self.op_out(ch, 2, m1 * PI); let c2 = self.op_out(ch, 3, m1 * PI); (m2 + c1 + c2) / 3.0 }
+            6 => { let m2 = self.op_out(ch, 1, m1 * PI); let c1 = self.op_out(ch, 2, 0.0); let c2 = self.op_out(ch, 3, 0.0); (m2 + c1 + c2) / 3.0 }
+            _ => { let m2 = self.op_out(ch, 1, 0.0); let c1 = self.op_out(ch, 2, 0.0); let c2 = self.op_out(ch, 3, 0.0); (m1 + m2 + c1 + c2) * 0.25 }
+        };
+
+        let sample = (output * 0.2).clamp(-1.0, 1.0);
+        let left = if self.fm_channels[ch].left_enable { sample } else { 0.0 };
+        let right = if self.fm_channels[ch].right_enable { sample } else { 0.0 };
         (left, right)
+    }
+
+    fn get_fm_output(&mut self) -> (f32, f32) {
+        let mut left = 0.0f32;
+        let mut right = 0.0f32;
+        for ch in 0..6 {
+            let (l, r) = self.get_fm_channel_output(ch);
+            left += l;
+            right += r;
+        }
+        (left / 6.0, right / 6.0)
     }
 
     fn get_ssg_output(&self) -> (f32, f32) {
@@ -203,44 +283,39 @@ impl YM2608 {
     }
 
     fn apply_register(&mut self, port: u8, addr: u8, data: u8) {
+        let ch_base = if port == 0 { 0usize } else { 3usize };
+
         if port == 0 {
             match addr {
+                // Key on/off (global: port 0 only)
                 0x28 => {
                     let ch_sel = (data & 0x03) as usize;
-                    let port_bit = ((data >> 2) & 0x01) as usize;
-                    let ch = ch_sel + port_bit * 3;
-                    if ch < 6 { self.fm_channels[ch].key_on = (data >> 4) != 0; }
+                    let part = ((data >> 2) & 0x01) as usize;
+                    let ch = ch_sel + part * 3;
+                    if ch < 6 {
+                        let prev_any = self.fm_channels[ch].operators.iter().any(|op| op.key_on);
+                        self.fm_channels[ch].operators[0].key_on = (data & 0x10) != 0;
+                        self.fm_channels[ch].operators[1].key_on = (data & 0x20) != 0;
+                        self.fm_channels[ch].operators[2].key_on = (data & 0x40) != 0;
+                        self.fm_channels[ch].operators[3].key_on = (data & 0x80) != 0;
+                        let new_any = self.fm_channels[ch].operators.iter().any(|op| op.key_on);
+                        if !prev_any && new_any {
+                            for op in &mut self.fm_channels[ch].operators { op.phase_acc = 0.0; }
+                            self.fm_op_feedback[ch] = 0.0;
+                        }
+                    }
                 }
-                0xA0 | 0xA1 | 0xA2 => {
-                    let ch = (addr - 0xA0) as usize;
-                    let hi = self.regs[(0xA4 + (addr - 0xA0)) as usize];
-                    let block = (hi >> 3) & 0x07;
-                    let fnumber = ((hi & 0x07) as u16) << 8 | data as u16;
-                    if ch < 6 { self.fm_channels[ch].frequency = fnumber; self.fm_channels[ch].octave = block; }
-                }
-                0xA4 | 0xA5 | 0xA6 => {
-                    let ch = (addr - 0xA4) as usize;
-                    let block = (data >> 3) & 0x07;
-                    let lo = self.regs[(0xA0 + (addr - 0xA4)) as usize];
-                    let fnumber = ((data & 0x07) as u16) << 8 | lo as u16;
-                    if ch < 6 { self.fm_channels[ch].frequency = fnumber; self.fm_channels[ch].octave = block; }
-                }
-                0x40..=0x4E => {
-                    let ch = (addr - 0x40) as usize % 3;
-                    if ch < 6 { self.fm_channels[ch].output_level = data & 0x7F; }
-                }
-                0x00 | 0x02 | 0x04 => {
-                    let ch = (addr / 2) as usize;
-                    if ch < 3 { self.ssg_channels[ch].frequency = (self.ssg_channels[ch].frequency & 0xFF00) | data as u16; }
-                }
-                0x01 | 0x03 | 0x05 => {
-                    let ch = (addr / 2) as usize;
-                    if ch < 3 { self.ssg_channels[ch].frequency = (self.ssg_channels[ch].frequency & 0x00FF) | (((data & 0x0F) as u16) << 8); }
-                }
-                0x08 | 0x09 | 0x0A => {
-                    let ch = (addr - 0x08) as usize;
-                    if ch < 3 { self.ssg_channels[ch].volume = data & 0x1F; }
-                }
+                // SSG registers
+                0x00 => self.ssg_channels[0].frequency = (self.ssg_channels[0].frequency & 0xF00) | data as u16,
+                0x01 => self.ssg_channels[0].frequency = (self.ssg_channels[0].frequency & 0x0FF) | ((data as u16 & 0x0F) << 8),
+                0x02 => self.ssg_channels[1].frequency = (self.ssg_channels[1].frequency & 0xF00) | data as u16,
+                0x03 => self.ssg_channels[1].frequency = (self.ssg_channels[1].frequency & 0x0FF) | ((data as u16 & 0x0F) << 8),
+                0x04 => self.ssg_channels[2].frequency = (self.ssg_channels[2].frequency & 0xF00) | data as u16,
+                0x05 => self.ssg_channels[2].frequency = (self.ssg_channels[2].frequency & 0x0FF) | ((data as u16 & 0x0F) << 8),
+                0x08 => self.ssg_channels[0].volume = data & 0x1F,
+                0x09 => self.ssg_channels[1].volume = data & 0x1F,
+                0x0A => self.ssg_channels[2].volume = data & 0x1F,
+                // ADPCM-A
                 0x10 => {
                     let key_on = (data & 0x80) == 0;
                     for (i, ch) in self.adpcm_a_channels.iter_mut().enumerate() {
@@ -259,7 +334,8 @@ impl YM2608 {
                         self.adpcm_a_channels[ch].pan_right = (data & 0x40) != 0;
                     }
                 }
-                _ => {}
+                // FM operator registers (port 0 → ch_base=0)
+                _ => { self.apply_fm_register(ch_base, addr, data); }
             }
         } else {
             match addr {
@@ -309,24 +385,44 @@ impl YM2608 {
                     self.adpcm_a_channels[ch].end_addr =
                         (self.adpcm_a_channels[ch].end_addr & 0x00FF) | ((data as u32) << 8);
                 }
-                0xA0 | 0xA1 | 0xA2 => {
-                    let ch = (addr - 0xA0) as usize + 3;
-                    let hi_idx = 0x100 + (0xA4 + (addr - 0xA0)) as usize;
-                    let hi = if hi_idx < self.regs.len() { self.regs[hi_idx] } else { 0 };
-                    let block = (hi >> 3) & 0x07;
-                    let fnumber = ((hi & 0x07) as u16) << 8 | data as u16;
-                    if ch < 6 { self.fm_channels[ch].frequency = fnumber; self.fm_channels[ch].octave = block; }
-                }
-                0xA4 | 0xA5 | 0xA6 => {
-                    let ch = (addr - 0xA4) as usize + 3;
-                    let block = (data >> 3) & 0x07;
-                    let lo_idx = 0x100 + (0xA0 + (addr - 0xA4)) as usize;
-                    let lo = if lo_idx < self.regs.len() { self.regs[lo_idx] } else { 0 };
-                    let fnumber = ((data & 0x07) as u16) << 8 | lo as u16;
-                    if ch < 6 { self.fm_channels[ch].frequency = fnumber; self.fm_channels[ch].octave = block; }
-                }
-                _ => {}
+                // Port 1 FM registers (ch_base=3)
+                _ => { self.apply_fm_register(ch_base, addr, data); }
             }
+        }
+    }
+
+    fn apply_fm_register(&mut self, ch_base: usize, addr: u8, data: u8) {
+        match addr {
+            // Operator DT1/MULT
+            0x30..=0x3F => { if let Some((ch, op)) = opn_ch_op(addr - 0x30) { let c = ch_base + ch; if c < 6 { self.fm_channels[c].operators[op].mult = data & 0x0F; } } }
+            // Operator Total Level
+            0x40..=0x4F => { if let Some((ch, op)) = opn_ch_op(addr - 0x40) { let c = ch_base + ch; if c < 6 { self.fm_channels[c].operators[op].total_level = data & 0x7F; } } }
+            // Operator AR/DR/SR/SL/RR/SSG-EG — stored in reg cache only
+            0x50..=0x9F => {}
+            // Channel F-number lo
+            0xA0..=0xA2 => {
+                let ch = ch_base + (addr - 0xA0) as usize;
+                if ch < 6 { self.fm_channels[ch].f_num = (self.fm_channels[ch].f_num & 0x700) | data as u16; }
+            }
+            // Channel Block/F-number hi
+            0xA4..=0xA6 => {
+                let ch = ch_base + (addr - 0xA4) as usize;
+                if ch < 6 {
+                    self.fm_channels[ch].block = (data >> 3) & 0x07;
+                    self.fm_channels[ch].f_num = (self.fm_channels[ch].f_num & 0x0FF) | (((data as u16) & 0x07) << 8);
+                }
+            }
+            // Channel Algorithm/Feedback
+            0xB0..=0xB2 => {
+                let ch = ch_base + (addr - 0xB0) as usize;
+                if ch < 6 { self.fm_channels[ch].algorithm = data & 0x07; self.fm_channels[ch].feedback = (data >> 3) & 0x07; }
+            }
+            // Channel L/R
+            0xB4..=0xB6 => {
+                let ch = ch_base + (addr - 0xB4) as usize;
+                if ch < 6 { self.fm_channels[ch].left_enable = (data & 0x80) != 0; self.fm_channels[ch].right_enable = (data & 0x40) != 0; }
+            }
+            _ => {}
         }
     }
 }
@@ -359,9 +455,6 @@ impl SoundChipEmulator for YM2608 {
     }
 
     fn clock(&mut self) {
-        for ch in &mut self.fm_channels {
-            if ch.key_on { ch.output_phase = ch.output_phase.wrapping_add(1); }
-        }
         for ch in &mut self.ssg_channels {
             ch.phase = ch.phase.wrapping_add(1);
         }
@@ -385,6 +478,7 @@ impl SoundChipEmulator for YM2608 {
                 self.clock();
                 self.accumulated_cycles -= 1.0;
             }
+            self.advance_fm_phases(sample_rate);
             let (fm_left, fm_right) = self.get_fm_output();
             let (ssg_left, ssg_right) = self.get_ssg_output();
             let (adpcm_a_left, adpcm_a_right) = self.get_adpcm_a_output();

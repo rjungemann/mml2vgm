@@ -127,6 +127,20 @@ pub struct VgmHeader {
     pub ym2151_clock: u32,
     /// Data offset
     pub data_offset: u32,
+    /// YM2203 clock rate (VGM header offset 0x40)
+    pub ym2203_clock: u32,
+    /// YM2608 clock rate (VGM header offset 0x44)
+    pub ym2608_clock: u32,
+    /// YM2610/YM2610B clock rate (VGM header offset 0x48)
+    pub ym2610b_clock: u32,
+    /// YM3812 clock rate (VGM header offset 0x4C)
+    pub ym3812_clock: u32,
+    /// YM3526 clock rate (VGM header offset 0x50)
+    pub ym3526_clock: u32,
+    /// Y8950 clock rate (VGM header offset 0x54)
+    pub y8950_clock: u32,
+    /// YMF262 clock rate (VGM header offset 0x58)
+    pub ymf262_clock: u32,
 }
 
 impl Default for VgmHeader {
@@ -147,6 +161,13 @@ impl Default for VgmHeader {
             ym2612_clock: 7_670_453,
             ym2151_clock: 3_579_545,
             data_offset: 0,
+            ym2203_clock: 0,
+            ym2608_clock: 0,
+            ym2610b_clock: 0,
+            ym3812_clock: 0,
+            ym3526_clock: 0,
+            y8950_clock: 0,
+            ymf262_clock: 0,
         }
     }
 }

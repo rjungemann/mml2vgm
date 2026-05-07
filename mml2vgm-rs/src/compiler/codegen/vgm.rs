@@ -16,13 +16,16 @@ pub enum VgmCommandType {
     Ym2612WritePort0 = 0x52,
     Ym2612WritePort1 = 0x53,
     Ym2151Write = 0x54,
-    Ym2608WritePort0 = 0x55,
-    Ym2608WritePort1 = 0x56,
-    Ym2610WritePort0 = 0x57,
-    Ym2610WritePort1 = 0x58,
+    Ym2203Write = 0x55,
+    Ym2608WritePort0 = 0x56,
+    Ym2608WritePort1 = 0x57,
+    Ym2610WritePort0 = 0x58,
+    Ym2610WritePort1 = 0x59,
     Ym3812Write = 0x5A,
-    Ymf262WritePort0 = 0x5B,
-    Ymf262WritePort1 = 0x5C,
+    Ym3526Write = 0x5B,
+    Y8950Write = 0x5C,
+    Ymf262WritePort0 = 0x5E,
+    Ymf262WritePort1 = 0x5F,
     Rf5c164Write = 0x68,
     Wait = 0x61,
     Wait1 = 0x62,
@@ -84,10 +87,14 @@ impl Default for Gd3Tag {
 struct PartCodegenState {
     /// Chip name for this part (e.g. "YM2612", "SN76489")
     chip: Option<String>,
-    /// YM2612 port (0 = channels 0-2, 1 = channels 3-5)
+    /// YM2612/YM2608 port (0 = channels 0-2, 1 = channels 3-5)
     ym2612_port: u8,
-    /// YM2612 channel within the port (0-2)
+    /// YM2612/YM2608/YM2203 channel within the port (0-2)
     ym2612_ch: u8,
+    /// OPL channel (0-8 for YM3812/YM3526/Y8950, 0-17 for YMF262)
+    opl_ch: u8,
+    /// OPM channel (0-7 for YM2151)
+    opm_ch: u8,
     /// Tempo in BPM
     tempo: u32,
     /// Current octave (0-8)
@@ -98,7 +105,7 @@ struct PartCodegenState {
     volume: u8,
     /// Selected FM instrument number
     instrument_num: Option<u32>,
-    /// Whether this part has a real hardware channel assigned (false for parts beyond 6 YM2612 channels)
+    /// Whether this part has a real hardware channel assigned (false for parts beyond max channels)
     has_channel: bool,
     /// Whether the F-type operator registers (DT/ML, KS/AR, etc.) have been written
     init_done: bool,
@@ -123,6 +130,8 @@ impl PartCodegenState {
             chip,
             ym2612_port,
             ym2612_ch,
+            opl_ch: 0,
+            opm_ch: 0,
             tempo: 120,
             octave: 4,
             length: 4,
@@ -150,6 +159,16 @@ pub struct VgmGenerator {
     fm_instruments: HashMap<u32, Vec<u32>>,
     /// Next YM2612 absolute channel to allocate (0-5)
     next_ym2612_channel: u8,
+    /// Next YM2608 absolute channel to allocate (0-5)
+    next_ym2608_channel: u8,
+    /// Next YM2203 channel to allocate (0-2)
+    next_ym2203_channel: u8,
+    /// Next YM2151 (OPM) channel to allocate (0-7)
+    next_opm_channel: u8,
+    /// Next OPL channel to allocate (0-8, shared across YM3812/YM3526/Y8950)
+    next_opl_channel: u8,
+    /// Next YMF262 (OPL3) channel to allocate (0-17)
+    next_ymf262_channel: u8,
     /// When true, add_wait is a no-op (used during parallel part processing)
     suppress_waits: bool,
     /// Time boundaries recorded by add_wait calls (even when suppressed).
@@ -169,6 +188,11 @@ impl VgmGenerator {
             gd3_tag: None,
             fm_instruments: HashMap::new(),
             next_ym2612_channel: 0,
+            next_ym2608_channel: 0,
+            next_ym2203_channel: 0,
+            next_opm_channel: 0,
+            next_opl_channel: 0,
+            next_ymf262_channel: 0,
             suppress_waits: false,
             time_checkpoints: BTreeSet::new(),
         };
@@ -201,8 +225,14 @@ impl VgmGenerator {
                 let chip = match chip_str.to_uppercase().as_str() {
                     "YM2612" => SoundChip::YM2612,
                     "SN76489" => SoundChip::SN76489,
-                    "YM2151" => SoundChip::YM2151,
-                    "YM2413" => SoundChip::YM2413,
+                    "YM2151" | "OPM" => SoundChip::YM2151,
+                    "YM2413" | "OPLL" => SoundChip::YM2413,
+                    "YM2608" | "OPNA" => SoundChip::YM2608,
+                    "YM2203" | "OPN" => SoundChip::YM2203,
+                    "YM3812" | "OPL2" => SoundChip::YM3812,
+                    "YM3526" | "OPL" => SoundChip::YM3526,
+                    "Y8950" => SoundChip::Y8950,
+                    "YMF262" | "OPL3" => SoundChip::YMF262,
                     _ => continue,
                 };
                 if !self.chips.contains(&chip) {
@@ -228,6 +258,24 @@ impl VgmGenerator {
                 }
                 SoundChip::YM2413 => {
                     self.header.ym2413_clock = chip.clock_rate();
+                }
+                SoundChip::YM2608 => {
+                    self.header.ym2608_clock = chip.clock_rate();
+                }
+                SoundChip::YM2203 => {
+                    self.header.ym2203_clock = chip.clock_rate();
+                }
+                SoundChip::YM3812 => {
+                    self.header.ym3812_clock = chip.clock_rate();
+                }
+                SoundChip::YM3526 => {
+                    self.header.ym3526_clock = chip.clock_rate();
+                }
+                SoundChip::Y8950 => {
+                    self.header.y8950_clock = chip.clock_rate();
+                }
+                SoundChip::YMF262 => {
+                    self.header.ymf262_clock = chip.clock_rate();
                 }
                 _ => {}
             }
@@ -268,9 +316,43 @@ impl VgmGenerator {
     fn convert_ast_to_commands(&mut self, ast: &MmlAst) -> MmlResult<()> {
         let mut part_names: Vec<String> = ast.parts.keys().cloned().collect();
         part_names.sort();
+
+        // Build effective chip map from metadata + explicit part annotations.
+        // Priority: explicit part.chip > PartYM2612/PartSN76489 metadata > ForcedMonoPartYM2612 > default YM2612.
+        let mut effective_chip_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        // Explicit part chips
+        for name in &part_names {
+            if let Some(chip) = ast.parts[name].chip.as_deref() {
+                effective_chip_map.insert(name.clone(), chip.to_string());
+            }
+        }
+        // PartYM2612 = A, PartSN76489 = B, PartYM2151 = F, etc.
+        for (key, value) in &ast.metadata {
+            let chip_name = if key.starts_with("PartYM2612") { "YM2612" }
+                else if key.starts_with("PartSN76489") { "SN76489" }
+                else if key.starts_with("PartYM2151") { "YM2151" }
+                else if key.starts_with("PartYM2608") { "YM2608" }
+                else { continue };
+            for name in &part_names {
+                if !effective_chip_map.contains_key(name) && name.starts_with(value.trim()) {
+                    effective_chip_map.insert(name.clone(), chip_name.to_string());
+                }
+            }
+        }
+        // ForcedMonoPartYM2612 → assign YM2612 to all otherwise unassigned parts
+        let forced_mono = ast.metadata.contains_key("ForcedMonoPartYM2612");
+        for name in &part_names {
+            if !effective_chip_map.contains_key(name) && (forced_mono || ast.parts[name].chip.is_none()) {
+                let has_ym2612 = self.chips.contains(&SoundChip::YM2612);
+                if has_ym2612 || forced_mono {
+                    effective_chip_map.insert(name.clone(), "YM2612".to_string());
+                }
+            }
+        }
+
         let num_ym2612_channels: u8 = part_names
             .iter()
-            .filter(|&n| ast.parts[n].chip.as_deref() == Some("YM2612"))
+            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2612").unwrap_or(false))
             .count()
             .min(6) as u8;
 
@@ -279,10 +361,63 @@ impl VgmGenerator {
             self.ym2612_global_init(num_ym2612_channels);
         }
 
+        // Emit YM2608 global init (same register layout as YM2612, different opcodes)
+        let num_ym2608_channels: u8 = part_names
+            .iter()
+            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2608").unwrap_or(false))
+            .count()
+            .min(6) as u8;
+        if num_ym2608_channels > 0 {
+            self.ym2608_global_init(num_ym2608_channels);
+        }
+
+        // Emit YM2203 global init (3-channel OPN)
+        let num_ym2203_channels: u8 = part_names
+            .iter()
+            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2203").unwrap_or(false))
+            .count()
+            .min(3) as u8;
+        if num_ym2203_channels > 0 {
+            self.ym2203_global_init(num_ym2203_channels);
+        }
+
+        // Emit YM2151 global init (8-channel OPM)
+        let num_opm_channels: u8 = part_names
+            .iter()
+            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2151").unwrap_or(false))
+            .count()
+            .min(8) as u8;
+        if num_opm_channels > 0 {
+            self.opm_global_init();
+        }
+
+        // Emit OPL global init for any OPL chip present
+        let opl_opcode: Option<u8> = part_names.iter().find_map(|n| {
+            effective_chip_map.get(n).and_then(|s| match s.as_str() {
+                "YM3812" => Some(VgmCommandType::Ym3812Write as u8),
+                "YM3526" => Some(VgmCommandType::Ym3526Write as u8),
+                "Y8950"  => Some(VgmCommandType::Y8950Write as u8),
+                _ => None,
+            })
+        });
+        if let Some(opcode) = opl_opcode {
+            self.opl_global_init(opcode);
+        }
+
+        // Emit YMF262 global init (18-channel OPL3)
+        let has_ymf262 = part_names
+            .iter()
+            .any(|n| effective_chip_map.get(n).map(|s| s == "YMF262").unwrap_or(false));
+        if has_ymf262 {
+            self.ymf262_global_init();
+        }
+
         // Process global settings (tempo, etc.) — these don't emit chip writes
         let mut global_time: u64 = 0;
+        let mut global_tempo: u32 = 120;
+        let mut global_length: u32 = 4;
         for node in &ast.global_settings {
-            self.process_node_global(node, &mut global_time)?;
+            self.process_node_global(node, &mut global_time, &mut global_tempo, &mut global_length)?;
         }
 
         // Process each part independently from time=0 (parallel/simultaneous playback).
@@ -295,8 +430,12 @@ impl VgmGenerator {
         self.suppress_waits = true;
         for name in &part_names {
             if let Some(part) = ast.parts.get(name) {
+                let mut effective_part = part.clone();
+                if let Some(chip) = effective_chip_map.get(name) {
+                    effective_part.chip = Some(chip.clone());
+                }
                 let mut part_time: u64 = 0;
-                self.process_part(part, &mut part_time)?;
+                self.process_part(&effective_part, &mut part_time)?;
                 if part_time > max_part_time {
                     max_part_time = part_time;
                 }
@@ -354,20 +493,43 @@ impl VgmGenerator {
     ) -> MmlResult<()> {
         let chip = part.chip.clone();
 
-        // Allocate YM2612 channel
-        let (ym2612_port, ym2612_ch, has_channel) = if chip.as_deref() == Some("YM2612") {
-            let abs_ch = self.next_ym2612_channel;
-            self.next_ym2612_channel = self.next_ym2612_channel.saturating_add(1);
-            if abs_ch < 6 {
-                (abs_ch / 3, abs_ch % 3, true)
-            } else {
-                (0, 0, false)
+        let (ym2612_port, ym2612_ch, opl_ch, opm_ch, has_channel) = match chip.as_deref() {
+            Some("YM2612") => {
+                let abs_ch = self.next_ym2612_channel;
+                self.next_ym2612_channel = self.next_ym2612_channel.saturating_add(1);
+                if abs_ch < 6 { (abs_ch / 3, abs_ch % 3, 0, 0, true) } else { (0, 0, 0, 0, false) }
             }
-        } else {
-            (0, 0, true)
+            Some("YM2608") => {
+                let abs_ch = self.next_ym2608_channel;
+                self.next_ym2608_channel = self.next_ym2608_channel.saturating_add(1);
+                if abs_ch < 6 { (abs_ch / 3, abs_ch % 3, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("YM2203") => {
+                let ch = self.next_ym2203_channel;
+                self.next_ym2203_channel = self.next_ym2203_channel.saturating_add(1);
+                if ch < 3 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("YM2151") => {
+                let ch = self.next_opm_channel;
+                self.next_opm_channel = self.next_opm_channel.saturating_add(1);
+                if ch < 8 { (0, 0, 0, ch, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("YM3812") | Some("YM3526") | Some("Y8950") => {
+                let ch = self.next_opl_channel;
+                self.next_opl_channel = self.next_opl_channel.saturating_add(1);
+                if ch < 9 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("YMF262") => {
+                let ch = self.next_ymf262_channel;
+                self.next_ymf262_channel = self.next_ymf262_channel.saturating_add(1);
+                if ch < 18 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            _ => (0, 0, 0, 0, true),
         };
 
         let mut state = PartCodegenState::new(chip, ym2612_port, ym2612_ch);
+        state.opl_ch = opl_ch;
+        state.opm_ch = opm_ch;
         state.has_channel = has_channel;
 
         for node in &part.commands {
@@ -376,17 +538,29 @@ impl VgmGenerator {
 
         // Key off any note still ringing at end of part (suppressed in EON/envelope mode)
         if state.keyed_on && !state.eon_mode {
-            self.ym2612_key_off(&state, time);
+            match state.chip.as_deref() {
+                Some("YM2612") => { self.ym2612_key_off(&state, time); }
+                Some("YM2608") => { self.ym2608_key_off(&state, time); }
+                Some("YM2203") => { self.ym2203_key_off(&state, time); }
+                Some("YM2151") => { self.opm_key_off(&state, time); }
+                Some("YM3812") => { self.opl_key_off(VgmCommandType::Ym3812Write as u8, &state, time); }
+                Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, &state, time); }
+                Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, &state, time); }
+                Some("YMF262") => { self.ymf262_key_off(&state, time); }
+                _ => {}
+            }
         }
 
         Ok(())
     }
 
     /// Process MML nodes that appear in global context (outside any part)
-    fn process_node_global(&mut self, node: &MmlNode, time: &mut u64) -> MmlResult<()> {
+    fn process_node_global(&mut self, node: &MmlNode, time: &mut u64, tempo: &mut u32, default_length: &mut u32) -> MmlResult<()> {
         match node {
+            MmlNode::Tempo(t) => { *tempo = t.bpm; }
+            MmlNode::Length(l) => { *default_length = l.value.max(1); }
             MmlNode::Rest(rest) => {
-                let samples = self.note_duration_to_samples(rest.duration, rest.dotted, 120, 4);
+                let samples = self.note_duration_to_samples(rest.duration, rest.dotted, *tempo, *default_length);
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -394,9 +568,10 @@ impl VgmGenerator {
                 // Global notes (no chip assigned) emit SN76489 writes using the default channel
                 let mut state = PartCodegenState::new(None, 0, 0);
                 state.octave = note.octave;
+                state.tempo = *tempo;
                 self.process_psg_note(note, &state, time);
-                let dur = note.duration.unwrap_or(4);
-                let samples = self.note_duration_to_samples(dur, note.dotted, 120, 4);
+                let dur = note.duration.unwrap_or(*default_length);
+                let samples = self.note_duration_to_samples(dur, note.dotted, *tempo, *default_length);
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -467,8 +642,18 @@ impl VgmGenerator {
                 self.process_chip_note(note, state, time)?;
             }
             MmlNode::Rest(rest) => {
-                if state.keyed_on && state.chip.as_deref() == Some("YM2612") && !state.eon_mode {
-                    self.ym2612_key_off(state, time);
+                if state.keyed_on && !state.eon_mode {
+                    match state.chip.as_deref() {
+                        Some("YM2612") => { self.ym2612_key_off(state, time); }
+                        Some("YM2608") => { self.ym2608_key_off(state, time); }
+                        Some("YM2203") => { self.ym2203_key_off(state, time); }
+                        Some("YM2151") => { self.opm_key_off(state, time); }
+                        Some("YM3812") => { self.opl_key_off(VgmCommandType::Ym3812Write as u8, state, time); }
+                        Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time); }
+                        Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time); }
+                        Some("YMF262") => { self.ymf262_key_off(state, time); }
+                        _ => {}
+                    }
                     state.keyed_on = false;
                 }
                 // C# RestProc calls SetVolume for FM channels (writes TL with beforeTL optimization).
@@ -531,39 +716,204 @@ impl VgmGenerator {
                 let params = state.instrument_num
                     .and_then(|n| self.fm_instruments.get(&n).cloned());
                 self.ym2612_write_tl_if_changed(state, params.as_deref(), *time);
-                // Key off any previous note (suppressed in EON mode — C# ProcKeyOff skipped)
                 if state.keyed_on && !state.eon_mode {
                     self.ym2612_key_off(state, time);
                     state.keyed_on = false;
                 }
-                // Frequency
                 let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
                 self.ym2612_write_freq(state.ym2612_port, state.ym2612_ch, block, f_num, *time);
-                // Key on
                 self.ym2612_key_on(state, time);
                 state.keyed_on = true;
-                // Apply quantize/gate:
-                // Q (proportional): note_on = floor(dur * value / 8), gap = dur - note_on
-                // q (absolute):     note_on = floor(dur * (48-value) / 48), gap = floor(dur * value / 48)
-                let (note_on_samples, gap) = if state.quantize == 0 {
-                    (samples, 0u32)
-                } else if state.quantize_proportional {
-                    let note_on = (samples as u64 * state.quantize as u64 / 8) as u32;
-                    (note_on, samples.saturating_sub(note_on))
-                } else {
-                    let gap = (samples as u64 * state.quantize as u64 / 48) as u32;
-                    let note_on = (samples as u64 * (48 - state.quantize as u64) / 48) as u32;
-                    (note_on, gap)
-                };
-                // Wait for note-on portion
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
-                // Key off at end of note-on (suppressed in EON/envelope mode)
                 if !state.eon_mode {
                     self.ym2612_key_off(state, time);
                     state.keyed_on = false;
                 }
-                // Wait for gap (silence between notes)
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM2608") if state.has_channel => {
+                if !state.init_done {
+                    let params = state.instrument_num
+                        .and_then(|n| self.fm_instruments.get(&n).cloned());
+                    if let Some(ref p) = params {
+                        self.ym2608_write_op_params(state.ym2612_port, state.ym2612_ch, p, *time);
+                    }
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.ym2608_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
+                self.ym2608_write_freq(state.ym2612_port, state.ym2612_ch, block, f_num, *time);
+                self.ym2608_key_on(state, time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.ym2608_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM2203") if state.has_channel => {
+                if !state.init_done {
+                    let params = state.instrument_num
+                        .and_then(|n| self.fm_instruments.get(&n).cloned());
+                    if let Some(ref p) = params {
+                        self.ym2203_write_op_params(state.ym2612_ch, p, *time);
+                    }
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.ym2203_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
+                self.ym2203_write_freq(state.ym2612_ch, block, f_num, *time);
+                self.ym2203_key_on(state, time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.ym2203_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM2151") if state.has_channel => {
+                if !state.init_done {
+                    self.opm_init_channel(state, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.opm_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                let (kc, kf) = Self::midi_note_to_opm_kc(midi);
+                self.opm_write_freq(state.opm_ch, kc, kf, *time);
+                self.opm_key_on(state, time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.opm_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM3812") if state.has_channel => {
+                if !state.init_done {
+                    self.opl_init_channel(VgmCommandType::Ym3812Write as u8, state, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Ym3812Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                self.opl_write_freq(VgmCommandType::Ym3812Write as u8, state.opl_ch, block, f_num, true, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Ym3812Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM3526") if state.has_channel => {
+                if !state.init_done {
+                    self.opl_init_channel(VgmCommandType::Ym3526Write as u8, state, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                self.opl_write_freq(VgmCommandType::Ym3526Write as u8, state.opl_ch, block, f_num, true, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("Y8950") if state.has_channel => {
+                if !state.init_done {
+                    self.opl_init_channel(VgmCommandType::Y8950Write as u8, state, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                self.opl_write_freq(VgmCommandType::Y8950Write as u8, state.opl_ch, block, f_num, true, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YMF262") if state.has_channel => {
+                let ch = state.opl_ch;
+                let port = (ch / 9) as u8;
+                let ch_in_bank = ch % 9;
+                if !state.init_done {
+                    self.ymf262_init_channel(state, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.ymf262_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                let opcode = if port == 0 { VgmCommandType::Ymf262WritePort0 as u8 } else { VgmCommandType::Ymf262WritePort1 as u8 };
+                self.opl_write_freq(opcode, ch_in_bank, block, f_num, true, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.ymf262_key_off(state, time);
+                    state.keyed_on = false;
+                }
                 if gap > 0 {
                     *time += gap as u64;
                     self.add_wait(gap, *time);
@@ -613,6 +963,22 @@ impl VgmGenerator {
             data: vec![0x90 | (atten & 0x0F)],
             time: *time,
         });
+    }
+
+    // ── Quantize helper ────────────────────────────────────────────────────────
+
+    fn quantize_split(samples: u32, quantize: u8, proportional: bool) -> (u32, u32) {
+        if quantize == 0 {
+            return (samples, 0);
+        }
+        if proportional {
+            let note_on = (samples as u64 * quantize as u64 / 8) as u32;
+            (note_on, samples.saturating_sub(note_on))
+        } else {
+            let gap = (samples as u64 * quantize as u64 / 48) as u32;
+            let note_on = (samples as u64 * (48 - quantize as u64) / 48) as u32;
+            (note_on, gap)
+        }
     }
 
     // ── YM2612 helpers ──────────────────────────────────────────────────────────
@@ -871,6 +1237,345 @@ impl VgmGenerator {
         (block, tone_val)
     }
 
+    // ── OPL frequency helper ──────────────────────────────────────────────────
+
+    /// Convert MIDI note to OPL F-number and block.
+    /// Uses opl_base = 49716 Hz (standard value for 3.58 MHz crystal).
+    fn midi_note_to_opl_freq(midi_note: u8) -> (u8, u16) {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        const OPL_BASE: f64 = 49716.0;
+        // Choose block so F-num fits in 0-1023
+        let block = {
+            let raw = (freq / (OPL_BASE / (1 << 20) as f64)).log2().ceil() as i32 - 9;
+            raw.clamp(0, 7) as u8
+        };
+        let f_num = (freq * (1u32 << (20u8.saturating_sub(block))) as f64 / OPL_BASE).round() as u16;
+        (block, f_num.min(1023))
+    }
+
+    // ── OPM (YM2151) frequency helper ─────────────────────────────────────────
+
+    /// Convert MIDI note to OPM KC (key code) and KF (key fraction).
+    /// KC = (OCT << 4) | NOTE_CODE  where NOTE_CODE follows the OPM KC table.
+    fn midi_note_to_opm_kc(midi_note: u8) -> (u8, u8) {
+        // Map semitone (0=C … 11=B) → OPM note code
+        // Unused KC values (3,7,11,15) are skipped in the OPM encoding
+        const SEMITONE_TO_KC: [u8; 12] = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
+        let semitone = (midi_note % 12) as usize;
+        let octave = (midi_note / 12) as i32 - 1; // MIDI C4=60 → octave=4
+        let oct = octave.clamp(0, 7) as u8;
+        let kc = (oct << 4) | SEMITONE_TO_KC[semitone];
+        (kc, 0)
+    }
+
+    // ── YM2608 (OPNA) helpers ─────────────────────────────────────────────────
+
+    fn ym2608_write_reg(&mut self, port: u8, reg: u8, val: u8, time: u64) {
+        let cmd_type = if port == 0 { VgmCommandType::Ym2608WritePort0 } else { VgmCommandType::Ym2608WritePort1 };
+        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+    }
+
+    fn ym2608_global_init(&mut self, num_channels: u8) {
+        let t = 0u64;
+        self.ym2608_write_reg(0, 0x22, 0x00, t);
+        self.ym2608_write_reg(0, 0x27, 0x00, t);
+        self.ym2608_write_reg(0, 0x2B, 0x00, t);
+        for abs_ch in 0u8..6 {
+            let port = abs_ch / 3;
+            let ch = abs_ch % 3;
+            let key_byte = ((port & 0x1) << 2) | (ch & 0x3);
+            self.ym2608_write_reg(0, 0x28, key_byte, t);
+            for &op_mul in &[0u8, 2, 1, 3] {
+                let op_off = ch + op_mul * 4;
+                self.ym2608_write_reg(port, 0x40 + op_off, 0x7F, t);
+            }
+            if abs_ch < num_channels {
+                self.ym2608_write_reg(port, 0xB4 + ch, 0xC0, t);
+            }
+        }
+    }
+
+    fn ym2608_write_op_params(&mut self, port: u8, ch: u8, params: &[u32], time: u64) {
+        let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
+        let alg_idx = op_stride * 4;
+        let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
+        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
+        let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
+        for op_idx in 0..4usize {
+            let op_off = ch + mml_to_hw[op_idx] * 4;
+            let b = op_idx * op_stride;
+            if params.len() > b + 8 {
+                let am  = if op_stride >= 11 { params.get(b + 9).copied().unwrap_or(0) as u8 } else { 0 };
+                let ssg = if op_stride >= 11 { params.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+                let (ar, dr, sr, rr, sl, tl, ks, ml, dt) = (
+                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
+                    params[b+4] as u8, params[b+5] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                );
+                self.ym2608_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
+                self.ym2608_write_reg(port, 0x40 + op_off, tl & 0x7F, time);
+                self.ym2608_write_reg(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
+                self.ym2608_write_reg(port, 0x60 + op_off, ((am & 0x1) << 7) | (dr & 0x1F), time);
+                self.ym2608_write_reg(port, 0x70 + op_off, sr & 0x1F, time);
+                self.ym2608_write_reg(port, 0x80 + op_off, ((sl & 0xF) << 4) | (rr & 0xF), time);
+                self.ym2608_write_reg(port, 0x90 + op_off, ssg & 0xF, time);
+            }
+        }
+        self.ym2608_write_reg(port, 0xB0 + ch, ((fb & 0x7) << 3) | (alg & 0x7), time);
+    }
+
+    fn ym2608_write_freq(&mut self, port: u8, ch: u8, block: u8, f_num: u16, time: u64) {
+        let msb = ((block & 0x7) << 3) | ((f_num >> 8) as u8 & 0x7);
+        self.ym2608_write_reg(port, 0xA4 + ch, msb, time);
+        self.ym2608_write_reg(port, 0xA0 + ch, (f_num & 0xFF) as u8, time);
+    }
+
+    fn ym2608_key_on(&mut self, state: &PartCodegenState, time: &u64) {
+        let key_byte = 0xF0u8 | ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
+        self.ym2608_write_reg(0, 0x28, key_byte, *time);
+    }
+
+    fn ym2608_key_off(&mut self, state: &PartCodegenState, time: &u64) {
+        let key_byte = 0x00u8 | ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
+        self.ym2608_write_reg(0, 0x28, key_byte, *time);
+    }
+
+    // ── YM2203 (OPN 3-channel) helpers ────────────────────────────────────────
+
+    fn ym2203_write_reg(&mut self, reg: u8, val: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::Ym2203Write,
+            data: vec![reg, val],
+            time,
+        });
+    }
+
+    fn ym2203_global_init(&mut self, num_channels: u8) {
+        let t = 0u64;
+        self.ym2203_write_reg(0x27, 0x00, t); // Timer/Ch3 off
+        for ch in 0u8..3 {
+            self.ym2203_write_reg(0x28, ch, t); // Key off
+            for &op_mul in &[0u8, 2, 1, 3] {
+                let op_off = ch + op_mul * 4;
+                self.ym2203_write_reg(0x40 + op_off, 0x7F, t); // Mute TL
+            }
+            if ch < num_channels {
+                self.ym2203_write_reg(0xB4 + ch, 0xC0, t); // Stereo enable
+            }
+        }
+    }
+
+    fn ym2203_write_op_params(&mut self, ch: u8, params: &[u32], time: u64) {
+        let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
+        let alg_idx = op_stride * 4;
+        let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
+        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
+        let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
+        for op_idx in 0..4usize {
+            let op_off = ch + mml_to_hw[op_idx] * 4;
+            let b = op_idx * op_stride;
+            if params.len() > b + 8 {
+                let (ar, dr, sr, rr, sl, tl, ks, ml, dt) = (
+                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
+                    params[b+4] as u8, params[b+5] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                );
+                self.ym2203_write_reg(0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
+                self.ym2203_write_reg(0x40 + op_off, tl & 0x7F, time);
+                self.ym2203_write_reg(0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
+                self.ym2203_write_reg(0x60 + op_off, dr & 0x1F, time);
+                self.ym2203_write_reg(0x70 + op_off, sr & 0x1F, time);
+                self.ym2203_write_reg(0x80 + op_off, ((sl & 0xF) << 4) | (rr & 0xF), time);
+            }
+        }
+        self.ym2203_write_reg(0xB0 + ch, ((fb & 0x7) << 3) | (alg & 0x7), time);
+    }
+
+    fn ym2203_write_freq(&mut self, ch: u8, block: u8, f_num: u16, time: u64) {
+        let msb = ((block & 0x7) << 3) | ((f_num >> 8) as u8 & 0x7);
+        self.ym2203_write_reg(0xA4 + ch, msb, time);
+        self.ym2203_write_reg(0xA0 + ch, (f_num & 0xFF) as u8, time);
+    }
+
+    fn ym2203_key_on(&mut self, state: &PartCodegenState, time: &u64) {
+        let key_byte = 0xF0u8 | (state.ym2612_ch & 0x3);
+        self.ym2203_write_reg(0x28, key_byte, *time);
+    }
+
+    fn ym2203_key_off(&mut self, state: &PartCodegenState, time: &u64) {
+        let key_byte = state.ym2612_ch & 0x3;
+        self.ym2203_write_reg(0x28, key_byte, *time);
+    }
+
+    // ── YM2151 (OPM) helpers ─────────────────────────────────────────────────
+
+    fn opm_write_reg(&mut self, reg: u8, val: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::Ym2151Write,
+            data: vec![reg, val],
+            time,
+        });
+    }
+
+    fn opm_global_init(&mut self) {
+        let t = 0u64;
+        // Key off all channels with all operators
+        for ch in 0u8..8 {
+            self.opm_write_reg(0x08, ch, t); // key off: ops=0, ch=ch
+        }
+        // Default operator config: stereo L+R, no feedback, algorithm 7
+        for ch in 0u8..8 {
+            self.opm_write_reg(0x20 + ch, 0xC7, t); // L=1, R=1, FB=0, CON=7
+        }
+    }
+
+    /// Write minimal OPM channel operator setup (simple sustain patch, no FM modulation)
+    fn opm_init_channel(&mut self, state: &PartCodegenState, time: u64) {
+        let ch = state.opm_ch;
+        let vol = state.volume;
+        // Algorithm 7: all 4 operators are carriers → pure additive
+        self.opm_write_reg(0x20 + ch, 0xC7, time); // L=1, R=1, FB=0, CON=7
+        // Each operator: DT1=0, MULT=1
+        for op in 0u8..4 {
+            let base = op * 8 + ch;
+            self.opm_write_reg(0x40 + base, 0x01, time); // DT1=0, MULT=1
+            // TL: volume maps 127→0 (full), 0→127 (mute)
+            let tl = (127u16.saturating_sub(vol as u16) / 4) as u8;
+            self.opm_write_reg(0x60 + base, tl & 0x7F, time); // TL
+            self.opm_write_reg(0x80 + base, 0x1F, time); // KS=0, AR=31
+            self.opm_write_reg(0xA0 + base, 0x00, time); // AM=0, D1R=0
+            self.opm_write_reg(0xC0 + base, 0x00, time); // DT2=0, D2R=0
+            self.opm_write_reg(0xE0 + base, 0x0F, time); // D1L=0, RR=15
+        }
+    }
+
+    fn opm_write_freq(&mut self, ch: u8, kc: u8, kf: u8, time: u64) {
+        self.opm_write_reg(0x28 + ch, kc, time);
+        self.opm_write_reg(0x30 + ch, kf << 2, time);
+    }
+
+    fn opm_key_on(&mut self, state: &PartCodegenState, time: &u64) {
+        // Key on: all operators (M1=bit3, C1=bit4, M2=bit5, C2=bit6) + ch
+        let key_byte = 0x78u8 | (state.opm_ch & 0x7);
+        self.opm_write_reg(0x08, key_byte, *time);
+    }
+
+    fn opm_key_off(&mut self, state: &PartCodegenState, time: &u64) {
+        let key_byte = state.opm_ch & 0x7; // all op bits = 0 → key off
+        self.opm_write_reg(0x08, key_byte, *time);
+    }
+
+    // ── OPL helpers (YM3812, YM3526, Y8950) ──────────────────────────────────
+
+    /// OPL operator slot address for a channel (0-8): returns (mod_slot, car_slot)
+    fn opl_slot(ch: u8) -> (u8, u8) {
+        let mod_slot = (ch % 3) + (ch / 3) * 6;
+        (mod_slot, mod_slot + 3)
+    }
+
+    fn opl_write_raw(&mut self, opcode: u8, reg: u8, val: u8, time: u64) {
+        let cmd_type = match opcode {
+            0x5A => VgmCommandType::Ym3812Write,
+            0x5B => VgmCommandType::Ym3526Write,
+            0x5C => VgmCommandType::Y8950Write,
+            _ => VgmCommandType::Ym3812Write, // fallback
+        };
+        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+    }
+
+    fn opl_global_init(&mut self, opcode: u8) {
+        let t = 0u64;
+        // Key off all 9 channels (write B0-B8 with bit 5 = 0)
+        for ch in 0u8..9 {
+            self.opl_write_raw(opcode, 0xB0 + ch, 0x00, t);
+        }
+    }
+
+    /// Initialize a single OPL channel with a minimal sine patch
+    fn opl_init_channel(&mut self, opcode: u8, state: &PartCodegenState, time: u64) {
+        let ch = state.opl_ch;
+        let vol = state.volume;
+        let (mod_slot, car_slot) = Self::opl_slot(ch);
+        // Modulator: EG-TYP=1 (sustain), MULT=1
+        self.opl_write_raw(opcode, 0x20 + mod_slot, 0x21, time);
+        // Modulator TL: high value = less FM modulation depth
+        self.opl_write_raw(opcode, 0x40 + mod_slot, 0x3F, time);
+        // Modulator AR/DR: fast attack, no decay
+        self.opl_write_raw(opcode, 0x60 + mod_slot, 0xF0, time);
+        // Modulator SL/RR: no sustain drop, fast release
+        self.opl_write_raw(opcode, 0x80 + mod_slot, 0x05, time);
+        // Carrier: EG-TYP=1, MULT=1
+        self.opl_write_raw(opcode, 0x20 + car_slot, 0x21, time);
+        // Carrier TL: map volume (127=full, 0=mute) to TL (0=full, 63=mute)
+        let car_tl = (63u16.saturating_sub(vol as u16 * 63 / 127)) as u8;
+        self.opl_write_raw(opcode, 0x40 + car_slot, car_tl & 0x3F, time);
+        // Carrier AR/DR
+        self.opl_write_raw(opcode, 0x60 + car_slot, 0xF0, time);
+        // Carrier SL/RR
+        self.opl_write_raw(opcode, 0x80 + car_slot, 0x05, time);
+        // Channel: feedback=0, FM synthesis (CNT=0)
+        self.opl_write_raw(opcode, 0xC0 + ch, 0x00, time);
+    }
+
+    /// Write OPL F-num and block to channel registers; key_on controls bit 5 of B0-B8.
+    fn opl_write_freq(&mut self, opcode: u8, ch: u8, block: u8, f_num: u16, key_on: bool, time: u64) {
+        // A0-A8: F-num low byte
+        self.opl_write_raw(opcode, 0xA0 + ch, (f_num & 0xFF) as u8, time);
+        // B0-B8: KON (bit5) | block (bits4:2) | F-num high (bits1:0)
+        let b_val = if key_on { 0x20u8 } else { 0u8 }
+            | ((block & 0x7) << 2)
+            | ((f_num >> 8) as u8 & 0x3);
+        self.opl_write_raw(opcode, 0xB0 + ch, b_val, time);
+    }
+
+    fn opl_key_off(&mut self, opcode: u8, state: &PartCodegenState, time: &u64) {
+        let ch = state.opl_ch;
+        // Clear KON bit (bit 5) but preserve block/f_num — use 0 for simplicity
+        self.opl_write_raw(opcode, 0xB0 + ch, 0x00, *time);
+    }
+
+    // ── YMF262 (OPL3, 18-channel) helpers ────────────────────────────────────
+
+    fn ymf262_write_reg(&mut self, port: u8, reg: u8, val: u8, time: u64) {
+        let cmd_type = if port == 0 { VgmCommandType::Ymf262WritePort0 } else { VgmCommandType::Ymf262WritePort1 };
+        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+    }
+
+    fn ymf262_global_init(&mut self) {
+        let t = 0u64;
+        // Enable OPL3 mode
+        self.ymf262_write_reg(1, 0x05, 0x01, t);
+        // Key off all 18 channels
+        for ch in 0u8..9 {
+            self.ymf262_write_reg(0, 0xB0 + ch, 0x00, t);
+            self.ymf262_write_reg(1, 0xB0 + ch, 0x00, t);
+        }
+    }
+
+    fn ymf262_init_channel(&mut self, state: &PartCodegenState, time: u64) {
+        let ch_abs = state.opl_ch;
+        let port = (ch_abs / 9) as u8;
+        let ch = ch_abs % 9;
+        let vol = state.volume;
+        let (mod_slot, car_slot) = Self::opl_slot(ch);
+        let car_tl = (63u16.saturating_sub(vol as u16 * 63 / 127)) as u8;
+        self.ymf262_write_reg(port, 0x20 + mod_slot, 0x21, time);
+        self.ymf262_write_reg(port, 0x40 + mod_slot, 0x3F, time);
+        self.ymf262_write_reg(port, 0x60 + mod_slot, 0xF0, time);
+        self.ymf262_write_reg(port, 0x80 + mod_slot, 0x05, time);
+        self.ymf262_write_reg(port, 0x20 + car_slot, 0x21, time);
+        self.ymf262_write_reg(port, 0x40 + car_slot, car_tl & 0x3F, time);
+        self.ymf262_write_reg(port, 0x60 + car_slot, 0xF0, time);
+        self.ymf262_write_reg(port, 0x80 + car_slot, 0x05, time);
+        // OPL3 L+R enable (bits 4 and 5) in C0 register
+        self.ymf262_write_reg(port, 0xC0 + ch, 0x30, time);
+    }
+
+    fn ymf262_key_off(&mut self, state: &PartCodegenState, time: &u64) {
+        let ch_abs = state.opl_ch;
+        let port = (ch_abs / 9) as u8;
+        let ch = (ch_abs % 9) as u8;
+        self.ymf262_write_reg(port, 0xB0 + ch, 0x00, *time);
+    }
+
     fn build_gd3_tag(&mut self, ast: &MmlAst) {
         let mut tag = Gd3Tag::default();
         for (key, value) in &ast.metadata {
@@ -927,27 +1632,56 @@ impl VgmGenerator {
     }
 
     fn write_header(&self, output: &mut Vec<u8>) -> MmlResult<()> {
-        output.extend_from_slice(&self.header.ident);
-        output.extend_from_slice(&0u32.to_le_bytes()); // EOF offset placeholder
-        output.extend_from_slice(&self.header.version.to_le_bytes());
-        output.extend_from_slice(&self.header.sn76489_clock.to_le_bytes());
-        output.extend_from_slice(&self.header.ym2413_clock.to_le_bytes());
-        output.extend_from_slice(&self.header.gd3_offset.to_le_bytes());
-        output.extend_from_slice(&self.header.total_samples.to_le_bytes());
-        output.extend_from_slice(&self.header.loop_offset.to_le_bytes());
-        output.extend_from_slice(&self.header.loop_samples.to_le_bytes());
-        output.extend_from_slice(&self.header.rate.to_le_bytes());
-        output.extend_from_slice(&self.header.sn76489_feedback.to_le_bytes());
-        output.push(self.header.sn76489_shift_register_width);
-        output.push(self.header.sn76489_flags);
-        output.extend_from_slice(&self.header.ym2612_clock.to_le_bytes());
-        output.extend_from_slice(&self.header.ym2151_clock.to_le_bytes());
-        // 0x34: VGM data offset (relative from 0x34).  Data starts at 0x100 → 0x100 − 0x34 = 0xCC.
+        // Build a 0x100-byte header block, then patch specific fields
+        let mut hdr = vec![0u8; 0x100];
+        // 0x00: ident
+        hdr[0..4].copy_from_slice(&self.header.ident);
+        // 0x04: EOF offset — patched at the end of generate()
+        // 0x08: version
+        hdr[8..12].copy_from_slice(&self.header.version.to_le_bytes());
+        // 0x0C: SN76489 clock
+        hdr[0x0C..0x10].copy_from_slice(&self.header.sn76489_clock.to_le_bytes());
+        // 0x10: YM2413 clock
+        hdr[0x10..0x14].copy_from_slice(&self.header.ym2413_clock.to_le_bytes());
+        // 0x14: GD3 offset
+        hdr[0x14..0x18].copy_from_slice(&self.header.gd3_offset.to_le_bytes());
+        // 0x18: total samples
+        hdr[0x18..0x1C].copy_from_slice(&self.header.total_samples.to_le_bytes());
+        // 0x1C: loop offset
+        hdr[0x1C..0x20].copy_from_slice(&self.header.loop_offset.to_le_bytes());
+        // 0x20: loop samples
+        hdr[0x20..0x24].copy_from_slice(&self.header.loop_samples.to_le_bytes());
+        // 0x24: rate
+        hdr[0x24..0x28].copy_from_slice(&self.header.rate.to_le_bytes());
+        // 0x28: SN76489 feedback (2 bytes)
+        hdr[0x28..0x2A].copy_from_slice(&self.header.sn76489_feedback.to_le_bytes());
+        // 0x2A: SN76489 shift register width
+        hdr[0x2A] = self.header.sn76489_shift_register_width;
+        // 0x2B: SN76489 flags
+        hdr[0x2B] = self.header.sn76489_flags;
+        // 0x2C: YM2612 clock
+        hdr[0x2C..0x30].copy_from_slice(&self.header.ym2612_clock.to_le_bytes());
+        // 0x30: YM2151 clock
+        hdr[0x30..0x34].copy_from_slice(&self.header.ym2151_clock.to_le_bytes());
+        // 0x34: VGM data offset (relative from 0x34); data at 0x100 → rel = 0xCC
         let data_offset_rel = self.header.data_offset.saturating_sub(0x34);
-        output.extend_from_slice(&data_offset_rel.to_le_bytes());
-        while output.len() < 0x100 {
-            output.push(0);
-        }
+        hdr[0x34..0x38].copy_from_slice(&data_offset_rel.to_le_bytes());
+        // Extended chip clocks (VGM 1.51+)
+        // 0x40: YM2203
+        hdr[0x40..0x44].copy_from_slice(&self.header.ym2203_clock.to_le_bytes());
+        // 0x44: YM2608
+        hdr[0x44..0x48].copy_from_slice(&self.header.ym2608_clock.to_le_bytes());
+        // 0x48: YM2610B
+        hdr[0x48..0x4C].copy_from_slice(&self.header.ym2610b_clock.to_le_bytes());
+        // 0x4C: YM3812
+        hdr[0x4C..0x50].copy_from_slice(&self.header.ym3812_clock.to_le_bytes());
+        // 0x50: YM3526
+        hdr[0x50..0x54].copy_from_slice(&self.header.ym3526_clock.to_le_bytes());
+        // 0x54: Y8950
+        hdr[0x54..0x58].copy_from_slice(&self.header.y8950_clock.to_le_bytes());
+        // 0x58: YMF262
+        hdr[0x58..0x5C].copy_from_slice(&self.header.ymf262_clock.to_le_bytes());
+        output.extend_from_slice(&hdr);
         Ok(())
     }
 

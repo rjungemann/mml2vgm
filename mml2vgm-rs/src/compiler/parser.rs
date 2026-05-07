@@ -502,15 +502,13 @@ impl Parser {
     /// Commit a pending FM instrument (even if incomplete) into the AST.
     /// M-type instruments are NOT stored in fm_instruments (matches C# instOPM behavior).
     fn finalize_pending_fm_instrument(&mut self, ast: &mut MmlAst) {
-        if let Some((number, rows, is_m_type)) = self.pending_fm_instrument.take() {
-            if !is_m_type {
-                let mut parameters: Vec<u32> = Vec::new();
-                for row in rows {
-                    parameters.extend(row);
-                }
-                let inst = FmInstrument { number, name: String::new(), parameters };
-                ast.fm_instruments.insert(number, inst);
+        if let Some((number, rows, _is_m_type)) = self.pending_fm_instrument.take() {
+            let mut parameters: Vec<u32> = Vec::new();
+            for row in rows {
+                parameters.extend(row);
             }
+            let inst = FmInstrument { number, name: String::new(), parameters };
+            ast.fm_instruments.insert(number, inst);
         }
     }
 
@@ -1035,11 +1033,52 @@ impl Parser {
                     })))
                 }
                 
+                // Infinite loop: [body]
+                Token::LeftBracket => {
+                    self.advance();
+                    let mut body = Vec::new();
+                    while self.current_token().is_some()
+                        && !matches!(self.current_token(), Some(Token::RightBracket))
+                    {
+                        if let Some(node) = self.parse_mml_command()? {
+                            body.push(node);
+                        } else {
+                            self.advance();
+                        }
+                    }
+                    self.consume(Token::RightBracket);
+                    Ok(Some(MmlNode::Loop(Loop { count: 0, body })))
+                }
+
+                // Finite loop: (body)N
+                Token::LeftParen => {
+                    self.advance();
+                    let mut body = Vec::new();
+                    while self.current_token().is_some()
+                        && !matches!(self.current_token(), Some(Token::RightParen))
+                    {
+                        if let Some(node) = self.parse_mml_command()? {
+                            body.push(node);
+                        } else {
+                            self.advance();
+                        }
+                    }
+                    self.consume(Token::RightParen);
+                    let count = if let Some(Token::Number(n)) = self.current_token() {
+                        let n = n as usize;
+                        self.advance();
+                        n
+                    } else {
+                        1
+                    };
+                    Ok(Some(MmlNode::Loop(Loop { count, body })))
+                }
+
                 Token::Comment(text) => {
                     self.advance();
                     Ok(Some(MmlNode::Comment(text)))
                 }
-                
+
                 _ => {
                     Ok(None)
                 }
@@ -1059,7 +1098,8 @@ pub fn parse(source: &str) -> MmlResult<MmlAst> {
 
 /// Parse MML source code from a file
 pub fn parse_file(path: &PathBuf) -> MmlResult<MmlAst> {
-    let source = std::fs::read_to_string(path)?;
+    let bytes = std::fs::read(path)?;
+    let source = String::from_utf8_lossy(&bytes).into_owned();
     parse(&source)
 }
 

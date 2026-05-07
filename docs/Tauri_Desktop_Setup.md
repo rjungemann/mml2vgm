@@ -1,5 +1,12 @@
 # Tauri Desktop App Setup Guide
 
+> **⚠️ DEPRECATED** — The Tauri desktop app has been superseded by the native
+> [egui desktop app](PLAN_egui_Desktop.md) (`egui-app/`).  
+> Use `just egui-dev` (or `cd egui-app && cargo run`) to launch the new desktop app.  
+> This document is retained for reference until `tauri-app/` is fully removed.
+
+---
+
 This guide explains how to set up and build the mml2vgm desktop application using [Tauri](https://tauri.app/).
 
 ## Overview

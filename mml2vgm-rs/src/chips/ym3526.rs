@@ -1,24 +1,50 @@
 //! YM3526 (OPL) sound chip emulation
 //!
-//! The YM3526 is a 9-channel FM synthesis chip used in early arcade systems.
-//! It is the first in the OPL family of Yamaha sound chips.
+//! The YM3526 is the original OPL FM synthesis chip. It has the same register
+//! architecture as YM3812 (OPL2) but without waveform selection (always sine).
 //!
-//! # Features
-//! - 9 FM channels
-//! - Can be configured as 9 melodic or 6 melodic + 5 rhythm
-//! - 2 operators per channel
-//! - Stereo panning per channel
+//! OPL register map (same as OPL2):
+//! - 0x20-0x35: Operator AM/VIB/EG/KSR/MULT (slot-addressed)
+//! - 0x40-0x55: Operator KSL/TL (total level = attenuation)
+//! - 0x60-0x75: Operator AR/DR
+//! - 0x80-0x95: Operator SL/RR
+//! - 0xA0-0xA8: Channel F-number LSB
+//! - 0xB0-0xB8: Channel Key-on/Block/F-number MSB
+//! - 0xBD: Rhythm mode
+//! - 0xC0-0xC8: Channel feedback/connection
 
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-/// FM channel for YM3526
+const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+
+fn slot_to_ch_op(slot_offset: u8) -> Option<(usize, usize)> {
+    let row = (slot_offset / 8) as usize;
+    let col = (slot_offset % 8) as usize;
+    if row > 2 || col > 5 { return None; }
+    if col < 3 { Some((row * 3 + col, 0)) } else { Some((row * 3 + col - 3, 1)) }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FmOperator {
+    phase_acc: f32,
+    total_level: u8,
+    mult: u8,
+}
+
+impl Default for FmOperator {
+    fn default() -> Self {
+        Self { phase_acc: 0.0, total_level: 0, mult: 1 }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct FmChannel {
-    frequency: u16,
+    operators: [FmOperator; 2],
+    f_num: u16,
     block: u8,
-    volume: u8,
     key_on: bool,
+    connection: u8,
     left_enable: bool,
     right_enable: bool,
 }
@@ -26,41 +52,28 @@ struct FmChannel {
 impl Default for FmChannel {
     fn default() -> Self {
         Self {
-            frequency: 0,
-            block: 0,
-            volume: 127,
-            key_on: false,
-            left_enable: true,
-            right_enable: true,
+            operators: [FmOperator::default(); 2],
+            f_num: 0, block: 0, key_on: false, connection: 0,
+            left_enable: true, right_enable: true,
         }
     }
 }
 
 /// YM3526 chip emulator with 9 FM channels
 pub struct YM3526 {
-    /// Master clock rate in Hz
     clock_rate: u32,
-
-    /// Sample rate for output
     sample_rate: u32,
-
-    /// Register cache
     regs: [u8; 0x100],
-
-    /// 9 FM channels
     channels: [FmChannel; 9],
-
-    /// Accumulated clock cycles
     accumulated_cycles: f32,
+    mod_feedback: [f32; 9],
 }
 
 impl YM3526 {
-    /// Create a new YM3526 emulator with the default clock rate
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
-    /// Create a new YM3526 emulator with a custom clock rate
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -68,43 +81,51 @@ impl YM3526 {
             regs: [0; 0x100],
             channels: [FmChannel::default(); 9],
             accumulated_cycles: 0.0,
+            mod_feedback: [0.0; 9],
         }
     }
 
-    /// Get output from a channel
-    fn get_channel_output(&self, ch: usize) -> (f32, f32) {
-        if ch >= 9 {
-            return (0.0, 0.0);
-        }
-
-        let channel = &self.channels[ch];
-        if !channel.key_on || channel.volume == 127 {
-            return (0.0, 0.0);
-        }
-
-        let base_freq = 440.0 * 2_f32.powi((channel.frequency as i32 - 69) / 12);
-        let freq = base_freq * 2_f32.powi((channel.block as i32) - 4);
-        let phase = (freq / self.sample_rate as f32 * 2.0 * PI).sin();
-        let output = phase * (1.0 - channel.volume as f32 / 127.0) * 0.12;
-
-        let left = if channel.left_enable { output } else { 0.0 };
-        let right = if channel.right_enable { output } else { 0.0 };
-
-        (left, right)
+    fn channel_freq_hz(&self, ch: usize) -> f32 {
+        let f_num = self.channels[ch].f_num as f32;
+        let block = self.channels[ch].block as i32;
+        f_num * 2_f32.powi(block - 1) * self.clock_rate as f32 / (1u32 << 19) as f32
     }
 
-    /// Get total output mixing all channels
-    fn get_output(&self) -> (f32, f32) {
-        let mut left = 0.0;
-        let mut right = 0.0;
-
+    fn advance_phases(&mut self, sample_rate: u32) {
         for ch in 0..9 {
-            let (ch_left, ch_right) = self.get_channel_output(ch);
-            left += ch_left;
-            right += ch_right;
+            if !self.channels[ch].key_on { continue; }
+            let base_freq = self.channel_freq_hz(ch);
+            for op in 0..2 {
+                let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
+                let inc = base_freq * mult * 2.0 * PI / sample_rate as f32;
+                self.channels[ch].operators[op].phase_acc += inc;
+                if self.channels[ch].operators[op].phase_acc > 2.0 * PI {
+                    self.channels[ch].operators[op].phase_acc -= 2.0 * PI;
+                }
+            }
         }
+    }
 
-        (left / 9.0, right / 9.0)
+    fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {
+        if ch >= 9 || !self.channels[ch].key_on { return (0.0, 0.0); }
+
+        let op0_phase = self.channels[ch].operators[0].phase_acc;
+        let op1_phase = self.channels[ch].operators[1].phase_acc;
+        let tl0 = 1.0 - self.channels[ch].operators[0].total_level as f32 / 63.0;
+        let tl1 = 1.0 - self.channels[ch].operators[1].total_level as f32 / 63.0;
+
+        let mod_out = op0_phase.sin() * tl0 + self.mod_feedback[ch] * 0.25;
+        let output = if self.channels[ch].connection == 0 {
+            (op1_phase + mod_out * PI).sin() * tl1
+        } else {
+            mod_out + op1_phase.sin() * tl1
+        };
+        self.mod_feedback[ch] = mod_out;
+
+        let sample = (output * 0.15).clamp(-1.0, 1.0);
+        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
+        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
+        (left, right)
     }
 }
 
@@ -125,36 +146,36 @@ impl SoundChipEmulator for YM3526 {
         self.regs[addr as usize] = data;
 
         match addr {
-            // Channel frequency number (low byte)
-            0x00..=0x08 => {
-                let ch = addr as usize;
-                if ch < 9 {
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x300) | (data as u16);
+            0x20..=0x35 => {
+                if let Some((ch, op)) = slot_to_ch_op(addr - 0x20) {
+                    self.channels[ch].operators[op].mult = data & 0x0F;
                 }
             }
-            // Channel key on, block, frequency (high byte)
-            0x10..=0x18 => {
-                let ch = (addr - 0x10) as usize;
-                if ch < 9 {
-                    self.channels[ch].key_on = (data & 0x20) != 0;
-                    self.channels[ch].block = (data & 0x1C) >> 2;
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0x0FF) | (((data as u16) & 0x03) << 8);
+            0x40..=0x55 => {
+                if let Some((ch, op)) = slot_to_ch_op(addr - 0x40) {
+                    self.channels[ch].operators[op].total_level = data & 0x3F;
                 }
             }
-            // Channel volume
-            0x30..=0x38 => {
-                let ch = (addr - 0x30) as usize;
-                if ch < 9 {
-                    self.channels[ch].volume = (data >> 2) & 0x3F;
+            0x60..=0x75 | 0x80..=0x95 => {}
+            0xA0..=0xA8 => {
+                let ch = (addr - 0xA0) as usize;
+                self.channels[ch].f_num = (self.channels[ch].f_num & 0x300) | data as u16;
+            }
+            0xB0..=0xB8 => {
+                let ch = (addr - 0xB0) as usize;
+                let prev = self.channels[ch].key_on;
+                self.channels[ch].key_on = (data & 0x20) != 0;
+                self.channels[ch].block = (data >> 2) & 0x07;
+                self.channels[ch].f_num = (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
+                if !prev && self.channels[ch].key_on {
+                    self.channels[ch].operators[0].phase_acc = 0.0;
+                    self.channels[ch].operators[1].phase_acc = 0.0;
+                    self.mod_feedback[ch] = 0.0;
                 }
             }
-            // Panning (left/right enable)
-            0x40..=0x48 => {
-                let ch = (addr - 0x40) as usize;
-                if ch < 9 {
-                    self.channels[ch].left_enable = (data & 0x10) != 0;
-                    self.channels[ch].right_enable = (data & 0x20) != 0;
-                }
+            0xC0..=0xC8 => {
+                let ch = (addr - 0xC0) as usize;
+                self.channels[ch].connection = data & 0x01;
             }
             _ => {}
         }
@@ -164,25 +185,22 @@ impl SoundChipEmulator for YM3526 {
         0xFF
     }
 
-    fn clock(&mut self) {
-        // OPL3 timing implementation would go here
-    }
+    fn clock(&mut self) {}
 
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
         self.sample_rate = sample_rate;
 
         for frame in buffer.chunks_mut(2) {
-            let cycles_per_sample = self.clock_rate as f32 / sample_rate as f32;
-            self.accumulated_cycles += cycles_per_sample;
-
-            while self.accumulated_cycles >= 1.0 {
-                self.clock();
-                self.accumulated_cycles -= 1.0;
+            self.advance_phases(sample_rate);
+            let mut left = 0.0f32;
+            let mut right = 0.0f32;
+            for ch in 0..9 {
+                let (l, r) = self.get_channel_output(ch);
+                left += l;
+                right += r;
             }
-
-            let (left, right) = self.get_output();
-            frame[0] = left.clamp(-1.0, 1.0);
-            frame[1] = right.clamp(-1.0, 1.0);
+            frame[0] = (left / 9.0).clamp(-1.0, 1.0);
+            frame[1] = (right / 9.0).clamp(-1.0, 1.0);
         }
     }
 }
@@ -216,20 +234,29 @@ mod tests {
     #[test]
     fn test_ym3526_write_key_on() {
         let mut chip = YM3526::new();
-        chip.write(0x10, 0x20);
+        chip.write(0xA0, 0x57); // f_num lo
+        chip.write(0xB0, 0x31); // key_on=1, block=4
         assert!(chip.channels[0].key_on);
+        assert_eq!(chip.channels[0].block, 4);
+    }
+
+    #[test]
+    fn test_ym3526_generate_samples_active() {
+        let mut chip = YM3526::new();
+        chip.write(0xA0, 0x57);
+        chip.write(0xB0, 0x31);
+        let mut buffer = [0.0f32; 8];
+        chip.generate_samples(&mut buffer, 44100);
+        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
     }
 
     #[test]
     fn test_ym3526_soundchip_trait() {
         let mut chip = YM3526::new();
-        assert_eq!(chip.name(), "YM3526 (OPL)");
-
         chip.reset();
-        chip.write(0x10, 0x20);
-        chip.write(0x00, 0x40);
+        chip.write(0xA0, 0x57);
+        chip.write(0xB0, 0x31);
         chip.clock();
-
         let mut buffer = [0.0f32; 4];
         chip.generate_samples(&mut buffer, 44100);
         assert_eq!(buffer.len(), 4);

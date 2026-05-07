@@ -13,6 +13,16 @@ pub mod ymf262;
 pub mod segapcm;
 pub mod c140;
 pub mod c352;
+pub mod ay8910;
+pub mod huc6280;
+pub mod ym2413;
+pub mod k051649;
+pub mod nes_apu;
+pub mod pokey;
+pub mod dmg;
+pub mod vrc6;
+pub mod k053260;
+pub mod k054539;
 
 use crate::{MmlError, MmlResult};
 

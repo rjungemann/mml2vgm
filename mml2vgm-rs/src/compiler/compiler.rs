@@ -55,7 +55,9 @@ impl MmlCompiler {
         self.apply_chip_assignments(&mut ast, &pre.chip_map);
 
         // 6. Code Generation
+        let part_count = ast.parts.len();
         let output_data = self.generate_code(&ast)?;
+        let info = Self::info_from_vgm(&output_data, part_count);
 
         // 7. Create result
         let output_path = self.determine_output_path(input_path);
@@ -64,7 +66,7 @@ impl MmlCompiler {
             data: output_data,
             output_path: Some(output_path.to_string_lossy().to_string()),
             warnings: Vec::new(),
-            info: crate::CompileInfo::default(),
+            info,
         })
     }
 
@@ -268,14 +270,53 @@ impl MmlCompiler {
         self.apply_chip_assignments(&mut ast, &pre.chip_map);
 
         // 3. Code Generation
+        let part_count = ast.parts.len();
         let output_data = self.generate_code(&ast)?;
+        let info = Self::info_from_vgm(&output_data, part_count);
 
         Ok(CompileResult {
             data: output_data,
             output_path: None,
             warnings: Vec::new(),
-            info: crate::CompileInfo::default(),
+            info,
         })
+    }
+
+    /// Build CompileInfo from generated output data (VGM only; other formats return defaults).
+    fn info_from_vgm(data: &[u8], part_count: usize) -> crate::CompileInfo {
+        let mut info = crate::CompileInfo::default();
+        info.part_count = part_count;
+        // Extract total_samples from VGM header at offset 0x18
+        if data.len() >= 0x1C && &data[0..4] == b"Vgm " {
+            let total_samples =
+                u32::from_le_bytes([data[0x18], data[0x19], data[0x1A], data[0x1B]]);
+            info.duration_samples = total_samples as u64;
+            info.duration_seconds = total_samples as f64 / 44100.0;
+            // Count register-write commands (opcodes 0x50-0xDF range)
+            let mut command_count: usize = 0;
+            let data_offset = if data.len() > 0x40 {
+                let raw = u32::from_le_bytes([data[0x34], data[0x35], data[0x36], data[0x37]]);
+                if raw == 0 { 0x40 } else { (raw + 0x34) as usize }
+            } else { 0x40 };
+            let mut i = data_offset.min(data.len());
+            while i < data.len() {
+                let op = data[i];
+                match op {
+                    0x50 => { command_count += 1; i += 2; }
+                    0x51..=0x5F => { command_count += 1; i += 3; }
+                    0x61 => { i += 3; }
+                    0x62 | 0x63 => { i += 1; }
+                    0x66 => break,
+                    0x67 => { if i + 6 < data.len() { let len = u32::from_le_bytes([data[i+2],data[i+3],data[i+4],data[i+5]]) as usize; i += 7 + len; } else { break; } }
+                    0xA0 | 0xB0..=0xBF => { command_count += 1; i += 3; }
+                    0xC0..=0xC4 | 0xD0..=0xD6 => { command_count += 1; i += 4; }
+                    0xE0..=0xE1 => { command_count += 1; i += 4; }
+                    _ => { i += 1; }
+                }
+            }
+            info.command_count = command_count;
+        }
+        info
     }
 
     /// Validate MML source code from a string without generating output

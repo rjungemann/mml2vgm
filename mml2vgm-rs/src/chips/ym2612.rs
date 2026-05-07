@@ -55,9 +55,9 @@ pub struct FmOperator {
     pub waveform: u8,
     /// SSG-EG (Software-controlled Envelope Generator) parameters
     pub ssg_eg: u8,
-    /// Current phase (0-4095 for sine wave)
-    pub phase: u16,
-    /// Current phase increment (frequency)
+    /// 32-bit phase accumulator; upper 12 bits (31:20) are the 4096-step sine index
+    pub phase: u32,
+    /// Per-clock-cycle phase increment: f_num * 2^(11+block) / 144 * ML
     pub phase_increment: u32,
     /// Current envelope state
     pub envelope_state: EnvelopeState,
@@ -132,7 +132,7 @@ impl Default for FmChannel {
             key_on: false,
             algorithm: 0,
             feedback: 0,
-            output_level: 127,
+            output_level: 0,
             left_enable: true,
             right_enable: true,
         }
@@ -239,7 +239,7 @@ impl YM2612 {
         Self {
             clock_rate,
             sample_rate: 44100,
-            clock_divider: 0.0,
+            clock_divider: clock_rate as f64 / 44100.0,
             accumulated_cycles: 0.0,
             channels: [Default::default(); 6],
             lfo: Default::default(),
@@ -279,14 +279,14 @@ impl YM2612 {
         // For now, simple sine wave output from operator 1
         // Full FM synthesis implementation will come later
         
-        if !channel.key_on || channel.output_level == 127 {
+        if !channel.key_on {
             return (0.0, 0.0);
         }
 
         // Get output from operator 1 (simplified)
         let output = self.get_operator_output(&channel.operators[0]);
-        
-        // Apply output level
+
+        // Apply output level (0 = max volume, 127 = silent)
         let scaled_output = output * (1.0 - channel.output_level as f32 / 127.0);
 
         // Apply panning
@@ -298,24 +298,24 @@ impl YM2612 {
 
     /// Get output from a single operator
     fn get_operator_output(&self, op: &FmOperator) -> f32 {
-        if !op.key_on || op.envelope_level == 127 {
+        if !op.key_on {
             return 0.0;
         }
 
-        // Simple sine wave based on phase
-        // Phase is 0-4095 (12 bits for one full cycle)
-        let phase_f = op.phase as f32 / 4096.0 * 2.0 * std::f32::consts::PI;
+        // Extract 12-bit sine index from upper bits of 32-bit accumulator
+        let phase_idx = (op.phase >> 20) & 0xFFF;
+        let phase_f = phase_idx as f32 / 4096.0 * 2.0 * std::f32::consts::PI;
         let sine = phase_f.sin();
 
-        // Apply envelope (simplified: just use envelope level)
+        // Apply envelope (0=loud, 127=silent)
         let envelope = 1.0 - op.envelope_level as f32 / 127.0;
 
         sine * envelope * 0.5
     }
 
-    /// Update operator phase
+    /// Update operator phase accumulator (add phase_increment per clock cycle)
     fn update_operator_phase(&mut self, op: &mut FmOperator) {
-        op.phase = op.phase.wrapping_add((op.phase_increment >> 16) as u16);
+        op.phase = op.phase.wrapping_add(op.phase_increment);
     }
 
     /// Update envelope generator for an operator
@@ -484,24 +484,24 @@ impl YM2612 {
                 self.channels[5].octave = (data >> 2) & 0x07;
             }
 
-            // === Key On/Off (0x28-0x2A) ===
-            // Registers 0x28-0x2A (channels 0-2) and 0x28-0x2A with different part bit
+            // === Key On/Off (0x28) ===
+            // Real YM2612: register 0x28 in either port encodes the target channel in data bits.
+            // data[3:2] = part (0 or 1), data[1:0] = channel-within-part (0-2),
+            // data[7:4] = per-operator key-on mask (0xF0 = all on, 0x00 = all off).
             0x28 => {
-                let channel = part * 3 + 0;
-                if channel < 6 {
-                    self.channels[channel].key_on = (data & 0xF0) != 0;
-                }
-            }
-            0x29 => {
-                let channel = part * 3 + 1;
-                if channel < 6 {
-                    self.channels[channel].key_on = (data & 0xF0) != 0;
-                }
-            }
-            0x2A => {
-                let channel = part * 3 + 2;
-                if channel < 6 {
-                    self.channels[channel].key_on = (data & 0xF0) != 0;
+                let ch_in_part = (data & 0x03) as usize;
+                let ch_part = ((data >> 2) & 0x01) as usize;
+                let channel = ch_part * 3 + ch_in_part;
+                if channel < 6 && ch_in_part < 3 {
+                    let key_on = (data & 0xF0) != 0;
+                    self.channels[channel].key_on = key_on;
+                    for op in &mut self.channels[channel].operators {
+                        op.key_on = key_on;
+                        if key_on {
+                            op.envelope_state = EnvelopeState::Attack;
+                            op.envelope_level = 127;
+                        }
+                    }
                 }
             }
 
@@ -553,9 +553,53 @@ impl SoundChipEmulator for YM2612 {
     }
 
     fn write(&mut self, addr: u8, data: u8) {
-        // YM2612 has two address spaces (part I and part II)
-        // For now, just handle part I (0x00-0x7F)
-        self.write_reg(addr, data);
+        self.write_port(0, addr, data);
+    }
+
+    fn write_port(&mut self, port: u8, addr: u8, data: u8) {
+        // Port 0 (VGM 0x52) → channels 0-2; port 1 (VGM 0x53) → channels 3-5.
+        let ch_base = port as usize * 3;
+
+        match addr {
+            // F-Num LSB: 0xA0+n → channel n within this port
+            0xA0..=0xA2 => {
+                let ch = ch_base + (addr - 0xA0) as usize;
+                if ch < 6 {
+                    self.channels[ch].frequency = (self.channels[ch].frequency & 0xFF00) | (data as u16);
+                }
+            }
+            // Block + F-Num MSB: 0xA4+n → channel n within this port
+            // data = [_, block2, block1, block0, f9, f8, 0, 0]
+            // VGM codegen: msb = (block << 3) | ((f_num >> 8) & 0x7)
+            0xA4..=0xA6 => {
+                let ch = ch_base + (addr - 0xA4) as usize;
+                if ch < 6 {
+                    self.channels[ch].octave = (data >> 3) & 0x07;
+                    let f_high = (data & 0x07) as u16;
+                    self.channels[ch].frequency = (f_high << 8) | (self.channels[ch].frequency & 0xFF);
+                }
+            }
+            // Algorithm/Feedback: 0xB0+n → channel n within this port
+            0xB0..=0xB2 => {
+                let ch = ch_base + (addr - 0xB0) as usize;
+                if ch < 6 {
+                    self.channels[ch].algorithm = data & 0x07;
+                    self.channels[ch].feedback = (data >> 3) & 0x07;
+                }
+            }
+            // Stereo/LFO sensitivity: 0xB4+n → channel n within this port
+            0xB4..=0xB6 => {
+                let ch = ch_base + (addr - 0xB4) as usize;
+                if ch < 6 {
+                    self.channels[ch].left_enable = (data & 0x80) != 0;
+                    self.channels[ch].right_enable = (data & 0x40) != 0;
+                }
+            }
+            // All other registers go through the generic handler
+            _ => {
+                self.write_reg(addr, data);
+            }
+        }
     }
 
     fn read(&self, addr: u8) -> u8 {
@@ -573,6 +617,21 @@ impl SoundChipEmulator for YM2612 {
 
         // Update all channels and operators
         for channel in &mut self.channels {
+            // Compute per-clock phase increment for each operator from channel frequency/octave.
+            // Formula: f_num * 2^(11+block) / 144, scaled by operator ML.
+            // This gives the correct increment for the 32-bit accumulator used in phase advance.
+            let f_num = channel.frequency as u64;
+            let block = channel.octave.min(7) as u32;
+            let base_inc = if f_num > 0 {
+                (f_num << (11 + block)) / 144
+            } else {
+                0
+            };
+            for op in &mut channel.operators {
+                let ml: u64 = if op.multiple == 0 { 1 } else { op.multiple as u64 * 2 };
+                op.phase_increment = ((base_inc * ml) / 2) as u32;
+            }
+
             // Update channel key state first
             if channel.key_on {
                 for op in &mut channel.operators {
@@ -585,8 +644,8 @@ impl SoundChipEmulator for YM2612 {
 
             // Update operators
             for op in &mut channel.operators {
-                // Update phase
-                op.phase = op.phase.wrapping_add((op.phase_increment >> 16) as u16);
+                // Update phase accumulator
+                op.phase = op.phase.wrapping_add(op.phase_increment);
                 
                 // Update envelope
                 match op.envelope_state {
@@ -688,44 +747,57 @@ mod tests {
     fn test_ym2612_write_frequency() {
         let mut chip = YM2612::new();
 
-        // Test channels 0-2 with registers 0xA8-0xAA (now fixed!)
-        // Channel 0: frequency low = 0x34, high/octave = 0x12
-        // 0x12 bits: [octave:5-3][freq_high:1-0] = [001:2-0][10:1-0]
-        // frequency = (0x12 & 0x03) << 8 | 0x34 = 0x02 << 8 | 0x34 = 0x0234
-        // octave = (0x12 >> 2) & 0x07 = 0x04
-        chip.write(0xA0, 0x34); // Channel 0 frequency low byte
-        chip.write(0xA8, 0x12); // Channel 0 frequency high byte (bits 1-0) + octave (bits 4-2)
-        assert_eq!(chip.channels[0].frequency, 0x0234);
-        assert_eq!(chip.channels[0].octave, 0x04);
+        // Port 0 (VGM 0x52): channels 0-2
+        // write_port(port, 0xA0+ch, f_num_low), write_port(port, 0xA4+ch, block<<3 | f_num_high)
+        // Channel 0: F-num=0x283=643, block=4
+        // msb = (4<<3) | (643>>8 & 7) = 32 | 2 = 0x22
+        chip.write_port(0, 0xA4, 0x22); // ch0 block+f_high: block=(0x22>>3)&7=4, f_high=0x22&7=2
+        chip.write_port(0, 0xA0, 0x83); // ch0 f_num low = 0x83
+        assert_eq!(chip.channels[0].frequency, 0x0283);
+        assert_eq!(chip.channels[0].octave, 4);
 
-        // Channel 1: frequency low = 0x56, high/octave = 0x1F
-        // 0x1F = 0001 1111: bits 1-0 = 11, octave = (0x1F >> 2) & 0x07 = 0x07
-        // frequency = (0x03) << 8 | 0x56 = 0x0356
-        chip.write(0xA1, 0x56); // Channel 1 frequency low byte
-        chip.write(0xA9, 0x1F); // Channel 1 frequency high byte (bits 1-0 = 11) + octave
-        assert_eq!(chip.channels[1].frequency, 0x0356);
-        assert_eq!(chip.channels[1].octave, 0x07);
+        // Channel 1: F-num=0x2A8, block=4
+        chip.write_port(0, 0xA5, 0x25); // ch1: block=(0x25>>3)&7=4, f_high=0x25&7=5
+        chip.write_port(0, 0xA1, 0xA8); // ch1 f_num low = 0xA8
+        assert_eq!(chip.channels[1].frequency, (5 << 8) | 0xA8);
+        assert_eq!(chip.channels[1].octave, 4);
 
-        // Test channels 3-5 with registers 0xAC-0xAE
-        chip.write(0xA4, 0xAB); // Channel 3 frequency low byte
-        chip.write(0xAC, 0x1D); // Channel 3: freq high bits = 01, octave = (0x1D >> 2) & 0x07 = 0x07
-        assert_eq!(chip.channels[3].frequency, 0x01AB);
-        assert_eq!(chip.channels[3].octave, 0x07);
+        // Port 1 (VGM 0x53): channels 3-5
+        // Channel 3: F-num=0x1AB, block=3
+        chip.write_port(1, 0xA4, 0x1D); // ch3: block=(0x1D>>3)&7=3, f_high=0x1D&7=5
+        chip.write_port(1, 0xA0, 0xAB); // ch3 f_num low = 0xAB
+        assert_eq!(chip.channels[3].frequency, (5 << 8) | 0xAB);
+        assert_eq!(chip.channels[3].octave, 3);
     }
 
     #[test]
     fn test_ym2612_soundchip_trait() {
         let mut chip = YM2612::new();
-        
+
         // Verify trait methods work
         assert_eq!(chip.name(), "YM2612 (OPN2)");
         assert_eq!(chip.clock_rate(), 7_670_453);
-        
+
         chip.reset();
         chip.write(0x28, 0xF0);
         chip.clock();
-        
+
         let mut buffer = [0.0f32; 2];
         chip.generate_samples(&mut buffer, 44100);
+    }
+
+    #[test]
+    fn test_ym2612_produces_sound_on_key_on() {
+        let mut chip = YM2612::new();
+        // C4: F-num=0x283, block=4
+        chip.write_port(0, 0xA4, 0x22); // block=4, f_high=2
+        chip.write_port(0, 0xA0, 0x83); // f_low=0x83
+        chip.write_port(0, 0xB4, 0xC0); // stereo enable
+        chip.write_reg(0x28, 0xF0);     // key-on ch0, all operators
+        // Generate enough samples for envelope attack to complete
+        let mut buffer = vec![0.0f32; 44100 * 2]; // 1 second stereo
+        chip.generate_samples(&mut buffer, 44100);
+        let any_nonzero = buffer.iter().any(|&s| s != 0.0);
+        assert!(any_nonzero, "YM2612 should produce non-zero output after key-on");
     }
 }
