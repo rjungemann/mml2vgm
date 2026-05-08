@@ -1,0 +1,16 @@
+#title "K051649 SCC MSX Example"
+#description "Konami SCC (K051649) - wavetable synthesis for MSX"
+
+$Msx1=K051649
+
+* K051649 SCC Channel
+@Msx1
+@WAVE0 @KEYON
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* Sustain section
+r16
+@KEYOFF
+t120 l4
+o5 c2 | g2 | a2 | f2

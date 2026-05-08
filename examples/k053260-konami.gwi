@@ -1,0 +1,17 @@
+#title "K053260 Konami Arcade PCM Example"
+#description "Konami K053260 arcade PCM chip"
+
+$ArcadePcm1=K053260
+$ArcadePcm2=K053260
+
+* K053260 Channel 1
+@ArcadePcm1
+@BANK0
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* K053260 Channel 2
+@ArcadePcm2
+@BANK1
+t120 l4
+o4 c c | g g | a a | f f

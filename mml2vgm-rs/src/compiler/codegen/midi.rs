@@ -491,8 +491,9 @@ impl MidiGenerator {
                 MmlNode::Comment(_) => {
                     // Skip comments
                 }
-                MmlNode::ChipCommand { .. } => {
-                    // Chip-specific command - skip for MIDI
+                MmlNode::ChipCommand { chip: _, command, args } => {
+                    // Map chip commands to MIDI CC messages
+                    self.handle_chip_command_to_midi(command, args, channel);
                 }
                 MmlNode::InstrumentSelection(inst) => {
                     // Map instrument to MIDI program change
@@ -557,6 +558,120 @@ impl MidiGenerator {
         
         if track_index < self.tracks.len() {
             self.tracks[track_index].events.push(MidiTrackEvent { delta, event });
+        }
+    }
+
+    /// Handle chip-specific commands by mapping them to MIDI CC messages (Phase 10)
+    fn handle_chip_command_to_midi(&mut self, command: &str, args: &[u32], channel: u8) {
+        use crate::compiler::codegen::midi_controller::*;
+        
+        let cmd_upper = command.to_uppercase();
+        
+        // Map command to MIDI CC based on command type
+        match cmd_upper.as_str() {
+            // FM Operator Level/Brightness parameters → Expression CC (11)
+            "TL" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8).saturating_sub(127).wrapping_neg()) as u8;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::EXPRESSION,
+                        value: cc_value,
+                    });
+                }
+            }
+            // FM Attack Rate → Brightness CC (12) for PSG, or Expression for FM
+            "AR" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8) >> 2) & 0x7F;
+                    // Default to Expression, could be refined with chip detection
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::EXPRESSION,
+                        value: cc_value,
+                    });
+                }
+            }
+            // Decay Rate → Resonance CC (13)
+            "DR" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8) >> 2) & 0x7F;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::EFFECT_CONTROL_2,
+                        value: cc_value,
+                    });
+                }
+            }
+            // Algorithm (AL) → General Purpose Slider 1 (16)
+            "AL" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8) * 16) & 0x7F;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::GENERAL_PURPOSE_SLIDER_1,
+                        value: cc_value,
+                    });
+                }
+            }
+            // Feedback (FB) → General Purpose Slider 2 (17)
+            "FB" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8) * 16) & 0x7F;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::GENERAL_PURPOSE_SLIDER_2,
+                        value: cc_value,
+                    });
+                }
+            }
+            // Pan (PAN) → Pan CC (10)
+            "PAN" => {
+                if !args.is_empty() {
+                    let pan_value = args[0] as u8;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::PAN,
+                        value: pan_value,
+                    });
+                }
+            }
+            // Volume control → Main Volume CC (7)
+            "VOLUME" | "LVOL" | "RVOL" => {
+                if !args.is_empty() {
+                    let vol_value = ((args[0] as u8) >> 1) & 0x7F;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::VOLUME,
+                        value: vol_value,
+                    });
+                }
+            }
+            // Envelope enable → General Purpose Slider 3 (18)
+            "EN" => {
+                if !args.is_empty() {
+                    let cc_value = if args[0] != 0 { 127 } else { 0 };
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::GENERAL_PURPOSE_SLIDER_3,
+                        value: cc_value,
+                    });
+                }
+            }
+            // Filter/Distortion mode → Effect Control 1 (12)
+            "FILTER" | "DIST" => {
+                if !args.is_empty() {
+                    let cc_value = ((args[0] as u8) * 32) & 0x7F;
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: midi_cc::EFFECT_CONTROL_1,
+                        value: cc_value,
+                    });
+                }
+            }
+            _ => {
+                // Unknown command - silently skip
+            }
         }
     }
 

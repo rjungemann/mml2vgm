@@ -1,0 +1,17 @@
+#title "K054539 Konami Advanced PCM Example"
+#description "Konami K054539 advanced PCM chip with ADPCM"
+
+$AdvancedPcm1=K054539@1
+$AdvancedPcm2=K054539@2
+
+* K054539 Channel 1
+@AdvancedPcm1
+@BANK0 @LOOP1
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* K054539 Channel 2
+@AdvancedPcm2
+@BANK1
+t120 l4
+o4 c c | g g | a a | f f

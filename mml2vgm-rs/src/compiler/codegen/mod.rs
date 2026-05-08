@@ -13,6 +13,7 @@ pub mod vgm;
 pub mod xgm;
 pub mod zgm;
 pub mod midi;
+pub mod midi_controller;
 
 use crate::{MmlError, MmlResult, OutputFormat as LibOutputFormat, SoundChip};
 use std::path::Path;

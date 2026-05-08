@@ -1,0 +1,17 @@
+#title "SegaPCM Genesis Example"
+#description "SegaPCM synthesis on Sega Genesis - PCM drum and bass samples"
+
+$Genesis1=SegaPCM@1
+$Genesis2=SegaPCM@2
+
+* Drums Channel
+@Genesis1
+@BANK0
+t120 l16
+o4 c8 r8 d8 r8 | e8 r8 f8 r8 | g8 r8 a8 r8 | b8 r8 >c8 r8
+
+* Bass Channel
+@Genesis2
+@BANK0
+t120 l8
+o2 c4 c4 | g4 g4 | a4 a4 | f4 f4

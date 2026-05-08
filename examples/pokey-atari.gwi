@@ -1,0 +1,16 @@
+#title "POKEY Atari 8-bit Example"
+#description "Atari POKEY chip - digital synthesis with filters"
+
+$Atari1=POKEY
+
+* POKEY Melody
+@Atari1
+@EN1 @FILTER0 @NOISE5
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* Rest for dynamics
+r16
+@EN0
+t120 l4
+o5 c c | g g | a a | f f

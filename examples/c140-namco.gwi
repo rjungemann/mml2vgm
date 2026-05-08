@@ -1,0 +1,17 @@
+#title "C140 Namco Arcade Example"
+#description "Namco C140 PCM chip - arcade wavetable synthesis"
+
+$Arcade1=C140
+$Arcade2=C140
+
+* Channel 1 - Lead
+@Arcade1
+@BANK0 @LOOP1 @LOOPLEN256
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* Channel 2 - Bass
+@Arcade2
+@BANK1
+t120 l4
+o3 c c | g g | a a | f f

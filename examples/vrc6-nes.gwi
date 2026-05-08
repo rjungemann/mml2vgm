@@ -1,0 +1,15 @@
+#title "VRC6 Konami NES Example"
+#description "Konami VRC6 NES expansion - pulse and sawtooth synthesis"
+
+$Vrc6Pulse1=VRC6@1
+$Vrc6Pulse2=VRC6@2
+
+* VRC6 Pulse 1
+@Vrc6Pulse1
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* VRC6 Pulse 2
+@Vrc6Pulse2
+t120 l4
+o4 c c | g g | a a | f f

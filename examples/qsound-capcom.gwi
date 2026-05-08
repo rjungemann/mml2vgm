@@ -1,0 +1,17 @@
+#title "QSound Capcom CPS Example"
+#description "Capcom QSound chip - arcade PCM with 3D panning"
+
+$CPS1=QSound@1
+$CPS2=QSound@2
+
+* QSound Channel 1
+@CPS1
+@PAN64
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+
+* QSound Channel 2
+@CPS2
+@PAN63
+t120 l4
+o4 c c | g g | a a | f f
