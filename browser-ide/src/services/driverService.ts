@@ -58,6 +58,157 @@ export interface ExternalToken {
     length: number;
 }
 
+/** A single autocompletion suggestion for the editor */
+export interface CompletionSuggestion {
+    label: string;
+    insertText: string;
+    detail?: string;
+    documentation?: string;
+    kind: 'keyword' | 'snippet' | 'value';
+}
+
+// ============================================================================
+// Per-driver completion data
+// ============================================================================
+
+const GWI_COMPLETIONS: CompletionSuggestion[] = [
+    // Chip part directives
+    { label: 'PartYM2612', insertText: 'PartYM2612', detail: 'Define YM2612 (FM) part', kind: 'keyword' },
+    { label: 'PartSN76489', insertText: 'PartSN76489', detail: 'Define SN76489 (PSG) part', kind: 'keyword' },
+    { label: 'PartYM2151', insertText: 'PartYM2151', detail: 'Define YM2151 (OPM) part', kind: 'keyword' },
+    { label: 'PartYM2608', insertText: 'PartYM2608', detail: 'Define YM2608 (OPNA) part', kind: 'keyword' },
+    { label: 'PartYM2610', insertText: 'PartYM2610', detail: 'Define YM2610 (OPNB) part', kind: 'keyword' },
+    { label: 'PartYM2413', insertText: 'PartYM2413', detail: 'Define YM2413 (OPLL) part', kind: 'keyword' },
+    { label: 'PartAY8910', insertText: 'PartAY8910', detail: 'Define AY-3-8910 (PSG) part', kind: 'keyword' },
+    { label: 'PartNESAPU', insertText: 'PartNESAPU', detail: 'Define NES APU part', kind: 'keyword' },
+    { label: 'PartDMG', insertText: 'PartDMG', detail: 'Define DMG (Game Boy) part', kind: 'keyword' },
+    // Tone/envelope blocks
+    { label: '@', insertText: '@ ', detail: 'Tone number select', kind: 'keyword' },
+    { label: "'@ M", insertText: "'@ M\n  ALG=0 FB=0\n  ; operator data here\n.", detail: "FM tone macro block", kind: 'snippet' },
+    { label: "'@ E", insertText: "'@ E\n  AL=0 AR=15 DR=0 SR=0 RR=5 SL=0 TL=0\n.", detail: "Envelope macro", kind: 'snippet' },
+    { label: "'@ P", insertText: "'@ P\n  ; PSG envelope data\n.", detail: "PSG envelope macro", kind: 'snippet' },
+    { label: "'@ A", insertText: "'@ A\n  ; arpeggio data\n.", detail: "Arpeggio macro", kind: 'snippet' },
+    // Loop/flow
+    { label: '/[', insertText: '/[', detail: 'Loop start', kind: 'keyword' },
+    { label: '/]', insertText: '/]', detail: 'Loop end', kind: 'keyword' },
+    // Note/octave/volume commands
+    { label: 'o', insertText: 'o4', detail: 'Set octave (o4)', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume (v100)', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo (t120)', kind: 'snippet' },
+    { label: 'q', insertText: 'q8', detail: 'Set quantize (q8)', kind: 'snippet' },
+    { label: 'l', insertText: 'l8', detail: 'Set default note length (l8)', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '>', insertText: '>', detail: 'Octave up', kind: 'keyword' },
+    { label: '<', insertText: '<', detail: 'Octave down', kind: 'keyword' },
+    // Part names
+    { label: 'A', insertText: 'A', detail: 'Part A', kind: 'value' },
+    { label: 'B', insertText: 'B', detail: 'Part B', kind: 'value' },
+    { label: 'C', insertText: 'C', detail: 'Part C', kind: 'value' },
+    { label: 'D', insertText: 'D', detail: 'Part D', kind: 'value' },
+    { label: 'E', insertText: 'E', detail: 'Part E', kind: 'value' },
+    { label: 'F', insertText: 'F', detail: 'Part F', kind: 'value' },
+];
+
+const M98_COMPLETIONS: CompletionSuggestion[] = [
+    { label: 'M98', insertText: 'M98', detail: 'M98 music header', kind: 'keyword' },
+    { label: 'OPNA', insertText: 'OPNA', detail: 'OPNA chip directive', kind: 'keyword' },
+    { label: '#TEMPO', insertText: '#TEMPO ', detail: 'Set tempo', kind: 'keyword' },
+    { label: '#OCTAVE', insertText: '#OCTAVE ', detail: 'Set octave', kind: 'keyword' },
+    { label: '#VOLUME', insertText: '#VOLUME ', detail: 'Set volume', kind: 'keyword' },
+    { label: '#CHANNEL', insertText: '#CHANNEL ', detail: 'Set channel', kind: 'keyword' },
+    { label: 'o', insertText: 'o4', detail: 'Set octave', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '@', insertText: '@ ', detail: 'Voice select', kind: 'keyword' },
+];
+
+const MUCOM_COMPLETIONS: CompletionSuggestion[] = [
+    { label: '#MUCOM88', insertText: '#MUCOM88', detail: 'MUCOM88 header', kind: 'keyword' },
+    { label: '#VOICE', insertText: '#VOICE\n  ; FM voice data here\n.', detail: 'FM voice definition block', kind: 'snippet' },
+    { label: '#TEMPO', insertText: '#TEMPO ', detail: 'Set tempo', kind: 'keyword' },
+    { label: '#OCTAVE', insertText: '#OCTAVE ', detail: 'Set octave', kind: 'keyword' },
+    { label: '#W', insertText: '#W ', detail: 'Wait command', kind: 'keyword' },
+    { label: '#INCLUDE', insertText: "#INCLUDE '", detail: 'Include file', kind: 'keyword' },
+    { label: 'A', insertText: 'A', detail: 'Channel A (FM)', kind: 'value' },
+    { label: 'B', insertText: 'B', detail: 'Channel B (FM)', kind: 'value' },
+    { label: 'C', insertText: 'C', detail: 'Channel C (FM)', kind: 'value' },
+    { label: 'G', insertText: 'G', detail: 'Channel G (SSG)', kind: 'value' },
+    { label: 'H', insertText: 'H', detail: 'Channel H (SSG)', kind: 'value' },
+    { label: 'I', insertText: 'I', detail: 'Channel I (SSG)', kind: 'value' },
+    { label: 'o', insertText: 'o4', detail: 'Set octave', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '@', insertText: '@0', detail: 'Voice number select', kind: 'keyword' },
+];
+
+const MOONDRIVER_COMPLETIONS: CompletionSuggestion[] = [
+    { label: '#MD', insertText: '#MD', detail: 'MoonDriver header', kind: 'keyword' },
+    { label: '#OPN2', insertText: '#OPN2', detail: 'Use YM2612 (OPN2) chip', kind: 'keyword' },
+    { label: '#OPNA', insertText: '#OPNA', detail: 'Use YM2608 (OPNA) chip', kind: 'keyword' },
+    { label: '#OPN3', insertText: '#OPN3', detail: 'Use YMF288 (OPN3) chip', kind: 'keyword' },
+    { label: '#INCLUDE', insertText: "#INCLUDE '", detail: 'Include file', kind: 'keyword' },
+    { label: '#TEMPO', insertText: '#TEMPO ', detail: 'Set tempo', kind: 'keyword' },
+    { label: '#TRACK', insertText: '#TRACK ', detail: 'Track definition', kind: 'keyword' },
+    { label: 'o', insertText: 'o4', detail: 'Set octave', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '@', insertText: '@0', detail: 'Voice select', kind: 'keyword' },
+];
+
+const PMD_COMPLETIONS: CompletionSuggestion[] = [
+    { label: '@MUSIC', insertText: '@MUSIC', detail: 'Music data section', kind: 'keyword' },
+    { label: '@PPZ', insertText: '@PPZ', detail: 'PPZ/ADPCM channel section', kind: 'keyword' },
+    { label: '@RHYTHM', insertText: '@RHYTHM', detail: 'Rhythm track section', kind: 'keyword' },
+    { label: '@ADPCM', insertText: '@ADPCM', detail: 'ADPCM section', kind: 'keyword' },
+    { label: '@@', insertText: '@@', detail: 'End of part marker', kind: 'keyword' },
+    { label: '#TEMPO', insertText: '#TEMPO ', detail: 'Set tempo', kind: 'keyword' },
+    { label: '#OCTAVE', insertText: '#OCTAVE ', detail: 'Set octave direction', kind: 'keyword' },
+    { label: '#TITLE', insertText: "#TITLE '", detail: 'Song title metadata', kind: 'keyword' },
+    { label: '#MEMO', insertText: "#MEMO '", detail: 'Comment metadata', kind: 'keyword' },
+    { label: 'BD', insertText: 'BD', detail: 'Bass drum rhythm step', kind: 'value' },
+    { label: 'SD', insertText: 'SD', detail: 'Snare drum rhythm step', kind: 'value' },
+    { label: 'TOM', insertText: 'TOM', detail: 'Tom-tom rhythm step', kind: 'value' },
+    { label: 'HH', insertText: 'HH', detail: 'Hi-hat rhythm step', kind: 'value' },
+    { label: 'CYM', insertText: 'CYM', detail: 'Cymbal rhythm step', kind: 'value' },
+    { label: 'RIM', insertText: 'RIM', detail: 'Rim shot rhythm step', kind: 'value' },
+    { label: 'o', insertText: 'o4', detail: 'Set octave', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '@', insertText: '@0', detail: 'Voice select', kind: 'keyword' },
+];
+
+const MUAP_COMPLETIONS: CompletionSuggestion[] = [
+    { label: '@FM', insertText: '@FM', detail: 'FM synthesis section', kind: 'keyword' },
+    { label: '@SSG', insertText: '@SSG', detail: 'SSG (PSG) section', kind: 'keyword' },
+    { label: '@RHYTHM', insertText: '@RHYTHM', detail: 'Rhythm section', kind: 'keyword' },
+    { label: '@ADPCM', insertText: '@ADPCM', detail: 'ADPCM section', kind: 'keyword' },
+    { label: '@OPNA', insertText: '@OPNA', detail: 'OPNA chip section', kind: 'keyword' },
+    { label: '#TEMPO', insertText: '#TEMPO ', detail: 'Set tempo', kind: 'keyword' },
+    { label: '#OCTAVE', insertText: '#OCTAVE ', detail: 'Set octave', kind: 'keyword' },
+    { label: 'o', insertText: 'o4', detail: 'Set octave', kind: 'snippet' },
+    { label: 'v', insertText: 'v100', detail: 'Set volume', kind: 'snippet' },
+    { label: 't', insertText: 't120', detail: 'Set tempo', kind: 'snippet' },
+    { label: 'r', insertText: 'r4', detail: 'Rest', kind: 'keyword' },
+    { label: '@', insertText: '@0', detail: 'Voice select', kind: 'keyword' },
+];
+
+const DRIVER_COMPLETIONS: Record<string, CompletionSuggestion[]> = {
+    gwi: GWI_COMPLETIONS,
+    mml: GWI_COMPLETIONS,
+    m98: M98_COMPLETIONS,
+    muc: MUCOM_COMPLETIONS,
+    mucom: MUCOM_COMPLETIONS,
+    mdl: MOONDRIVER_COMPLETIONS,
+    moondriver: MOONDRIVER_COMPLETIONS,
+    mus: PMD_COMPLETIONS,
+    pmd: PMD_COMPLETIONS,
+    muap: MUAP_COMPLETIONS,
+};
+
 // ============================================================================
 // Driver Service Class
 // ============================================================================
@@ -449,6 +600,28 @@ export class DriverService {
                 console.error('Error in driver service listener:', error);
             }
         }
+    }
+
+    // ========================================================================
+    // Completions
+    // ========================================================================
+
+    /**
+     * Completion item shape (subset of Monaco's CompletionItem, without range).
+     */
+
+    /**
+     * Return format-specific completion suggestions for a driver.
+     *
+     * The `prefix` is the word currently being typed (may be empty).
+     * Returns a list of {label, insertText, detail, documentation} objects
+     * that MonacoEditor can turn into Monaco CompletionItems.
+     */
+    public getCompletions(driverId: string, prefix: string): CompletionSuggestion[] {
+        const all = DRIVER_COMPLETIONS[driverId] ?? DRIVER_COMPLETIONS['gwi'];
+        if (!prefix) return all;
+        const lower = prefix.toLowerCase();
+        return all.filter(s => s.label.toLowerCase().startsWith(lower));
     }
 
     // ========================================================================

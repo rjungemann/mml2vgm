@@ -528,7 +528,10 @@ impl eframe::App for MmlApp {
                         if let Some(bytes) = self.docs.active().and_then(|d| d.compiled_bytes.clone()) {
                             let fmt = self.compile_opts.format.clone();
                             std::thread::spawn(move || {
-                                if let Some(path) = rfd::FileDialog::new().add_filter("Output", &[fmt.as_str()]).save_file() {
+                                let extension = if fmt == "mid" { "mid" } else { fmt.as_str() };
+                                let dialog = rfd::FileDialog::new()
+                                    .add_filter("Output", &[extension]);
+                                if let Some(path) = dialog.save_file() {
                                     let _ = std::fs::write(&path, &bytes);
                                 }
                             });

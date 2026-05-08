@@ -91,14 +91,17 @@ pub enum OutputFormat {
     XGM2,
     /// ZGM format (Extended VGM with YM2609 and MIDI support)
     ZGM,
+    /// Standard MIDI File format
+    MID,
 }
 
 /// All output formats exposed by the public API.
-pub const ALL_OUTPUT_FORMATS: [OutputFormat; 4] = [
+pub const ALL_OUTPUT_FORMATS: [OutputFormat; 5] = [
     OutputFormat::VGM,
     OutputFormat::XGM,
     OutputFormat::XGM2,
     OutputFormat::ZGM,
+    OutputFormat::MID,
 ];
 
 impl OutputFormat {
@@ -109,6 +112,7 @@ impl OutputFormat {
             OutputFormat::XGM => "xgm",
             OutputFormat::XGM2 => "xgm2",
             OutputFormat::ZGM => "zgm",
+            OutputFormat::MID => "mid",
         }
     }
 
@@ -116,6 +120,7 @@ impl OutputFormat {
     pub fn support_tier(&self) -> SupportTier {
         match self {
             OutputFormat::VGM | OutputFormat::XGM | OutputFormat::XGM2 | OutputFormat::ZGM => SupportTier::Partial,
+            OutputFormat::MID => SupportTier::Declared,
         }
     }
 }
@@ -135,8 +140,9 @@ impl std::str::FromStr for OutputFormat {
             "xgm" => Ok(OutputFormat::XGM),
             "xgm2" => Ok(OutputFormat::XGM2),
             "zgm" => Ok(OutputFormat::ZGM),
+            "mid" => Ok(OutputFormat::MID),
             _ => Err(MmlError::UnsupportedCommand(format!(
-                "Unknown output format: {}. Supported: vgm, xgm, xgm2, zgm",
+                "Unknown output format: {}. Supported: vgm, xgm, xgm2, zgm, mid",
                 s
             ))),
         }
@@ -775,6 +781,7 @@ mod tests {
         assert_eq!("xgm".parse::<OutputFormat>().unwrap(), OutputFormat::XGM);
         assert_eq!("xgm2".parse::<OutputFormat>().unwrap(), OutputFormat::XGM2);
         assert_eq!("zgm".parse::<OutputFormat>().unwrap(), OutputFormat::ZGM);
+        assert_eq!("mid".parse::<OutputFormat>().unwrap(), OutputFormat::MID);
     }
 
     #[test]

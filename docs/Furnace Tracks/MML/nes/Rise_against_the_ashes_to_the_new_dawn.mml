@@ -1,0 +1,13 @@
+; Rise against the ashes to a new dawn
+; By: Crisps
+; System: Famicom + Konami VRC6
+
+$OPN, $UNKNOWN_0x0088,
+
+!ALL
+
+$$ALL
+  ; Pattern data not available
+
+$$ALL
+  ; Pattern data not available

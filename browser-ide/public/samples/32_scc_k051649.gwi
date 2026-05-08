@@ -1,0 +1,37 @@
+; K051649 (SCC) — Wavetable Chip Example
+; =====================================================================
+; NOTE: K051649 (SCC — Sound Creative Chip) is not yet wired into
+; the mml2vgm compiler's VGM code generator. This file is a placeholder
+; that will be expanded once compiler support is added.
+;
+; Chip: Konami K051649 / K052539 (SCC+)
+; Channels: 5 wavetable channels, each with a 32-sample custom waveform
+; Used in: Konami MSX cartridges (Gradius 2, Salamander, Snatcher),
+;          Konami arcade boards
+;
+; Planned example:
+;   - PartK051649 = A header
+;   - A1-A5 = five SCC channels with different waveforms
+;   - Custom waveform definitions using '@ W blocks (if/when supported)
+;   - Genre: Konami MSX game music style
+;
+; When compiler support is added, this file will demonstrate:
+;   PartK051649 = A
+;   '@ W 0 { ... }   ; 32-sample waveform definition
+;   'A1 T150 @0 v100 o5 l8 c d e f g a b >c
+; =====================================================================
+
+; Placeholder: compiles as an empty VGM
+'{
+
+    TitleName   = K051649 SCC (Placeholder)
+    SystemName  = Konami MSX
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+}
+
+; K051649 compiler support not yet available.
+; See docs/Example_Tracks_Plan.md Phase 4 for implementation status.

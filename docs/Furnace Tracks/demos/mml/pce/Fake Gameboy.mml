@@ -1,0 +1,48 @@
+
+$OPM,
+
+!ALL
+
+$Inst1,
+$Inst2,
+$Inst3,
+$Inst4,
+
+$$ALL
+  [r D+5 D+5 D+5 D+5 D+5 D+5 D+5 r r r r r r r r r r r r r r r r r r r r r r r r r r r r r r r rV97 G2V97 C+8V121 G+8V111 E8V110 D+5V111 A+7V111 E3 F+5V2 r C0 r C0V2 A1 D1 rV225 rV29 A+0 F2 rV202 rV37 G19 C4 rV31 rV68 E5 G6 rV116 rV98 F12 r r r r C0V2 C+0V2 r C0V1 C+0V1 C0V1 r C0V1 C0V1 C0V1 C0 r r r r r C0 rV4 C0 r rV150 r rV73 B6 D8V5 C+9V116 C9V110 B3 r rV31 r r r r r r r r r r r r F+2 F+10 r r r r rV31 D1V127 D0 r r r r]
+
+$$ALL
+  [C+0 rV8 r r r r r r rV22 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 r F+2 r rV29 r D+2 r rV26 r B1 r rV20 r E1 r rV10 r E0 r r r r r rV2 r r r rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r rV1 r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r C0 r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r]
+
+$$ALL
+  [rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r]
+
+$$ALL
+  [r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r G2V80 C0V255 rV32 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r r r r r r r rV15 rV15 r r r r r F6V84 rV99 rV110 F9V109 G9V50 r r r r r r r r F+2 F+10 r r r r rV31 D1V127 D0 r r r r F+2V15 rV3 r r r r D1V2 C0 r r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV31 r r r r rV255 rV255 rV255 rV1 C0 r]
+
+$$ALL
+  [r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r rV1 r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r C0 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255]
+
+$$ALL
+  [rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r E0V5 rV255 rV3 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV1 r r r]
+
+$$ALL
+  [r r rV15 D1 r r r r r A+6 r C6V115 G+9V101 G2 rV2 rV31 D1V127 D0 r r r r F+2V15 rV3 r r r r rV31 r r r r r r r r r r r r r r rV8 r r r F+2 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 r r D2 r rV22 r F+1 r r r r r rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r]
+
+$$ALL
+  [r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r rV1 r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r]
+
+$$ALL
+  [r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r rV5 B15 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r r r r r r r r rV15 r r r r r C6V83 r E0V73 G9V117 C+9V32 r r F+2V15 rV3 r r r r rV31 r r r r r r r r r r r r F+2 F+10 r r r r r r G0 r r r rV31 r]
+
+$$ALL
+  [r D+1 r rV1 r r r rV255 r rV255 rV255 rV255 rV255 rV255 r rV31 r F2 r rV28 r D2 r rV27 r D2 r rV17 r E0 r rV17 r E0 r r r r rV255 rV255 rV255 C0 r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r rV1 r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r C0 r r r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r]
+
+$$ALL
+  [r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255]
+
+$$ALL
+  [rV255 rV255 rV255 r r rV32 E0V1 rV255 D0 r r r r r r rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 rV255 r r r r r r r r r r r r C0 r r r r r D1 r r r r r rV65 r G2 r rV31 r F+2 r rV31 r F+2 r rV31 r F+2 r rV31 r r r r r r r r r r r r r D7V86 r r rV31 r F+2 r rV31 r F+2 r r r r r r r r r r r r r r r r r r r r E5V69 r r r F+2 r rV31 r r r r r r r r r]
+
+$$ALL
+  [r r r r r r r r r r r r r r C+7 rV32 r F+2 r rV22 r E2 r rV29 r B1 r rV14 r A+0 r rV8 r F0 r rV6 r F+0 r rV8 r G+0 r rV87 G+5 r r r rV1 r D0 r rV6 r G0 r rV11 r C1 r rV16 r F1 r rV21 r A+1 r rV26 r D+2 r rV31 rV65 r r rV6 r rV255 r rV255 r rV255 rV255 rV255 rV255 C+0V5 rV255 r rV255 rV255 r rV255 r rV255 rV255 D+0 rV255 r rV255 rV7 r rV255 r rV255 r rV255 rV255 rV255 rV255 A+0V4 rV255 r rV255 rV255 r rV255 r rV255 rV255 D+0 rV255 r rV255 rV2 r rV255 r]

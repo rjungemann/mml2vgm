@@ -35,6 +35,9 @@ import SamplesPanel from '@/components/panels/SamplesPanel';
 import FmToneEditorPanel from '@/components/panels/FmToneEditorPanel';
 import EnvelopeEditorPanel from '@/components/panels/EnvelopeEditorPanel';
 import ArpeggioEditorPanel from '@/components/panels/ArpeggioEditorPanel';
+import PmdRhythmEditorPanel from '@/components/panels/PmdRhythmEditorPanel';
+import MucomVoiceEditorPanel from '@/components/panels/MucomVoiceEditorPanel';
+import MoonDriverChipSelectorPanel from '@/components/panels/MoonDriverChipSelectorPanel';
 import { TabBar } from '@/components/TabBar';
 import BottomTabs, { type BottomTab } from '@/components/BottomTabs';
 import { useSessionStorageState } from '@/utils/useSessionStorageState';
@@ -764,8 +767,11 @@ export const App: React.FC = () => {
     const baseName = doc.filename.replace(/\.\w+$/, '');
     const fileName = `${baseName}.${format}`;
     
+    // Use appropriate MIME type for MIDI files
+    const mimeType = format === 'mid' ? 'audio/midi' : 'application/octet-stream';
+    
     // Create blob and download
-    const blob = new Blob([exportResult.data], { type: 'application/octet-stream' });
+    const blob = new Blob([exportResult.data], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -1152,6 +1158,8 @@ export const App: React.FC = () => {
   ));
 
   // Bottom tabs
+  const activeLanguage = activeDocument?.language;
+
   const bottomTabs: BottomTab[] = [
     {
       id: 'output',
@@ -1183,6 +1191,22 @@ export const App: React.FC = () => {
       label: 'Samples',
       content: <SamplesPanel uploadTrigger={sampleUploadTrigger} />,
     },
+    // Driver-specific tabs — only shown when the active document uses the matching format
+    ...(activeLanguage === 'mus' ? [{
+      id: 'pmdRhythm',
+      label: 'PMD Rhythm',
+      content: <PmdRhythmEditorPanel />,
+    }] : []),
+    ...(activeLanguage === 'muc' ? [{
+      id: 'mucomVoice',
+      label: 'MUCOM Voice',
+      content: <MucomVoiceEditorPanel />,
+    }] : []),
+    ...(activeLanguage === 'mdl' ? [{
+      id: 'moonDriverChip',
+      label: 'MD Chip',
+      content: <MoonDriverChipSelectorPanel />,
+    }] : []),
   ];
 
   return (
@@ -1352,6 +1376,7 @@ export const App: React.FC = () => {
                   useDocumentStore.getState().updateDocumentContent(activeDocumentId!, content);
                 }}
                 settings={settings.editor}
+                driverId={activeDocument.language}
                 currentPosition={traceStatus.currentPosition}
                 navigationPosition={navigatePosition}
                 activeNoteEvents={activeNoteEvents}

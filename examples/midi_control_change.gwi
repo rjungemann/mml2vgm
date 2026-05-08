@@ -1,0 +1,24 @@
+{
+Title=MIDI Control Change Demo
+Composer=mml2vgm
+ClockCount=192
+}
+
+; Demonstrates MIDI Control Change commands
+; Compile with: mml2vgm-rs midi_control_change.gwi --format mid -o midi_cc.mid
+
+; Part A1: Piano with volume and pan changes
+'A1 @ch0 @p0 l4 o4
+v100 @panL c4 d4 e4 f4  ; Left pan, volume 100
+v80 @panR g4 f4 e4 d4    ; Right pan, volume 80
+v127 @panC c2            ; Center pan, full volume
+
+; Part B1: Using shorthand CC commands
+'B1 @ch1 @p24 l4 o3
+@sustain c4 d4 e4 f4     ; Sustain on
+@sustainOff g4 f4 e4 d4 ; Sustain off
+
+; Part C1: Expression changes
+'C1 @ch2 @p48 l4 o4
+@expr0 c4 d4 e4 f4       ; Minimum expression
+@expr127 g4 f4 e4 d4    ; Maximum expression

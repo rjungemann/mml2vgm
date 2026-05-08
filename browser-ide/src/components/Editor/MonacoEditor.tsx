@@ -9,6 +9,8 @@ interface MonacoEditorProps {
   document: Document;
   onChange: (content: string) => void;
   settings: EditorSettings;
+  /** The active document's language/driver id (e.g. 'gwi', 'muc', 'mus') */
+  driverId?: string;
   // Trace playback props
   currentPosition?: Position | null;
   // Navigation
@@ -28,7 +30,7 @@ export interface MonacoEditorHandle {
 }
 
 const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
-  { document, onChange, settings, currentPosition, navigationPosition, activeNoteEvents },
+  { document, onChange, settings, driverId, currentPosition, navigationPosition, activeNoteEvents },
   ref
 ) => {
   const editorRef = useRef<any>(null);
@@ -37,6 +39,8 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
   const [currentLineDecorations, setCurrentLineDecorations] = useState<string[]>([]);
   const [navDecorations, setNavDecorations] = useState<string[]>([]);
   const [noteEventDecorations, setNoteEventDecorations] = useState<string[]>([]);
+  // Use a ref so that the Monaco completion provider closure always reads the latest value
+  const driverIdRef = useRef<string>(driverId ?? document.language ?? 'gwi');
 
   // Expose editor methods via ref
   useImperativeHandle(ref, () => ({
@@ -64,12 +68,18 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
     },
   }));
 
+  // Keep driverIdRef in sync with the prop so the completion provider
+  // always reads the latest value without needing re-registration.
+  useEffect(() => {
+    driverIdRef.current = driverId ?? document.language ?? 'gwi';
+  }, [driverId, document.language]);
+
   // Register MML language and theme when Monaco is loaded
   useEffect(() => {
     if (!monaco) return;
 
-    // Register MML language
-    registerMmlLanguage(monaco);
+    // Register MML language, passing a stable callback that reads the ref.
+    registerMmlLanguage(monaco, () => driverIdRef.current);
 
     // Register themes
     registerMmlTheme(monaco, 'mml-dark', 'vs-dark');
@@ -77,6 +87,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
 
     // Set the current theme
     monaco.editor.setTheme(settings.theme === 'vs-dark' ? 'mml-dark' : 'mml-light');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monaco, settings.theme]);
 
   // Highlight current playback position

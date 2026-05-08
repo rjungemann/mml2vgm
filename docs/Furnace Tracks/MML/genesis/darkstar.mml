@@ -1,0 +1,10 @@
+; Dark Star (newmod3)
+; By: Zzzax (cover by tildearrow)
+; System: Sega Genesis/Mega Drive
+
+$UNKNOWN_0x0083, $FM1,
+
+!ALL
+
+$$ALL
+  ; TODO: Add pattern data

@@ -1,0 +1,74 @@
+'{
+
+    TitleName   = Polyrhythm
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; Polyrhythm demo — MML parts are independent time streams.
+; When different parts use different phrase lengths, they drift in and out of
+; alignment, creating polyrhythm naturally — no special syntax needed.
+;
+; A1 plays a 3-beat pattern (3/4 feel) using dotted quarter notes.
+; A2 plays a straight 4-beat pattern (4/4 feel).
+; B1 provides a triplet bass that divides the beat in three.
+;
+; All three streams start and end at the same time after 12 beats (LCM of 3 and 4),
+; demonstrating how the compiler handles multiple independent time-grids.
+
+; FM lead patch — clean sine, all-carrier (algorithm 7)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 028,006,000,006,002,000,000,001,000,000,000
+'@ 028,006,000,006,002,000,000,001,002,000,000
+'@ 028,006,000,006,002,000,000,002,000,000,000
+'@ 028,006,000,006,002,000,000,002,006,000,000
+'@ 007,000
+
+; FM harmony patch — slightly softer, detuned (algorithm 7)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 020,008,000,006,003,010,000,001,001,000,000
+'@ 020,008,000,006,003,010,000,001,007,000,000
+'@ 020,008,000,006,003,010,000,002,001,000,000
+'@ 020,008,000,006,003,010,000,002,007,000,000
+'@ 007,000
+
+'A1 T120
+'A2 T120
+'B1 T120
+
+; ── A1: 3-BEAT PATTERN (3/4 feel) ────────────────────────────────────────────
+; Three phrases of 3 dotted quarter notes each, cycling through C major triads.
+; Phrase repeats 4 times to fill 12 beats total.
+;
+; Each dotted quarter = 3 eighth notes → 3 notes per "bar" of 3 beats.
+
+'A1 @0 v100 l4. o5 q6
+'A1 (c e g)4
+'A1 l2. o5 c
+
+; ── A2: 4-BEAT PATTERN (4/4 feel) ────────────────────────────────────────────
+; Three phrases of 4 quarter notes each, cycling through C major scale degrees.
+; Phrase repeats 3 times to fill 12 beats total.
+
+'A2 @1 v80 l4 o4 q5
+'A2 (c d e g)3
+'A2 l1 o4 c
+
+; ── B1: TRIPLET BASS ─────────────────────────────────────────────────────────
+; PSG bass in triplets (triplet eighth = l12 for each note at T120).
+; Groups of 3 sixteenth notes approximate an even triplet feel.
+; Cycles through root, fifth, root at a faster rate than either FM part.
+
+'B1 v12 l8 o3 q7
+'B1 (c g c g c g)2
+'B1 l4 (c g c g)2 c g
+'B1 l1 o3 c

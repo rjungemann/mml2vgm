@@ -257,6 +257,12 @@ impl MmlCompiler {
                 let data = generator.generate()?;
                 Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
+            OutputFormat::MID => {
+                let generator = crate::compiler::codegen::midi::MidiGenerator::from_ast(ast, &self.options)?;
+                let data = generator.generate()?;
+                let source_map = generator.source_map().clone();
+                Ok((data, source_map))
+            }
         }
     }
 

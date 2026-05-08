@@ -493,6 +493,34 @@ export class FileService {
     /**
      * Clean up resources.
      */
+    /**
+     * Save MIDI binary data to a .mid file with download.
+     */
+    public async saveMidiFile(
+        data: Uint8Array,
+        suggestedName: string = 'untitled.mid'
+    ): Promise<boolean> {
+        try {
+            // Create a Blob from the MIDI data
+            const blob = new Blob([data], { type: 'audio/midi' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a download link
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = suggestedName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            return true;
+        } catch (error) {
+            this.setError(`Failed to save MIDI file: ${error}`);
+            return false;
+        }
+    }
+
     public cleanup(): void {
         this._stateListeners = [];
         this._workspaces = [];

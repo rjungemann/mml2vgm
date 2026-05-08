@@ -1,0 +1,20 @@
+{
+Title=Basic MIDI Export Demo
+Composer=mml2vgm
+ClockCount=192
+}
+
+; Simple MIDI song demonstrating basic MIDI features
+; Compile with: mml2vgm-rs midi_basic.gwi --format mid -o midi_basic.mid
+
+; Part A1: Piano melody on MIDI channel 0
+'A1 @ch0 @p0 l4 o4
+c4 d4 e4 f4 g4 f4 e4 d4 c2
+
+; Part B1: Strings on MIDI channel 1
+'B1 @ch1 @p48 l4 o3
+a4 c4 e4 a4 c4 e4 a2
+
+; Part C1: Bass on MIDI channel 2
+'C1 @ch2 @p32 l4 o2
+c2 g2 c2 g2

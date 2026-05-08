@@ -1,0 +1,57 @@
+'{
+
+    TitleName   = Nested Loops
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Advanced loop patterns — MML supports both finite repeats and nested loops.
+;
+; Syntax:
+;   (body)N          — repeat body N times
+;   [body]N          — repeat body N times (same as parentheses)
+;   Nested:          — outer loop wraps an inner loop
+;   Loop exit:       — in the LAST pass of the outer loop the exit segment is played
+;
+; This example uses B1 (melody), B2 (counterpoint), B3 (bass) on SN76489.
+
+'B1 T120
+'B2 T120
+'B3 T120
+
+; ── B1: MELODY ──────────────────────────────────────────────────────────────
+; A 2-bar cell is nested inside a 4-bar phrase which is then repeated.
+; The inner (c d e f)2 runs twice per outer pass; the outer loops 4 times.
+; On the final outer pass, the extra cadence bar "g1" plays.
+;
+; Inner loop: c d e f — ascending C major tetrachord (2×)
+; Outer loop: [inner + g a]4 — rising figure with falling tag (4×)
+; Exit phrase: g1 — whole-note landing on the last repeat
+
+'B1 v12 l8 o5 q6
+'B1 [( c d e f )2 g a]3
+'B1 ( c d e f )2 g1
+
+; ── B2: COUNTERPOINT ────────────────────────────────────────────────────────
+; Descending scale against B1's ascending line.
+; Inner loop repeats the top of the scale; outer loop steps it down.
+; Exit: c2 whole note on final pass.
+
+'B2 v9 l8 o5 q5
+'B2 [( >c b a g )2 f e]3
+'B2 ( >c b a g )2 <c1
+
+; ── B3: BASS ────────────────────────────────────────────────────────────────
+; Root–fifth pattern, one octave lower.
+; Each bar alternates root and fifth; the 4-bar loop runs 4 times.
+; The exit bar (c1) gives a conclusive ending.
+
+'B3 v10 l4 o3 q7
+'B3 [c g c g | c g c g | f c f c | g d g d]3
+'B3 c g c g | c g c g | f c f c | c1

@@ -451,3 +451,267 @@ Example — using `n` to access a note that would otherwise require an octave sw
 ; With n: stays at o3 for surrounding notes, n picks exact pitch
 'B1 l8 o3 a n37 a
 ```
+
+---
+
+## MIDI-Specific Commands
+
+These commands are available when compiling to MIDI format (`--format mid`).
+They generate Standard MIDI File (SMF) output with the corresponding MIDI events.
+
+### Control Change Commands
+
+| Command | Description | MIDI CC | Values |
+|---------|-------------|---------|--------|
+| `@c<controller>[=<value>]` | Control Change | CC# | 0-127 |
+| `@c<controller>,<value>` | Control Change (comma syntax) | CC# | 0-127 |
+| `@cc<controller>,<value>` | Control Change (alternative syntax) | CC# | 0-127 |
+
+**Examples:**
+```
+@c64=127    ; Sustain pedal on (CC64)
+@c64=0      ; Sustain pedal off
+@c7,100     ; Channel volume to 100 (CC7)
+@c10,64     ; Pan center (CC10)
+@cc11,127   ; Expression max (CC11)
+```
+
+### Shorthand Control Change Commands
+
+| Command | Description | MIDI CC | Values |
+|---------|-------------|---------|--------|
+| `@v<value>` | Volume | CC7 | 0-127 |
+| `@pan<value>` | Pan | CC10 | 0-127 |
+| `@panL` | Pan Left | CC10 | 0 |
+| `@panC` | Pan Center | CC10 | 64 |
+| `@panR` | Pan Right | CC10 | 127 |
+| `@expr<value>` | Expression | CC11 | 0-127 |
+| `@sustain` | Sustain Pedal On | CC64 | 127 |
+| `@sustainOff` | Sustain Pedal Off | CC64 | 0 |
+| `@damper` | Damper Pedal On | CC64 | 127 |
+| `@damperOff` | Damper Pedal Off | CC64 | 0 |
+| `@portamento` | Portamento On | CC65 | 127 |
+| `@portOff` | Portamento Off | CC65 | 0 |
+| `@sostenuto` | Sostenuto On | CC66 | 127 |
+| `@sostenutoOff` | Sostenuto Off | CC66 | 0 |
+| `@soft` | Soft Pedal On | CC67 | 127 |
+| `@softOff` | Soft Pedal Off | CC67 | 0 |
+| `@localOn` | Local Control On | CC122 | 127 |
+| `@localOff` | Local Control Off | CC122 | 0 |
+
+**Examples:**
+```
+@panL      ; Pan hard left
+@panC      ; Pan center
+@panR      ; Pan hard right
+@expr127   ; Full expression
+@sustain   ; Sustain on
+@damperOff ; Damper off
+```
+
+### Program Change Commands
+
+| Command | Description | MIDI Event |
+|---------|-------------|------------|
+| `@p<program>` | Program Change | PC# | 0-127 |
+| `@pg<program>` | Program Change (alternative) | PC# | 0-127 |
+| `@pr<program>` | Program Change + Bank | PC# | 0-127 |
+| `@ch<channel>` | Set MIDI Channel | - | 0-15 |
+
+**Examples:**
+```
+@p0        ; Acoustic Grand Piano (GM Program 0)
+@pg112     ; Standard Drum Kit (GM Program 112)
+@ch9       ; Set to MIDI channel 10 (drums)
+@pr40,0,0  ; Program 40 with Bank MSB=0, LSB=0
+```
+
+**General MIDI Program Numbers:**
+- 0-7: Pianos
+- 8-15: Chromatic Percussion
+- 16-23: Organs
+- 24-31: Guitars
+- 32-39: Bass
+- 40-47: Strings
+- 48-55: Ensemble
+- 56-63: Brass
+- 64-71: Reed
+- 72-79: Pipe
+- 80-87: Synth Lead
+- 88-95: Synth Pad
+- 96-103: Synth Effects
+- 104-111: Ethnic
+- 112-119: Percussive
+- 120-127: Sound Effects
+
+### Pitch Bend Commands
+
+| Command | Description | MIDI Event | Values |
+|---------|-------------|------------|--------|
+| `@b<value>` | Pitch Bend (center = 0) | PB | -8192 to +8191 |
+| `@bend<value>` | Pitch Bend (alternative) | PB | -8192 to +8191 |
+| `@b+<value>` | Pitch Bend Up | PB | 0 to +8191 |
+| `@b-<value>` | Pitch Bend Down | PB | -8192 to 0 |
+
+**Examples:**
+```
+@b0       ; Pitch bend center (no bend)
+@b+100    ; Pitch bend +100 cents
+@b-50     ; Pitch bend -50 cents
+@bend200  ; Pitch bend +200
+```
+
+### Aftertouch Commands
+
+| Command | Description | MIDI Event | Values |
+|---------|-------------|------------|--------|
+| `@a<value>` | Channel Aftertouch (Pressure) | CA | 0-127 |
+| `@at<value>` | Channel Aftertouch (alternative) | CA | 0-127 |
+| `@pa<note>,<value>` | Polyphonic Aftertouch | PA | note: 0-127, value: 0-127 |
+
+**Examples:**
+```
+@a127     ; Maximum channel aftertouch
+@at64     ; Medium channel aftertouch
+@pa60,100 ; Polyphonic aftertouch on note 60 (C4) with value 100
+```
+
+### System Exclusive Commands
+
+| Command | Description | MIDI Event |
+|---------|-------------|------------|
+| `@x<hex_bytes>` | System Exclusive | SysEx | Hex values separated by commas |
+| `@sysex<hex_bytes>` | System Exclusive (alternative) | SysEx | Hex values separated by commas |
+
+**Examples:**
+```
+@xF0,41,10,42,12,40,00,7F,00,41,F7  ; Roland SysEx example
+@sysexF0,41,10,42,12,00,7F,F7       ; Another SysEx message
+```
+
+### Reset Commands
+
+| Command | Description | MIDI Events |
+|---------|-------------|--------------|
+| `@allNotesOff` | All Notes Off | CC120 |
+| `@resetAllCtrl` | Reset All Controllers | CC121 |
+| `@allSoundOff` | All Sound Off | CC120 + CC121 + CC123 |
+
+**Examples:**
+```
+@allNotesOff   ; Turn off all notes
+@resetAllCtrl  ; Reset all controllers to default
+@allSoundOff   ; Complete sound off (notes + controllers + local)
+```
+
+### Drum Mode Commands
+
+| Command | Description | MIDI Note | Channel |
+|---------|-------------|-----------|----------|
+| `#D<drum_name>` | Drum note | See table below | 10 |
+
+**Drum Note Aliases:**
+
+| Alias | MIDI Note | Drum Name |
+|-------|-----------|-----------|
+| `#Dkick` | 36 | Bass Drum (Acoustic) |
+| `#Dbd` | 36 | Bass Drum (alias) |
+| `#Dbassdrum` | 36 | Bass Drum (full) |
+| `#Dsnare` | 38 | Acoustic Snare |
+| `#Dsd` | 38 | Snare Drum (alias) |
+| `#Dhh` | 42 | Closed Hi-Hat |
+| `#Dhihat` | 42 | Hi-Hat (closed, alias) |
+| `#Dclosedhh` | 42 | Closed Hi-Hat (full) |
+| `#Doh` | 46 | Open Hi-Hat |
+| `#Dopenhh` | 46 | Open Hi-Hat (full) |
+| `#Dcrash` | 49 | Crash Cymbal 1 |
+| `#Dride` | 51 | Ride Cymbal 1 |
+| `#Dclap` | 39 | Hand Clap |
+| `#Dtom1` | 50 | High Tom |
+| `#Dhightom` | 50 | High Tom (full) |
+| `#Dtom2` | 48 | Mid Tom |
+| `#Dmidtom` | 48 | Mid Tom (full) |
+| `#Dtom3` | 41 | Low Tom |
+| `#Dlowtom` | 41 | Low Tom (full) |
+| `#Dcowbell` | 56 | Cowbell |
+| `#Dtambourine` | 54 | Tambourine |
+| `#Dshaker` | 70 | Shaker |
+
+**Examples:**
+```
+; Drum pattern on channel 10
+@ch9
+#Dkick4 #Dsnare8 #Dhh8 #Doh8
+```
+
+**Note:** Drum notes automatically use MIDI channel 10 (GM standard drum channel).
+
+### MIDI Channel and Program Assignment
+
+| Command | Description |
+|---------|-------------|
+| `@ch<channel>` | Set MIDI channel for current part (0-15) |
+| `@pr<program>` | Set program for current part (0-127) |
+| `@pr<program>,<bank_msb>` | Set program with Bank MSB (0-127) |
+| `@pr<program>,<bank_msb>,<bank_lsb>` | Set program with full bank (MSB, LSB) |
+
+**Examples:**
+```
+; Set up a piano part on channel 1
+@ch0 @p0
+c4 d4 e4 f4
+
+; Set up a drum part on channel 10 with drum kit
+@ch9 @p112
+#Dkick4 #Dsnare8
+```
+
+### Exporting to MIDI Format
+
+To compile your MML to a Standard MIDI File:
+
+**CLI:**
+```sh
+mml2vgm-rs song.gwi --format mid -o song.mid
+```
+
+**egui Desktop:**
+1. Select "mid" from the Format dropdown
+2. Click "Compile"
+3. Use "Build > Export" to save the .mid file
+
+**Browser IDE:**
+1. Select "mid" as the output format in settings
+2. Compile your song
+3. Use "File > Export as MIDI" to download the .mid file
+
+### Standard MIDI File (SMF) Features
+
+- **Format Type:** Type 0 (single track) for single part, Type 1 (multi-track) for multiple parts
+- **Division:** 192 ticks per quarter note (PPQN)
+- **Tempo:** Exported as Set Tempo meta event (microseconds per quarter note)
+- **Time Signature:** 4/4 by default, can be set via metadata
+- **Running Status:** Enabled for smaller file sizes
+- **Variable Length:** Delta times use variable-length quantity encoding
+
+### MIDI Note Number Reference
+
+| Note | MIDI # | Note | MIDI # | Note | MIDI # |
+|------|--------|------|--------|------|--------|
+| C-1  | 0      | C0   | 12     | C1   | 24     |
+| C#-1 | 1      | C#0  | 13     | C#1  | 25     |
+| D-1  | 2      | D0   | 14     | D1   | 26     |
+| D#-1 | 3      | D#0  | 15     | D#1  | 27     |
+| E-1  | 4      | E0   | 16     | E1   | 28     |
+| F-1  | 5      | F0   | 17     | F1   | 29     |
+| F#-1 | 6      | F#0  | 18     | F#1  | 30     |
+| G-1  | 7      | G0   | 19     | G1   | 31     |
+| G#-1 | 8      | G#0  | 20     | G#1  | 32     |
+| A-1  | 9      | A0   | 21     | A1   | 33     |
+| A#-1 | 10     | A#0  | 22     | A#1  | 34     |
+| B-1  | 11     | B0   | 23     | B1   | 35     |
+| C2   | 36     | C3   | 48     | C4   | 60     |
+| C5   | 72     | C6   | 84     | C7   | 96     |
+| C8   | 108    | G8   | 115    | C9   | 120    |
+
+Middle C (C4) = MIDI note 60

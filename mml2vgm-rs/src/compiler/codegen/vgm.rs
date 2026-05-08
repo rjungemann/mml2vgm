@@ -33,6 +33,10 @@ pub enum VgmCommandType {
     Wait2 = 0x63,
     End = 0x66,
     DataBlock = 0x67,
+    // Console chips
+    DmgWrite = 0xB3,
+    NesApuWrite = 0xB4,
+    K051649Write = 0xD2,
 }
 
 /// A single VGM command
@@ -123,6 +127,10 @@ struct PartCodegenState {
     before_tl: [i16; 4],
     /// When true, key-off is suppressed (C# page.envelopeMode). Set by EON command.
     eon_mode: bool,
+    /// Console chip channel numbers
+    k051649_ch: u8,
+    nes_ch: u8,
+    dmg_ch: u8,
 }
 
 impl PartCodegenState {
@@ -145,6 +153,9 @@ impl PartCodegenState {
             quantize_proportional: false,
             before_tl: [127; 4],
             eon_mode: false,
+            k051649_ch: 0,
+            nes_ch: 0,
+            dmg_ch: 0,
         }
     }
 }
@@ -170,6 +181,12 @@ pub struct VgmGenerator {
     next_opl_channel: u8,
     /// Next YMF262 (OPL3) channel to allocate (0-17)
     next_ymf262_channel: u8,
+    /// Next K051649 channel to allocate (0-4)
+    next_k051649_channel: u8,
+    /// Next NES APU channel to allocate (0-4: Pulse1, Pulse2, Triangle, Noise, DPCM)
+    next_nes_channel: u8,
+    /// Next DMG channel to allocate (0-3: Pulse1, Pulse2, Wave, Noise)
+    next_dmg_channel: u8,
     /// When true, add_wait is a no-op (used during parallel part processing)
     suppress_waits: bool,
     /// Time boundaries recorded by add_wait calls (even when suppressed).
@@ -198,6 +215,9 @@ impl VgmGenerator {
             next_opm_channel: 0,
             next_opl_channel: 0,
             next_ymf262_channel: 0,
+            next_k051649_channel: 0,
+            next_nes_channel: 0,
+            next_dmg_channel: 0,
             suppress_waits: false,
             time_checkpoints: BTreeSet::new(),
             source_map: SourceMap::default(),
@@ -283,11 +303,27 @@ impl VgmGenerator {
                     "YM3526" | "OPL" => SoundChip::YM3526,
                     "Y8950" => SoundChip::Y8950,
                     "YMF262" | "OPL3" => SoundChip::YMF262,
+                    "K051649" | "SCC" | "SCC1" => SoundChip::K051649,
+                    "NES" | "NESAPU" | "2A03" => SoundChip::NES,
+                    "DMG" | "GAMEBOY" | "GAME BOY" => SoundChip::DMG,
                     _ => continue,
                 };
                 if !self.chips.contains(&chip) {
                     self.chips.push(chip);
                 }
+            }
+        }
+
+        // Also check for metadata keys like PartK051649, PartNES, PartDMG
+        for (key, _) in &ast.metadata {
+            let chip = match key.to_uppercase().as_str() {
+                "PARTK051649" | "PARTSCC" | "PARTSCC1" => SoundChip::K051649,
+                "PARTNES" | "PARTNESAPU" | "PART2A03" => SoundChip::NES,
+                "PARTDMG" | "PARTGAMEBOY" => SoundChip::DMG,
+                _ => continue,
+            };
+            if !self.chips.contains(&chip) {
+                self.chips.push(chip);
             }
         }
 
@@ -326,6 +362,16 @@ impl VgmGenerator {
                 }
                 SoundChip::YMF262 => {
                     self.header.ymf262_clock = chip.clock_rate();
+                }
+                SoundChip::K051649 => {
+                    self.header.k051649_clock = chip.clock_rate();
+                    self.header.k051649_flags |= 0x80000000; // Bit 31: K051649 present
+                }
+                SoundChip::NES => {
+                    self.header.nes_apu_clock = chip.clock_rate();
+                }
+                SoundChip::DMG => {
+                    self.header.dmg_clock = chip.clock_rate();
                 }
                 _ => {}
             }
@@ -382,6 +428,9 @@ impl VgmGenerator {
                 else if key.starts_with("PartSN76489") { "SN76489" }
                 else if key.starts_with("PartYM2151") { "YM2151" }
                 else if key.starts_with("PartYM2608") { "YM2608" }
+                else if key.starts_with("PartK051649") | key.starts_with("PartSCC") { "K051649" }
+                else if key.starts_with("PartNES") | key.starts_with("Part2A03") { "NES" }
+                else if key.starts_with("PartDMG") | key.starts_with("PartGameBoy") { "DMG" }
                 else { continue };
             for name in &part_names {
                 if !effective_chip_map.contains_key(name) && name.starts_with(value.trim()) {
@@ -460,6 +509,37 @@ impl VgmGenerator {
             .any(|n| effective_chip_map.get(n).map(|s| s == "YMF262").unwrap_or(false));
         if has_ymf262 {
             self.ymf262_global_init();
+        }
+
+        // Emit console chip global inits
+        let has_k051649 = part_names
+            .iter()
+            .any(|n| effective_chip_map.get(n).map(|s| s == "K051649").unwrap_or(false));
+        if has_k051649 {
+            // K051649: silence all channels (clear key-on register)
+            self.k051649_write(0, 0xAF, 0, 0);
+            // Initialize waveforms to default (sine-like)
+            let default_wave: [i8; 32] = [
+                0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
+                72, 60, 48, 36, 24, 12, 0, -12, -24, -36, -48, -60, -72, -84, -96, -108
+            ];
+            for ch in 0..5 {
+                self.k051649_set_waveform(ch, &default_wave, 0);
+            }
+        }
+
+        let has_nes = part_names
+            .iter()
+            .any(|n| effective_chip_map.get(n).map(|s| s == "NES").unwrap_or(false));
+        if has_nes {
+            self.nes_apu_global_init();
+        }
+
+        let has_dmg = part_names
+            .iter()
+            .any(|n| effective_chip_map.get(n).map(|s| s == "DMG").unwrap_or(false));
+        if has_dmg {
+            self.dmg_global_init();
         }
 
         // Process global settings (tempo, etc.) — these don't emit chip writes
@@ -575,12 +655,46 @@ impl VgmGenerator {
                 self.next_ymf262_channel = self.next_ymf262_channel.saturating_add(1);
                 if ch < 18 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
             }
+            Some("K051649") | Some("SCC") | Some("SCC1") => {
+                let ch = self.next_k051649_channel;
+                self.next_k051649_channel = self.next_k051649_channel.saturating_add(1);
+                if ch < 5 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("NES") | Some("NESAPU") | Some("2A03") => {
+                let ch = self.next_nes_channel;
+                self.next_nes_channel = self.next_nes_channel.saturating_add(1);
+                if ch < 5 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
+                let ch = self.next_dmg_channel;
+                self.next_dmg_channel = self.next_dmg_channel.saturating_add(1);
+                if ch < 4 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
             _ => (0, 0, 0, 0, true),
         };
 
-        let mut state = PartCodegenState::new(chip, ym2612_port, ym2612_ch);
+        let mut state = PartCodegenState::new(chip.clone(), ym2612_port, ym2612_ch);
+        let chip_str = chip.as_deref();
         state.opl_ch = opl_ch;
         state.opm_ch = opm_ch;
+        state.k051649_ch = match chip_str {
+            Some("K051649") | Some("SCC") | Some("SCC1") => {
+                self.next_k051649_channel.saturating_sub(1)
+            }
+            _ => 0,
+        };
+        state.nes_ch = match chip_str {
+            Some("NES") | Some("NESAPU") | Some("2A03") => {
+                self.next_nes_channel.saturating_sub(1)
+            }
+            _ => 0,
+        };
+        state.dmg_ch = match chip_str {
+            Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
+                self.next_dmg_channel.saturating_sub(1)
+            }
+            _ => 0,
+        };
         state.has_channel = has_channel;
 
         for node in &part.commands {
@@ -598,6 +712,9 @@ impl VgmGenerator {
                 Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, &state, time); }
                 Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, &state, time); }
                 Some("YMF262") => { self.ymf262_key_off(&state, time); }
+                Some("K051649") | Some("SCC") | Some("SCC1") => { self.k051649_note_off(state.k051649_ch, *time); }
+                Some("NES") | Some("NESAPU") | Some("2A03") => { self.nes_apu_note_off_pulse(state.nes_ch, *time); }
+                Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => { self.dmg_note_off_pulse(state.dmg_ch, *time); }
                 _ => {}
             }
         }
@@ -1019,6 +1136,88 @@ impl VgmGenerator {
                 self.emit_note_event(note, state, note_start_time, samples);
                 *time += samples as u64;
                 self.add_wait(samples, *time);
+            }
+            Some("K051649") | Some("SCC") | Some("SCC1") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize with default waveform
+                    let default_wave: [i8; 32] = [
+                        0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
+                        72, 60, 48, 36, 24, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                    ];
+                    self.k051649_set_waveform(state.k051649_ch, &default_wave, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.k051649_note_off(state.k051649_ch, *time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                self.k051649_note_on(state.k051649_ch, midi, 0, state.volume, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.k051649_note_off(state.k051649_ch, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("NES") | Some("NESAPU") | Some("2A03") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize channel
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.nes_apu_note_off_pulse(state.nes_ch, *time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                // For simplicity, treat all NES channels as Pulse for now
+                self.nes_apu_note_on_pulse(state.nes_ch, midi, 0, state.volume, 0, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.nes_apu_note_off_pulse(state.nes_ch, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize channel
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.dmg_note_off_pulse(state.dmg_ch, *time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                // For simplicity, treat all DMG channels as Pulse for now
+                self.dmg_note_on_pulse(state.dmg_ch, midi, 0, state.volume, 0, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.dmg_note_off_pulse(state.dmg_ch, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
             }
             _ => {
                 // Unknown chip: just advance time
@@ -1803,6 +2002,15 @@ impl VgmGenerator {
         hdr[0x54..0x58].copy_from_slice(&self.header.y8950_clock.to_le_bytes());
         // 0x58: YMF262
         hdr[0x58..0x5C].copy_from_slice(&self.header.ymf262_clock.to_le_bytes());
+        // Extended chip clocks (VGM 1.71)
+        // 0x80: DMG (Game Boy APU) clock
+        hdr[0x80..0x84].copy_from_slice(&self.header.dmg_clock.to_le_bytes());
+        // 0x84: NES APU clock
+        hdr[0x84..0x88].copy_from_slice(&self.header.nes_apu_clock.to_le_bytes());
+        // 0x94: OKIM6295 / K051649 flags
+        hdr[0x94..0x98].copy_from_slice(&self.header.k051649_flags.to_le_bytes());
+        // 0x9C: K051649 / K052539 clock rate
+        hdr[0x9C..0xA0].copy_from_slice(&self.header.k051649_clock.to_le_bytes());
         output.extend_from_slice(&hdr);
         Ok(())
     }
@@ -1849,6 +2057,277 @@ impl VgmGenerator {
         output.extend_from_slice(&pcm.data.len().to_le_bytes());
         output.extend_from_slice(&pcm.data);
         Ok(())
+    }
+
+    // ── K051649 (SCC) helpers ─────────────────────────────────────────────────
+
+    /// Write a K051649 register (VGM opcode 0xD2)
+    /// pp = port (0 = SCC1, 1 = SCC2), aa = register address, dd = data
+    fn k051649_write(&mut self, port: u8, addr: u8, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::K051649Write,
+            data: vec![port, addr, data],
+            time,
+        });
+    }
+
+    /// Set K051649 waveform for a channel (32 bytes of signed samples)
+    fn k051649_set_waveform(&mut self, ch: u8, wave: &[i8; 32], time: u64) {
+        let base_addr = ch * 0x20; // Each channel has 32-byte waveform RAM at 0x00, 0x20, 0x40, 0x60, 0x80
+        for (i, &sample) in wave.iter().enumerate() {
+            self.k051649_write(0, base_addr + i as u8, sample as u8, time);
+        }
+    }
+
+    /// Convert MIDI note to K051649 frequency divider
+    /// SCC uses: period = clock / (freq * 16)
+    /// Returns (freq_lo, freq_hi) for registers 0xA0+ch*2 and 0xA1+ch*2
+    fn midi_note_to_k051649_freq(&self, midi_note: u8, clock: u32) -> (u8, u8) {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let divider = clock as f64 / (16.0 * freq);
+        let divider_int = divider.round() as u32;
+        let freq_val = divider_int.min(4095) as u16; // 12-bit divider
+        ((freq_val & 0xFF) as u8, ((freq_val >> 8) & 0x0F) as u8)
+    }
+
+    /// Write K051649 note-on for a channel
+    fn k051649_note_on(&mut self, ch: u8, note: u8, octave: u8, volume: u8, time: u64) {
+        let clock = self.header.k051649_clock;
+        let (freq_lo, freq_hi) = self.midi_note_to_k051649_freq(note, clock);
+        
+        // Write frequency divider ( registers 0xA0+ch*2 = lo, 0xA1+ch*2 = hi)
+        let base = 0xA0 + ch * 2;
+        self.k051649_write(0, base, freq_lo, time);
+        self.k051649_write(0, base + 1, freq_hi, time);
+        
+        // Write volume (0-15) at 0xAA + ch
+        self.k051649_write(0, 0xAA + ch, volume.min(15), time);
+        
+        // Key on: set bit N in register 0xAF
+        self.k051649_write(0, 0xAF, 1 << ch, time);
+    }
+
+    /// Write K051649 note-off for a channel
+    fn k051649_note_off(&mut self, ch: u8, time: u64) {
+        // Key off: clear bit N in register 0xAF
+        // For now, just write 0 to disable all channels
+        self.k051649_write(0, 0xAF, 0, time);
+    }
+
+    // ── NES APU (2A03) helpers ────────────────────────────────────────────────
+
+    /// Write a NES APU register (VGM opcode 0xB4)
+    /// aa = $4000-relative address, dd = data
+    fn nes_apu_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::NesApuWrite,
+            data: vec![addr, data],
+            time,
+        });
+    }
+
+    /// Convert MIDI note to NES APU timer period
+    /// NES APU: freq = cpu_clock / (16 * (period + 1) * 2)
+    /// Returns 11-bit period value
+    fn midi_note_to_nes_freq(&self, midi_note: u8, clock: u32) -> u16 {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        // NES timer formula: period = (clock / (16 * 2 * freq)) - 1
+        // But we need to find the closest period that gives us the target frequency
+        // period = (cpu_clock / (16 * (freq + 1))) / 2 - 1... let's use a simpler approach
+        // From VGM spec: period = (CPU clock / (16 * note_freq)) - 1
+        let period = (clock as f64 / (16.0 * freq)).round() - 1.0;
+        period.max(0.0).min(2047.0) as u16
+    }
+
+    /// Write NES Pulse channel note-on
+    fn nes_apu_note_on_pulse(&mut self, ch: u8, note: u8, octave: u8, volume: u8, duty: u8, time: u64) {
+        let clock = self.header.nes_apu_clock;
+        let period = self.midi_note_to_nes_freq(note, clock);
+        let base = if ch == 0 { 0x4000 } else { 0x4004 };
+        
+        // Write duty and volume (0x4000 or 0x4004)
+        let duty_volume = ((duty & 0x3) << 6) | (volume & 0xF);
+        self.nes_apu_write((base - 0x4000) as u8, duty_volume, time);
+        
+        // Write sweep (0x4001 or 0x4005) - for now just disable sweep
+        self.nes_apu_write((base - 0x4000 + 1) as u8, 0x08, time);
+        
+        // Write timer low (0x4002 or 0x4006)
+        self.nes_apu_write((base - 0x4000 + 2) as u8, (period & 0xFF) as u8, time);
+        
+        // Write timer high + length counter (0x4003 or 0x4007)
+        let length = 0; // For now, no length counter
+        self.nes_apu_write((base - 0x4000 + 3) as u8, ((period >> 8) as u8 & 0x07) | ((length & 0xF8) << 3), time);
+    }
+
+    /// Write NES Pulse channel note-off (set volume to 0)
+    fn nes_apu_note_off_pulse(&mut self, ch: u8, time: u64) {
+        let base = if ch == 0 { 0x4000 } else { 0x4004 };
+        // Set volume to 0
+        self.nes_apu_write((base - 0x4000) as u8, 0, time);
+    }
+
+    /// Write NES Triangle channel note-on
+    fn nes_apu_note_on_triangle(&mut self, note: u8, octave: u8, time: u64) {
+        let clock = self.header.nes_apu_clock;
+        let period = self.midi_note_to_nes_freq(note, clock);
+        
+        // Write linear counter (0x4008)
+        self.nes_apu_write(0x08, 0x80, time); // Enable linear counter, no counter value
+        
+        // Write timer low (0x400A)
+        self.nes_apu_write(0x0A, (period & 0xFF) as u8, time);
+        
+        // Write timer high + length counter (0x400B)
+        self.nes_apu_write(0x0B, ((period >> 8) as u8 & 0x07) | 0x80, time);
+    }
+
+    /// Write NES Noise channel note-on
+    fn nes_apu_note_on_noise(&mut self, period: u8, mode: u8, volume: u8, time: u64) {
+        // Write volume and envelope (0x400C)
+        self.nes_apu_write(0x0C, (volume & 0xF) << 4, time);
+        
+        // Write mode and period (0x400E)
+        let mode_bit = if mode == 1 { 0x80 } else { 0x00 };
+        self.nes_apu_write(0x0E, mode_bit | (period & 0x0F), time);
+        
+        // Write length counter (0x400F) - for now just start the channel
+        self.nes_apu_write(0x0F, 0x00, time);
+    }
+
+    /// Write NES global init (silence all channels)
+    fn nes_apu_global_init(&mut self) {
+        let t = 0u64;
+        // Silence all channels
+        for addr in [0x4000, 0x4001, 0x4002, 0x4003, 0x4004, 0x4005, 0x4006, 0x4007, 
+                      0x4008, 0x4009, 0x400A, 0x400B, 0x400C, 0x400D, 0x400E, 0x400F] {
+            self.nes_apu_write((addr - 0x4000) as u8, 0, t);
+        }
+    }
+
+    // ── DMG (Game Boy) helpers ───────────────────────────────────────────────
+
+    /// Write a DMG register (VGM opcode 0xB3)
+    /// aa = $FF10-relative address, dd = data
+    fn dmg_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::DmgWrite,
+            data: vec![addr, data],
+            time,
+        });
+    }
+
+    /// Convert MIDI note to DMG frequency
+    /// DMG: freq = clock / (32 * (2048 - period)) for non-sweep
+    /// Returns (period_low, period_high) for NRx3 and NRx4
+    fn midi_note_to_dmg_freq(&self, midi_note: u8) -> (u8, u8) {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let clock = self.header.dmg_clock as f64;
+        // period = 2048 - (clock / (32 * freq))
+        let period = (2048.0 - (clock / (32.0 * freq))).round();
+        let period_int = period.max(0.0).min(2047.0) as u16;
+        ((period_int & 0xFF) as u8, ((period_int >> 8) & 0x07) as u8)
+    }
+
+    /// Write DMG Pulse channel note-on
+    fn dmg_note_on_pulse(&mut self, ch: u8, note: u8, octave: u8, volume: u8, duty: u8, time: u64) {
+        let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
+        let base = if ch == 0 { 0xFF10 } else { 0xFF16 };
+        
+        // NRx1: Sweep (ch 0 only) + Duty + Sound length
+        if ch == 0 {
+            // For now, disable sweep
+            self.dmg_write((base - 0xFF10) as u8 + 0, 0x00, time);
+        }
+        
+        // NRx1: Duty + Sound length (bits 6-7 = duty, bits 0-5 = length)
+        self.dmg_write((base - 0xFF10) as u8 + 0, ((duty & 0x3) << 6) | 0x3F, time);
+        
+        // NRx2: Initial volume + envelope
+        let vol_env = ((volume & 0xF) << 4) | 0x0F; // Max volume, envelope down
+        self.dmg_write((base - 0xFF10) as u8 + 1, vol_env, time);
+        
+        // NRx3: Frequency low
+        self.dmg_write((base - 0xFF10) as u8 + 2, freq_lo, time);
+        
+        // NRx4: Frequency high + trigger (bit 7 = trigger)
+        self.dmg_write((base - 0xFF10) as u8 + 3, ((freq_hi & 0x07) << 4) | 0x80, time);
+    }
+
+    /// Write DMG Pulse channel note-off
+    fn dmg_note_off_pulse(&mut self, ch: u8, time: u64) {
+        let base = if ch == 0 { 0xFF10 } else { 0xFF16 };
+        // Clear volume to 0
+        self.dmg_write((base - 0xFF10) as u8 + 1, 0x00, time);
+    }
+
+    /// Write DMG Wave channel note-on
+    fn dmg_note_on_wave(&mut self, note: u8, octave: u8, volume: u8, time: u64) {
+        let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
+        
+        // NR30: Wave enable (bit 7)
+        self.dmg_write(0x0A, 0x80, time);
+        
+        // NR31: Sound length
+        self.dmg_write(0x0B, 0xFF, time);
+        
+        // NR32: Volume (bits 5-6) + Select (bits 0-4)
+        let vol_select = ((volume & 0x3) << 5) | 0x1F;
+        self.dmg_write(0x0C, vol_select, time);
+        
+        // NR33: Frequency low
+        self.dmg_write(0x0D, freq_lo, time);
+        
+        // NR34: Frequency high + trigger
+        self.dmg_write(0x0E, ((freq_hi & 0x07) << 4) | 0x80, time);
+    }
+
+    /// Write DMG Noise channel note-on
+    fn dmg_note_on_noise(&mut self, lfsr_width: u8, period: u8, volume: u8, time: u64) {
+        // NR41: Sound length
+        self.dmg_write(0x10, 0xFF, time);
+        
+        // NR42: Initial volume + envelope
+        let vol_env = ((volume & 0xF) << 4) | 0x0F;
+        self.dmg_write(0x11, vol_env, time);
+        
+        // NR43: Clock shift + width + trigger
+        let width_bit = if lfsr_width == 1 { 0x40 } else { 0x00 };
+        self.dmg_write(0x12, width_bit | (period & 0x0F) | 0x80, time);
+        
+        // NR44: Trigger (bit 7)
+        self.dmg_write(0x13, 0x80, time);
+    }
+
+    /// Write DMG set wave table (32 nibbles packed into 16 bytes)
+    fn dmg_set_wave_table(&mut self, nibbles: &[u8; 32], time: u64) {
+        for i in 0..16 {
+            let byte = (nibbles[i * 2] & 0x0F) | ((nibbles[i * 2 + 1] & 0x0F) << 4);
+            self.dmg_write((0x20 + i as u8), byte, time);
+        }
+    }
+
+    /// Write DMG sweep register for Pulse1
+    fn dmg_set_sweep(&mut self, period: u8, direction: u8, shift: u8, time: u64) {
+        let reg = ((period & 0x7) << 4) | ((direction & 0x1) << 3) | (shift & 0x7);
+        self.dmg_write(0x00, reg, time);
+    }
+
+    /// Write DMG global init
+    fn dmg_global_init(&mut self) {
+        let t = 0u64;
+        // NR52: Power control - turn on sound
+        self.dmg_write(0x16, 0x80, t);
+        // NR51: Channel enable - enable all channels
+        self.dmg_write(0x15, 0xFF, t);
+        // NR50: Master volume
+        self.dmg_write(0x14, 0x77, t);
+        // Initialize all channels to silent state
+        for addr in 0xFF10..=0xFF23u16 {
+            if addr != 0xFF10 && addr != 0xFF11 && addr != 0xFF16 && addr != 0xFF20 {
+                self.dmg_write((addr - 0xFF10) as u8, 0, t);
+            }
+        }
     }
 }
 

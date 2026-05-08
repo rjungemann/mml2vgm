@@ -1,0 +1,40 @@
+; YM3812 (OPL2) Instrument Patch Library
+; =====================================================================
+; Include this file with: + patches/opl2_basic.gwi
+;
+; NOTE: The mml2vgm compiler initialises each OPL2 (YM3812) channel
+; with a hardcoded 2-operator sine patch. Custom FM patches defined
+; here are not yet applied to OPL channels. The definitions below are
+; retained for documentation and future implementation.
+;
+; OPL2 uses 2 operators per channel (modulator + carrier), unlike the
+; 4-operator OPN/OPM chips. Waveform select (bits 0-2) is an OPL-
+; specific feature enabling half-sine, absolute-sine, pulse-sine, etc.
+;
+; Format (2-operator, per operator): MULT, KSL, TL, AR, DR, SL, RR, AM, VIB, EG-TYP, KSR, WS
+; Plus per-channel: FB (feedback 0-7), CNT (connection: 0=FM, 1=additive)
+;
+; When compiler support is added, these patches will become active.
+; =====================================================================
+
+; @0 — opl2-organ: pure sine, feedback 4, FM mode (CNT=0)
+;   2-op FM patch, modulator shapes the carrier timbre
+; Modulator:  MULT=2, KSL=0, TL=32, AR=15, DR=0, SL=0, RR=0, WS=0
+; Carrier:    MULT=1, KSL=0, TL=0,  AR=15, DR=0, SL=0, RR=0, WS=0
+; Channel:    FB=4, CNT=0
+
+; @1 — opl2-piano: half-sine + absolute-sine waveforms, fast decay
+;   WS=1 (half-sine) on modulator, WS=3 (absolute sine) on carrier
+; Modulator:  MULT=1, KSL=0, TL=20, AR=15, DR=8, SL=5, RR=6, WS=1
+; Carrier:    MULT=1, KSL=0, TL=0,  AR=15, DR=8, SL=5, RR=6, WS=3
+; Channel:    FB=2, CNT=0
+
+; @2 — opl2-flute: slow attack, sine, soft modulation
+; Modulator:  MULT=1, KSL=0, TL=40, AR=6, DR=2, SL=3, RR=4, WS=0
+; Carrier:    MULT=1, KSL=0, TL=0,  AR=6, DR=2, SL=3, RR=4, WS=0
+; Channel:    FB=0, CNT=0
+
+; @3 — opl2-bass: low carrier ratio, high feedback, FM mode
+; Modulator:  MULT=2, KSL=0, TL=42, AR=15, DR=10, SL=4, RR=8, WS=0
+; Carrier:    MULT=1, KSL=0, TL=0,  AR=15, DR=10, SL=4, RR=8, WS=0
+; Channel:    FB=6, CNT=0

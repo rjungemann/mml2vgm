@@ -16,7 +16,7 @@ This document outlines the **execution plan** for implementing external driver s
 | 2: M98 Driver | ✅ COMPLETED | `.m98` — NEC PC-9801 / YM2608 |
 | 3: Mucom Driver | ✅ COMPLETED | `.muc` — Sega Mega Drive / YM2612 + SN76489 |
 | 4: MoonDriver | ✅ COMPLETED | `.mdl` — Multi-platform / OPN2 + OPNA + OPN3 |
-| 5: PMD Driver | ✅ COMPLETED | `.mdl`/`.mus` — NEC PC-9801 / YM2608 + rhythm + ADPCM |
+| 5: PMD Driver | ✅ COMPLETED (⚠️ rhythm not compiled) | `.mdl`/`.mus` — NEC PC-9801 / YM2608 + rhythm + ADPCM; rhythm tokenized/parsed but not emitted to VGM |
 | 6: Muap Driver | ✅ COMPLETED | `.muap` — YM2608 OPNA |
 | 7: Integration | ✅ COMPLETED | `DriverService` + syntax highlighting; lazy-loading deferred |
 
@@ -258,7 +258,7 @@ impl DriverRegistry {
 
 ---
 
-### Phase 5: PMD Driver ✅ COMPLETED
+### Phase 5: PMD Driver ✅ COMPLETED (with known limitations)
 
 **Objective**: Implement the PC-9801 focused driver.
 
@@ -270,7 +270,7 @@ impl DriverRegistry {
   
 - [x] `mml2vgm-rs/src/drivers/pmd/mod.rs`
   - [x] Parser for PMD syntax
-  - [x] Rhythm section handling (BD, SD, TOM, HH, CYM, RIM tokens)
+  - [x] Rhythm section handling (BD, SD, TOM, HH, CYM, RIM tokens) — **tokenizer and AST only; see limitation below**
   - [x] ADPCM section handling (`@ADPCM` directive)
   - [x] Part end marker (`@@`) support
   - [x] Tokenizer: notes w/ `#`/`+` sharps, directives, all PMD commands, loops, `@@` marker
@@ -281,11 +281,24 @@ impl DriverRegistry {
   
 - [x] Integration and testing — 19 unit tests; `.mus`/`.mdl` format handler in browser IDE
 
+#### Known Limitation: Rhythm Section Not Compiled
+
+The PMD rhythm section (BD, SD, TOM, HH, CYM, RIM via the `@RHYTHM` directive) is **parsed and syntax-highlighted but not emitted to VGM**.
+
+The compile path in `PMDDriver::compile()` calls `pmd_parse()` but discards the resulting AST (`let _ast = pmd_parse(content)`). The raw source string is then passed directly to `MmlCompiler::compile_from_source()`, which is the native GWI compiler. That compiler has no knowledge of PMD rhythm syntax, so all `@RHYTHM` section content and BD/SD/TOM/HH/CYM/RIM hit events are silently dropped — no YM2608 rhythm channel register writes (`0x10`–`0x18`) are emitted in the output VGM.
+
+To fix this, the compilation path needs:
+
+1. A PMD-to-GWI lowering pass that maps `@RHYTHM` section hits to native YM2608 rhythm channel MML (or direct register writes)
+2. Or a dedicated PMD codegen backend in `mml2vgm-rs` that walks the PMD AST and emits VGM data directly, bypassing the GWI compiler for rhythm tracks
+
+This is tracked as a deferred item; the PMD rhythm editor panel (see Phase 7) depends on this being resolved first.
+
 #### Deliverables
 
 - Complete PMD driver in Rust
 - WASM module compiled and optimized
-- Rhythm section support
+- Rhythm section: tokenized and parsed ✅; compiled to VGM ❌ (deferred)
 - ADPCM sample handling
 
 ---
@@ -330,8 +343,99 @@ impl DriverRegistry {
   
 - [x] Format-specific editor features
   - [x] Syntax highlighting per format via `tokenize()` → `getTokenPatterns()`
-  - [ ] Autocomplete per format — deferred; no per-format autocomplete; out of scope for v1
-  - [ ] Format-specific panels (PMD rhythm editor) — deferred; out of scope for v1
+  - [x] Autocomplete per format — **implemented** (TypeScript-only, no Rust changes needed)
+    - Added `CompletionSuggestion` interface and `getCompletions(driverId, prefix)` method to `driverService.ts`
+    - Per-driver completion sets for all six formats (GWI, M98, Mucom, MoonDriver, PMD, Muap)
+    - Updated `registerMmlLanguage()` in `mmlLanguage.ts` to accept a `getDriverId: () => string` callback; the Monaco `CompletionItemProvider` delegates to `driverService.getCompletions()` at call time so completions always reflect the current document format
+    - Added `driverId` prop to `MonacoEditor` and a `driverIdRef` that stays in sync; the ref-based callback ensures re-registration is not needed when the format changes
+    - `App.tsx` passes `activeDocument.language` as the `driverId` prop to `MonacoEditor`
+  - [x] Format-specific panels — **implemented** for three external driver formats
+
+    Three new driver-specific bottom-tab panels were added. They appear automatically in the bottom pane when the active document matches the format, and disappear otherwise.
+
+    - **`PmdRhythmEditorPanel.tsx`** (shown when language = `mus`)
+      - 16-step sequencer grid for the six YM2608 rhythm instruments: BD, SD, TOM, HH, CYM, RIM
+      - Parse button loads the current `@RHYTHM` section from the document; Apply button writes the grid back
+      - Keyboard-accessible: cells respond to Space/Enter
+
+    - **`MucomVoiceEditorPanel.tsx`** (shown when language = `muc`)
+      - Form-based editor for MUCOM88 FM voices (`#VOICE N { … }` blocks)
+      - Edits ALG, FB, and all four operators (AR, DR, SR, RR, SL, TL, KS, ML, DT)
+      - Multi-voice navigation; Parse and Apply round-trip with the document
+
+    - **`MoonDriverChipSelectorPanel.tsx`** (shown when language = `mdl`)
+      - Radio-button chip selector: `#OPN2` (YM2612), `#OPNA` (YM2608), `#OPN3` (YMF288)
+      - Shows chip capabilities; Apply rewrites the chip directive at the top of the document
+
+    Panels are conditionally spread into the `bottomTabs` array in `App.tsx` using `activeDocument.language`.
+    
+    #### Native-format editors (GWI) — iterate on existing implementations
+    
+    Four visual editors already ship in both the **browser IDE** (React/TypeScript) and the **egui desktop app** (Rust/egui). The deferred work below describes improvements on top of what is already functional.
+    
+    - **FM Tone Editor**
+      - *Browser*: `FmToneEditorPanel.tsx` — parameter grid, algorithm diagram, carrier-op highlight, preview playback via `audioService`
+      - *egui*: `panels/fm_tone_editor.rs` — combo-box instrument selector, slider grid, `parse_fm_instruments` / `serialize_fm_instrument` round-trip
+      - *Iterations*:
+        - Add a visual algorithm wiring diagram to the egui panel (currently text-only; browser already has this)
+        - Add a "copy to clipboard as MML snippet" button in both surfaces
+        - Support bulk import of SBI / OPM / TFI patch file formats (drag-drop in browser, file dialog in egui)
+        - Show carrier/modulator role labels on each operator row
+    
+    - **Arpeggio Editor**
+      - *Browser*: `ArpeggioEditorPanel.tsx` — note picker with letter/sharp/octave selectors, step list, serializes to `'@ A` blocks
+      - *egui*: `panels/arpeggio_editor.rs` — combo-box selector, step table, `parse_arpeggios` / `serialize_arpeggio` round-trip
+      - *Iterations*:
+        - Add a mini piano-roll preview row in both surfaces (horizontal bar per step, colored by pitch)
+        - Add "randomize" and "reverse" convenience actions
+        - Keyboard shortcut to append a step from the MIDI keyboard panel (both surfaces)
+    
+    - **Envelope Editor**
+      - *Browser*: `EnvelopeEditorPanel.tsx` — step list, bar-chart preview, serializes to `'@ E` blocks
+      - *egui*: `panels/envelope_editor.rs` — step table, `parse_envelopes` / `serialize_envelope` round-trip
+      - *Iterations*:
+        - Draw an ADSR-style curve overlay on the bar chart (browser and egui)
+        - Add loop-start / loop-end markers to the step list
+        - Allow step values to be entered by clicking on the chart bars directly (browser)
+    
+    - **Sample / PCM Editor**
+      - *Browser*: `SamplesPanel.tsx` — IndexedDB-backed WAV library, upload/delete, compile-time injection, usage cross-reference (`'@ P` regex), ZIP export, storage quota bar
+      - *egui*: `panels/sample_editor.rs` — `PcmInstrumentDef` form editor, `parse_pcm_instruments` / `serialize_pcm_instrument` round-trip
+      - *Iterations*:
+        - Add waveform preview thumbnail in browser (`AudioWaveformView` already exists; wire it up inside SamplesPanel)
+        - Show per-sample trim (start/end frame) and loop-point fields in both surfaces
+        - Add a "preview play" button for each sample in the egui panel (wire through `AudioPlayer`)
+        - Surface the `'@ P` reference count per sample in the egui panel (already shown in browser)
+    
+    #### Driver-specific panels — new work, deferred
+    
+    These panels are gated by the active `driverId` and require the autocomplete / tokenize infrastructure above to be in place first.
+    
+    - **PMD rhythm editor** (driver: `pmd`)
+      - Visual per-beat step sequencer grid for the six YM2608 rhythm instruments: BD, SD, TOM, HH, CYM, RIM
+      - Each cell toggles a hit; volume/accent per cell is optional (right-click or long-press)
+      - Panel generates and parses the corresponding `@RHYTHM` section MML text bidirectionally
+      - *Browser*: React component, CSS grid layout, updates document via `applyEdit(range, newText)`
+      - *egui*: `panels/pmd_rhythm_editor.rs`, `egui::Grid` widget, writes back via `DocumentStore::apply_edit`
+    
+    - **Mucom voice editor** (driver: `mucom`)
+      - Form-based FM operator parameter editor (ALG, FB, AR, DR, SR, RR, SL, TL, KS, ML, DT) for the `#VOICE` block
+      - Renders algorithm wiring diagram (reuse / port `AlgDiagram` from `FmToneEditorPanel.tsx`)
+      - Round-trips to/from the text `#VOICE` definition via the driver's `tokenize()` token stream
+      - *Browser*: largely the same layout as `FmToneEditorPanel`; differs in the `#VOICE` serialization format
+      - *egui*: port of `fm_tone_editor.rs` with mucom `#VOICE` serializer
+    
+    - **MoonDriver chip selector** (driver: `moondriver`)
+      - Visual radio-group for `#OPN2` / `#OPNA` / `#OPN3` that rewrites the chip directive inline
+      - Shows the channel count and available chip features for the selected variant
+      - *Browser*: small toolbar-style React component rendered above the Monaco editor when `driverId === 'moondriver'`
+      - *egui*: top-of-panel combo box inside a `moondriver`-gated sidebar section
+    
+    #### Implementation approach (both surfaces)
+    
+    - **Browser**: each panel is a React component; `driverId` is read from `useDriverStore`; content mutations go through a shared `applyEdit(range: monaco.IRange, newText: string)` helper that calls `editor.executeEdits`
+    - **egui**: each panel is a `panels/<name>.rs` module with a `show(ctx, state, docs)` function; content mutations call `DocumentStore::apply_edit(range, new_text)` which splices the underlying `String` and marks the document dirty
+    - Panel state (selected index, working copy) is kept separate from document content; panels re-parse their section from the document on every frame / on content-change event so they stay in sync with manual edits in the code editor
   
 - ~~[ ] Performance optimization (WASM size, compilation speed, memory)~~ — deferred; current
   performance is acceptable; profile-driven optimization deferred until regression observed

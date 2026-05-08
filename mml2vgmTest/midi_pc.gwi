@@ -1,0 +1,10 @@
+{
+Title=MIDI Program Change Test
+Composer=Test
+ClockCount=192
+}
+
+'A1 @ch0 @p0 l4 o4
+c4 d4 e4 f4
+'B1 @ch1 @p48 l4 o4
+a4 c4 e4 a4

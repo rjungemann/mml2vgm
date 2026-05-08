@@ -1,0 +1,23 @@
+{
+Title=MIDI Drum Pattern Demo
+Composer=mml2vgm
+ClockCount=192
+}
+
+; Demonstrates MIDI drum note commands
+; Compile with: mml2vgm-rs midi_drums.gwi --format mid -o midi_drums.mid
+
+; Drum part on MIDI channel 10 (GM standard drum channel)
+'D1 @ch9 @p112 l8 o4
+; Basic rock beat: kick on 1 and 3, snare on 2 and 4
+#Dkick #Dhh #Dhh #Dhh #Dsnare #Dhh #Dhh #Dhh
+#Dkick #Dhh #Dhh #Dhh #Dsnare #Dhh #Dhh #Dhh
+
+; Add some cymbals and toms
+'D2 @ch9 @p112 l8 o4
+r4 #Dcrash4 r4 r2
+#Dtom14 #Dtom24 #Dtom34 #Doh4
+
+; Bass line to complement the drums
+'B1 @ch0 @p32 l8 o2
+c4 r4 g4 r4 c4 r4 g4 r4

@@ -205,6 +205,96 @@ pub struct Alias {
     pub expansion: String,
 }
 
+/// MIDI Control Change
+#[derive(Debug, Clone, PartialEq)]
+pub struct ControlChange {
+    /// Controller number (0-127)
+    pub controller: u8,
+    /// Controller value (0-127)
+    pub value: u8,
+    /// Optional MIDI channel override (0-15)
+    pub channel: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Program Change
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProgramChange {
+    /// Program number (0-127)
+    pub program: u8,
+    /// Optional MIDI channel override (0-15)
+    pub channel: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Pitch Bend
+#[derive(Debug, Clone, PartialEq)]
+pub struct PitchBend {
+    /// Pitch bend value (-8192 to 8191, center = 0)
+    pub value: i16,
+    /// Optional MIDI channel override (0-15)
+    pub channel: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Channel Aftertouch (Pressure)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Aftertouch {
+    /// Pressure value (0-127)
+    pub value: u8,
+    /// Optional MIDI channel override (0-15)
+    pub channel: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Polyphonic Aftertouch (Note Pressure)
+#[derive(Debug, Clone, PartialEq)]
+pub struct PolyAftertouch {
+    /// Note number (0-127)
+    pub note: u8,
+    /// Pressure value (0-127)
+    pub value: u8,
+    /// Optional MIDI channel override (0-15)
+    pub channel: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI System Exclusive message
+#[derive(Debug, Clone, PartialEq)]
+pub struct SysEx {
+    /// System Exclusive data bytes
+    pub data: Vec<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Channel assignment for a part
+#[derive(Debug, Clone, PartialEq)]
+pub struct MidiChannel {
+    /// MIDI channel (0-15)
+    pub channel: u8,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
+/// MIDI Program assignment for a part
+#[derive(Debug, Clone, PartialEq)]
+pub struct MidiProgram {
+    /// Program number (0-127)
+    pub program: u8,
+    /// Optional bank MSB (0-127)
+    pub bank_msb: Option<u8>,
+    /// Optional bank LSB (0-127)
+    pub bank_lsb: Option<u8>,
+    /// Source location span
+    pub span: Option<Span>,
+}
+
 /// MML AST node
 #[derive(Debug, Clone, PartialEq)]
 pub enum MmlNode {
@@ -254,6 +344,22 @@ pub enum MmlNode {
         command: String,
         args: Vec<u32>,
     },
+    /// MIDI Control Change
+    MidiControlChange(ControlChange),
+    /// MIDI Program Change
+    MidiProgramChange(ProgramChange),
+    /// MIDI Pitch Bend
+    MidiPitchBend(PitchBend),
+    /// MIDI Channel Aftertouch
+    MidiAftertouch(Aftertouch),
+    /// MIDI Polyphonic Aftertouch
+    MidiPolyAftertouch(PolyAftertouch),
+    /// MIDI System Exclusive
+    MidiSysEx(SysEx),
+    /// MIDI Channel assignment
+    MidiChannel(MidiChannel),
+    /// MIDI Program assignment
+    MidiProgram(MidiProgram),
 }
 
 /// MML AST root

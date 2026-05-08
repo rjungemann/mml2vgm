@@ -94,6 +94,8 @@ enum FormatArg {
     Xgm2,
     /// ZGM format (Extended VGM with YM2609 and MIDI support)
     Zgm,
+    /// MIDI format (Standard MIDI File)
+    Mid,
 }
 
 impl std::fmt::Display for FormatArg {
@@ -103,6 +105,7 @@ impl std::fmt::Display for FormatArg {
             FormatArg::Xgm => write!(f, "xgm"),
             FormatArg::Xgm2 => write!(f, "xgm2"),
             FormatArg::Zgm => write!(f, "zgm"),
+            FormatArg::Mid => write!(f, "mid"),
         }
     }
 }
@@ -114,6 +117,7 @@ impl From<FormatArg> for OutputFormat {
             FormatArg::Xgm => OutputFormat::XGM,
             FormatArg::Xgm2 => OutputFormat::XGM2,
             FormatArg::Zgm => OutputFormat::ZGM,
+            FormatArg::Mid => OutputFormat::MID,
         }
     }
 }
@@ -183,6 +187,7 @@ fn list_supported_formats() {
     println!("  - xgm  [{}] - XGM format (Mega Drive)", OutputFormat::XGM.support_tier());
     println!("  - xgm2 [{}] - XGM2 format (Mega Drive with extended features)", OutputFormat::XGM2.support_tier());
     println!("  - zgm  [{}] - ZGM format (Extended VGM with YM2609 and MIDI support)", OutputFormat::ZGM.support_tier());
+    println!("  - mid  [{}] - Standard MIDI File format", OutputFormat::MID.support_tier());
     println!();
     println!("Default: vgm");
 }

@@ -4,8 +4,10 @@
 //! It takes tokens from the lexer and builds an Abstract Syntax Tree (AST).
 
 use crate::compiler::ast::{
-    Alias, Arpeggio, Envelope, FmInstrument, Include, Length, Loop, Metadata, MmlAst, MmlNode,
-    Note, Octave, OctaveShift, PartDefinition, PcmInstrument, Rest, Tempo, Volume,
+    Alias, Arpeggio, Aftertouch, ControlChange, Envelope, FmInstrument, Include, Length, 
+    Loop, Metadata, MidiChannel, MidiProgram, MmlAst, MmlNode, Note, Octave, OctaveShift, 
+    PartDefinition, PcmInstrument, PitchBend, PolyAftertouch, ProgramChange, Rest, 
+    SysEx, Tempo, Volume,
 };
 use crate::compiler::lexer::{Token, tokenize};
 use crate::{MmlError, MmlResult, Position, Span};
@@ -836,12 +838,169 @@ impl Parser {
         Ok(())
     }
 
-    /// Parse instrument selection
+    /// Parse instrument selection or MIDI command
     fn parse_instrument_selection(&mut self) -> MmlResult<Option<MmlNode>> {
         if matches!(self.current_token(), Some(Token::AtSign)) {
             self.advance();
         }
         
+        // Check for MIDI-specific commands first
+        if let Some(token) = self.current_token() {
+            match token {
+                Token::ControlChangeCommand => {
+                    self.advance();
+                    return self.parse_midi_control_change();
+                }
+                Token::ProgramChangeCommand => {
+                    self.advance();
+                    return self.parse_midi_program_change();
+                }
+                Token::PitchBendCommand => {
+                    self.advance();
+                    return self.parse_midi_pitch_bend();
+                }
+                Token::AftertouchCommand => {
+                    self.advance();
+                    return self.parse_midi_aftertouch();
+                }
+                Token::PolyAftertouchCommand => {
+                    self.advance();
+                    return self.parse_midi_poly_aftertouch();
+                }
+                Token::SysExCommand => {
+                    self.advance();
+                    return self.parse_midi_sysex();
+                }
+                Token::MidiChannelCommand => {
+                    self.advance();
+                    return self.parse_midi_channel();
+                }
+                Token::MidiProgramCommand => {
+                    self.advance();
+                    return self.parse_midi_program();
+                }
+                Token::PanCommand => {
+                    self.advance();
+                    return self.parse_midi_pan();
+                }
+                Token::ExpressionCommand => {
+                    self.advance();
+                    return self.parse_midi_expression();
+                }
+                Token::SustainCommand => {
+                    self.advance();
+                    return self.parse_midi_sustain();
+                }
+                Token::AllNotesOffCommand => {
+                    self.advance();
+                    return Ok(Some(self.create_control_change(120, 0)));
+                }
+                Token::ResetAllCtrlCommand => {
+                    self.advance();
+                    return Ok(Some(self.create_control_change(121, 0)));
+                }
+                Token::AllSoundOffCommand => {
+                    self.advance();
+                    // All Sound Off: CC120 + CC121 + CC123
+                    // For now, just send CC120 (all notes off) + CC121 (reset all controllers)
+                    // A proper implementation would send all three
+                    return Ok(Some(MmlNode::Loop(Loop {
+                        count: 1,
+                        body: vec![
+                            self.create_control_change(120, 0),
+                            self.create_control_change(121, 0),
+                            self.create_control_change(123, 0),
+                        ],
+                    })));
+                }
+                Token::DamperCommand => {
+                    self.advance();
+                    // Damper pedal = CC64
+                    let value = if let Some(Token::Identifier(s)) = self.current_token() {
+                        if s.to_lowercase() == "off" {
+                            self.advance();
+                            0
+                        } else {
+                            127
+                        }
+                    } else {
+                        127
+                    };
+                    return Ok(Some(self.create_control_change(64, value)));
+                }
+                Token::PortamentoCommand => {
+                    self.advance();
+                    // Portamento = CC65
+                    let value = if let Some(Token::Identifier(s)) = self.current_token() {
+                        if s.to_lowercase() == "off" {
+                            self.advance();
+                            0
+                        } else {
+                            127
+                        }
+                    } else {
+                        127
+                    };
+                    return Ok(Some(self.create_control_change(65, value)));
+                }
+                Token::SostenutoCommand => {
+                    self.advance();
+                    // Sostenuto = CC66
+                    let value = if let Some(Token::Identifier(s)) = self.current_token() {
+                        if s.to_lowercase() == "off" {
+                            self.advance();
+                            0
+                        } else {
+                            127
+                        }
+                    } else {
+                        127
+                    };
+                    return Ok(Some(self.create_control_change(66, value)));
+                }
+                Token::SoftCommand => {
+                    self.advance();
+                    // Soft pedal = CC67
+                    let value = if let Some(Token::Identifier(s)) = self.current_token() {
+                        if s.to_lowercase() == "off" {
+                            self.advance();
+                            0
+                        } else {
+                            127
+                        }
+                    } else {
+                        127
+                    };
+                    return Ok(Some(self.create_control_change(67, value)));
+                }
+                Token::LocalControlCommand => {
+                    self.advance();
+                    // Local Control on/off = CC122
+                    // 0 = off, 127 = on
+                    let value = if let Some(Token::Identifier(s)) = self.current_token() {
+                        if s.to_lowercase() == "on" {
+                            self.advance();
+                            127
+                        } else if s.to_lowercase() == "off" {
+                            self.advance();
+                            0
+                        } else {
+                            127
+                        }
+                    } else {
+                        127
+                    };
+                    return Ok(Some(self.create_control_change(122, value)));
+                }
+                Token::DrumNoteCommand => {
+                    self.advance();
+                    return self.parse_drum_note();
+                }
+                _ => {}
+            }
+        }
+        
+        // Parse regular instrument selection
         let number = if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             n as usize
@@ -857,6 +1016,309 @@ impl Parser {
         };
 
         Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: None })))
+    }
+
+    /// Helper to create a ControlChange node
+    fn create_control_change(&self, controller: u8, value: u8) -> MmlNode {
+        MmlNode::MidiControlChange(ControlChange {
+            controller,
+            value,
+            channel: None,
+            span: None,
+        })
+    }
+
+    /// Parse @c or @cc control change command
+    fn parse_midi_control_change(&mut self) -> MmlResult<Option<MmlNode>> {
+        let controller = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            n as u8
+        } else {
+            return Ok(None);
+        };
+        
+        let value = if self.consume(Token::Equals) {
+            if let Some(Token::Number(n)) = self.current_token() {
+                self.advance();
+                n as u8
+            } else {
+                127 // Default to max if no value specified
+            }
+        } else if self.consume(Token::Comma) {
+            if let Some(Token::Number(n)) = self.current_token() {
+                self.advance();
+                n as u8
+            } else {
+                127
+            }
+        } else {
+            127 // Default value
+        };
+        
+        Ok(Some(MmlNode::MidiControlChange(ControlChange {
+            controller,
+            value,
+            channel: None,
+            span: None,
+        })))
+    }
+
+    /// Parse @p or @pg program change command
+    fn parse_midi_program_change(&mut self) -> MmlResult<Option<MmlNode>> {
+        let program = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            n as u8
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(MmlNode::MidiProgramChange(ProgramChange {
+            program,
+            channel: None,
+            span: None,
+        })))
+    }
+
+    /// Parse @b or @bend pitch bend command
+    fn parse_midi_pitch_bend(&mut self) -> MmlResult<Option<MmlNode>> {
+        let value = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            // Convert to signed value (-8192 to 8191)
+            // For now, treat as positive offset from center
+            (n as i16 - 8192).clamp(-8192, 8191)
+        } else if self.consume(Token::Sharp) || self.consume(Token::Flat) {
+            // Handle + and - prefixes
+            let sign = if self.current_token() == Some(Token::Sharp) { 1 } else { -1 };
+            if let Some(Token::Number(n)) = self.current_token() {
+                self.advance();
+                let base: i16 = n as i16;
+                (base * sign).clamp(-8192, 8191)
+            } else {
+                0
+            }
+        } else {
+            0 // Center
+        };
+        
+        Ok(Some(MmlNode::MidiPitchBend(PitchBend {
+            value,
+            channel: None,
+            span: None,
+        })))
+    }
+
+    /// Parse @a or @at aftertouch command
+    fn parse_midi_aftertouch(&mut self) -> MmlResult<Option<MmlNode>> {
+        let value = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            n as u8
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(MmlNode::MidiAftertouch(Aftertouch {
+            value,
+            channel: None,
+            span: None,
+        })))
+    }
+
+    /// Parse @pa polyphonic aftertouch command
+    fn parse_midi_poly_aftertouch(&mut self) -> MmlResult<Option<MmlNode>> {
+        let note = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            n as u8
+        } else {
+            return Ok(None);
+        };
+        
+        let value = if self.consume(Token::Comma) {
+            if let Some(Token::Number(n)) = self.current_token() {
+                self.advance();
+                n as u8
+            } else {
+                127
+            }
+        } else {
+            127
+        };
+        
+        Ok(Some(MmlNode::MidiPolyAftertouch(PolyAftertouch {
+            note,
+            value,
+            channel: None,
+            span: None,
+        })))
+    }
+
+    /// Parse @x or @sysex system exclusive command
+    fn parse_midi_sysex(&mut self) -> MmlResult<Option<MmlNode>> {
+        let mut data = Vec::new();
+        
+        // Parse hex bytes separated by commas
+        while let Some(Token::Number(n)) = self.current_token() {
+            data.push(n as u8);
+            self.advance();
+            if !self.consume(Token::Comma) {
+                break;
+            }
+        }
+        
+        Ok(Some(MmlNode::MidiSysEx(SysEx {
+            data,
+            span: None,
+        })))
+    }
+
+    /// Parse @ch MIDI channel command
+    fn parse_midi_channel(&mut self) -> MmlResult<Option<MmlNode>> {
+        let channel = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            (n % 16) as u8 // Clamp to 0-15
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(MmlNode::MidiChannel(MidiChannel {
+            channel,
+            span: None,
+        })))
+    }
+
+    /// Parse @pr MIDI program command
+    fn parse_midi_program(&mut self) -> MmlResult<Option<MmlNode>> {
+        let program = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            (n % 128) as u8
+        } else {
+            return Ok(None);
+        };
+        
+        let mut bank_msb = None;
+        let mut bank_lsb = None;
+        
+        if self.consume(Token::Comma) {
+            if let Some(Token::Number(n)) = self.current_token() {
+                self.advance();
+                bank_msb = Some((n % 128) as u8);
+            }
+            if self.consume(Token::Comma) {
+                if let Some(Token::Number(n)) = self.current_token() {
+                    self.advance();
+                    bank_lsb = Some((n % 128) as u8);
+                }
+            }
+        }
+        
+        Ok(Some(MmlNode::MidiProgram(MidiProgram {
+            program,
+            bank_msb,
+            bank_lsb,
+            span: None,
+        })))
+    }
+
+    /// Parse @pan pan command (maps to CC10)
+    fn parse_midi_pan(&mut self) -> MmlResult<Option<MmlNode>> {
+        let value = if let Some(token) = self.current_token() {
+            match token {
+                Token::Identifier(ref s) if s.to_lowercase() == "left" => {
+                    self.advance();
+                    0 // Pan left
+                }
+                Token::Identifier(ref s) if s.to_lowercase() == "center" || s.to_lowercase() == "centre" => {
+                    self.advance();
+                    64 // Pan center
+                }
+                Token::Identifier(ref s) if s.to_lowercase() == "right" => {
+                    self.advance();
+                    127 // Pan right
+                }
+                Token::Number(n) => {
+                    self.advance();
+                    (n % 128) as u8
+                }
+                _ => {
+                    return Ok(None);
+                }
+            }
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(self.create_control_change(10, value)))
+    }
+
+    /// Parse @expr expression command (maps to CC11)
+    fn parse_midi_expression(&mut self) -> MmlResult<Option<MmlNode>> {
+        let value = if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            (n % 128) as u8
+        } else {
+            return Ok(None);
+        };
+        
+        Ok(Some(self.create_control_change(11, value)))
+    }
+
+    /// Parse @sustain sustain command (maps to CC64)
+    fn parse_midi_sustain(&mut self) -> MmlResult<Option<MmlNode>> {
+        let value = if let Some(Token::Identifier(s)) = self.current_token() {
+            if s.to_lowercase() == "off" {
+                self.advance();
+                0
+            } else {
+                127
+            }
+        } else {
+            127 // Default to on
+        };
+        
+        Ok(Some(self.create_control_change(64, value)))
+    }
+
+    /// Parse #D drum note command
+    fn parse_drum_note(&mut self) -> MmlResult<Option<MmlNode>> {
+        // Drum notes use note names that map to MIDI drum numbers
+        // e.g., #Dkick, #Dsnare, #Dhh, etc.
+        let identifier = if let Some(Token::Identifier(s)) = self.current_token() {
+            self.advance();
+            s
+        } else {
+            return Ok(None);
+        };
+        
+        // Map drum names to MIDI note numbers
+        let note_number = match identifier.to_lowercase().as_str() {
+            "kick" | "bd" | "bassdrum" => 36,      // Bass Drum
+            "snare" | "sd" => 38,                 // Acoustic Snare
+            "hh" | "hihat" | "closedhh" => 42,     // Closed Hi-Hat
+            "oh" | "openhh" => 46,                 // Open Hi-Hat
+            "crash" => 49,                         // Crash Cymbal
+            "ride" => 51,                          // Ride Cymbal
+            "tom1" | "hightom" => 50,              // High Tom
+            "tom2" | "midtom" => 48,                // Mid Tom
+            "tom3" | "lowtom" => 41,                // Low Tom
+            "clap" => 39,                          // Hand Clap
+            "cowbell" => 56,                       // Cowbell
+            "tambourine" => 54,                    // Tambourine
+            "shaker" => 70,                        // Shaker
+            _ => {
+                // Try to parse as a number
+                if let Ok(n) = identifier.parse::<u8>() {
+                    n.clamp(35, 81) // Valid GM drum range
+                } else {
+                    return Ok(None);
+                }
+            }
+        };
+        
+        // Create a note on channel 10 (drum channel in GM)
+        let mut note = Note::new('C', 0, 4);
+        // Override the MIDI note calculation to use the drum number
+        // We'll need to handle this specially in the code generator
+        
+        Ok(Some(MmlNode::Note(note)))
     }
 
     /// Parse MML commands

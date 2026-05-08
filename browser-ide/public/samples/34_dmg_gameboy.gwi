@@ -1,0 +1,42 @@
+; DMG Game Boy APU — Example
+; =====================================================================
+; NOTE: DMG Game Boy APU is not yet wired into the mml2vgm compiler's
+; VGM code generator. This file is a placeholder that will be expanded
+; once compiler support is added.
+;
+; Chip: Nintendo DMG-CPU (Game Boy APU)
+; Channels:
+;   Pulse 1 — square wave with hardware frequency sweep (vibrato/portamento)
+;   Pulse 2 — square wave, no sweep unit
+;   Wave    — 4-bit PCM wavetable, 32 samples, custom waveform table
+;   Noise   — LFSR noise, programmable period and width
+; Used in: Nintendo Game Boy (DMG, GBC) — 1989-2003
+;
+; Planned example:
+;   - PartDMG = A (or PartPulse1, PartPulse2, PartWave, PartNoise)
+;   - A1 = Pulse 1 lead with sweep effect
+;   - A2 = Pulse 2 harmony
+;   - B1 = Wave channel custom bass waveform
+;   - B2 = Noise drum pattern
+;   - Genre: Game Boy chiptune style
+;
+; When compiler support is added, this file will demonstrate:
+;   PartDMG = A
+;   '@ W 0 { ... }   ; 32 x 4-bit wave channel waveform definition
+;   'A1 T160 @0 v15 o5 l8 c d e f g a b >c
+; =====================================================================
+
+; Placeholder: compiles as an empty VGM
+'{
+
+    TitleName   = DMG Game Boy (Placeholder)
+    SystemName  = Game Boy
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+}
+
+; DMG Game Boy APU compiler support not yet available.
+; See docs/Example_Tracks_Plan.md Phase 4 for implementation status.

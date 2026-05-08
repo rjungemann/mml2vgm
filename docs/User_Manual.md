@@ -291,9 +291,58 @@ mml2vgm-rs --list-chips
 | XGM | `--format xgm` | `.xgm` | Sega Mega Drive XGM (SGDK) |
 | XGM2 | `--format xgm2` | `.xgm2` | Extended XGM with PCM overlay |
 | ZGM | `--format zgm` | `.zgm` | Extended VGM with MIDI + YM2609 |
+| MIDI | `--format mid` | `.mid` | Standard MIDI File (SMF) |
 
 VGM is the most compatible format and works with the widest range of players
-and emulators.
+and emulators. MIDI format produces Standard MIDI Files that can be imported into
+DAWs (Digital Audio Workstations) or played with any MIDI-compatible software.
+
+### MIDI Export
+
+MIDI export produces Standard MIDI File (SMF) output that can be used with:
+- Digital Audio Workstations (DAWs) like FL Studio, Ableton, Reaper, etc.
+- MIDI sequencers and editors
+- Software synthesizers and sound fonts
+- Hardware MIDI devices
+
+**Features:**
+- Type 0 (single track) for single-part songs
+- Type 1 (multi-track) for multi-part songs
+- 192 ticks per quarter note (PPQN) resolution
+- Running status compression for smaller files
+- Full MIDI 1.0 event support (Note On/Off, Control Change, Program Change, Pitch Bend, Aftertouch, SysEx)
+- GM (General MIDI) drum mapping on channel 10
+
+**Usage:**
+```sh
+# Basic MIDI export
+mml2vgm-rs song.gwi --format mid -o song.mid
+
+# Compile and play MIDI immediately
+mml2vgm-rs song.gwi --format mid --play
+```
+
+**MIDI-Specific MML Commands:**
+See the [MIDI Commands Reference](MML_Commands.md#midi-specific-commands) for a full list
+of MIDI-specific commands like `@c` (Control Change), `@p` (Program Change), `@b` (Pitch Bend),
+`@ch` (Channel), `@pan` (Pan), `@sustain` (Sustain Pedal), and drum note commands.
+
+**Example: Simple MIDI Song**
+```
+{
+Title=My MIDI Song
+}
+
+'A1 @ch0 @p0  ; Channel 1, Acoustic Grand Piano
+l4 o4 c def g2 r2
+
+'B1 @ch9 @p112 ; Channel 10, Drum Kit
+#Dkick4 #Dsnare8 #Dhh8 #Doh8
+```
+
+This creates a simple melody with piano and a basic drum pattern.
+The `@ch` command assigns parts to specific MIDI channels, and `@p` sets the program (instrument).
+Drum notes using `#D` automatically map to MIDI channel 10 with General MIDI drum sounds.
 
 ---
 

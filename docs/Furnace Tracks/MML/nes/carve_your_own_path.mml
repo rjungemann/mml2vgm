@@ -1,0 +1,10 @@
+; Carve Your Own Path
+; By: Abstract 64
+; System: NES (Ricoh 2A03) + Namco 163
+
+$OPN, $UNKNOWN_0x008C,
+
+!ALL
+
+$$ALL
+  ; Pattern data not available

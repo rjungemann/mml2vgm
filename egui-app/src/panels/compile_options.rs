@@ -17,7 +17,7 @@ impl CompileOptions {
     }
 }
 
-const FORMATS: &[&str] = &["vgm", "xgm", "xgm2", "zgm"];
+const FORMATS: &[&str] = &["vgm", "xgm", "xgm2", "zgm", "mid"];
 const CHIPS: &[&str] = &[
     "auto",
     "YM2612", "SN76489", "YM2608", "YM2151", "YM2203",

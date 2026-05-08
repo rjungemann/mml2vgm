@@ -12,6 +12,7 @@
 pub mod vgm;
 pub mod xgm;
 pub mod zgm;
+pub mod midi;
 
 use crate::{MmlError, MmlResult, OutputFormat as LibOutputFormat, SoundChip};
 use std::path::Path;
@@ -55,6 +56,8 @@ pub enum OutputFormat {
     Xgm2,
     /// ZGM format (ZGM Music)
     Zgm,
+    /// MIDI format (Standard MIDI File)
+    Midi,
 }
 
 impl From<LibOutputFormat> for OutputFormat {
@@ -64,6 +67,7 @@ impl From<LibOutputFormat> for OutputFormat {
             LibOutputFormat::XGM => OutputFormat::Xgm,
             LibOutputFormat::XGM2 => OutputFormat::Xgm2,
             LibOutputFormat::ZGM => OutputFormat::Zgm,
+            LibOutputFormat::MID => OutputFormat::Midi,
         }
     }
 }
@@ -75,6 +79,7 @@ impl std::fmt::Display for OutputFormat {
             OutputFormat::Xgm => write!(f, "xgm"),
             OutputFormat::Xgm2 => write!(f, "xgm2"),
             OutputFormat::Zgm => write!(f, "zgm"),
+            OutputFormat::Midi => write!(f, "mid"),
         }
     }
 }
@@ -88,6 +93,7 @@ impl std::str::FromStr for OutputFormat {
             "xgm" => Ok(OutputFormat::Xgm),
             "xgm2" => Ok(OutputFormat::Xgm2),
             "zgm" => Ok(OutputFormat::Zgm),
+            "mid" => Ok(OutputFormat::Midi),
             _ => Err(MmlError::InvalidOutputFormat(s.to_string())),
         }
     }
@@ -117,6 +123,7 @@ pub fn generate_code(
         OutputFormat::Xgm => Box::new(xgm::XgmGenerator::from_ast(ast, options)?),
         OutputFormat::Xgm2 => Box::new(xgm::Xgm2Generator::from_ast(ast, options)?),
         OutputFormat::Zgm => Box::new(zgm::ZgmGenerator::from_ast(ast, options)?),
+        OutputFormat::Midi => Box::new(midi::MidiGenerator::from_ast(ast, options)?),
     };
 
     generator.generate()
@@ -169,6 +176,15 @@ pub struct VgmHeader {
     pub y8950_clock: u32,
     /// YMF262 clock rate (VGM header offset 0x58)
     pub ymf262_clock: u32,
+    /// DMG (Game Boy APU) clock rate (VGM header offset 0x80)
+    pub dmg_clock: u32,
+    /// NES APU clock rate (VGM header offset 0x84)
+    pub nes_apu_clock: u32,
+    /// OKIM6295/K051649 flags (VGM header offset 0x94)
+    /// bit 31: K051649 present, bit 30: K052539 present, bits 0-1: OKIM6295 clock divider
+    pub k051649_flags: u32,
+    /// K051649/K052539 clock rate (VGM header offset 0x9C)
+    pub k051649_clock: u32,
 }
 
 impl Default for VgmHeader {
@@ -196,6 +212,10 @@ impl Default for VgmHeader {
             ym3526_clock: 0,
             y8950_clock: 0,
             ymf262_clock: 0,
+            dmg_clock: 0,
+            nes_apu_clock: 0,
+            k051649_flags: 0,
+            k051649_clock: 0,
         }
     }
 }
@@ -213,6 +233,76 @@ mod tests {
         assert_eq!(header.version, 0x00000171);
         assert_eq!(header.sn76489_clock, 3_579_545);
         assert_eq!(header.rate, 44100);
+        // New console chip fields should default to 0
+        assert_eq!(header.dmg_clock, 0);
+        assert_eq!(header.nes_apu_clock, 0);
+        assert_eq!(header.k051649_flags, 0);
+        assert_eq!(header.k051649_clock, 0);
+    }
+
+    #[test]
+    fn test_vgm_header_dmg_clock_offset() {
+        let mut ast = MmlAst::new();
+        let mut part = PartDefinition {
+            name: "DMG1".to_string(),
+            chip: Some("DMG".to_string()),
+            tempo: Some(120),
+            commands: vec![],
+        };
+        ast.parts.insert("DMG1".to_string(), part);
+        
+        let options = CompileOptions::default();
+        let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
+        let result = generator.generate().unwrap();
+        
+        // Check DMG clock at offset 0x80
+        let dmg_clock_bytes = &result[0x80..0x84];
+        assert_eq!(dmg_clock_bytes, &4_194_304u32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_vgm_header_nes_apu_clock_offset() {
+        let mut ast = MmlAst::new();
+        let mut part = PartDefinition {
+            name: "NES1".to_string(),
+            chip: Some("NES".to_string()),
+            tempo: Some(120),
+            commands: vec![],
+        };
+        ast.parts.insert("NES1".to_string(), part);
+        
+        let options = CompileOptions::default();
+        let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
+        let result = generator.generate().unwrap();
+        
+        // Check NES APU clock at offset 0x84
+        let nes_clock_bytes = &result[0x84..0x88];
+        assert_eq!(nes_clock_bytes, &1_789_772u32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_vgm_header_k051649_clock_offset() {
+        let mut ast = MmlAst::new();
+        let mut part = PartDefinition {
+            name: "SCC1".to_string(),
+            chip: Some("K051649".to_string()),
+            tempo: Some(120),
+            commands: vec![],
+        };
+        ast.parts.insert("SCC1".to_string(), part);
+        
+        let options = CompileOptions::default();
+        let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
+        let result = generator.generate().unwrap();
+        
+        // Check K051649 clock at offset 0x9C
+        let k051649_clock_bytes = &result[0x9C..0xA0];
+        assert_eq!(k051649_clock_bytes, &1_789_772u32.to_le_bytes());
+        
+        // Check K051649 flags at offset 0x94 - bit 31 should be set
+        let k051649_flags_bytes = &result[0x94..0x98];
+        let flags = u32::from_le_bytes([k051649_flags_bytes[0], k051649_flags_bytes[1], k051649_flags_bytes[2], k051649_flags_bytes[3]]);
+        assert!(flags & 0x80000000 != 0, "K051649 flag bit 31 should be set");
     }
 
     #[test]
@@ -234,6 +324,10 @@ mod tests {
         assert_eq!(
             OutputFormat::from(LibFormat::ZGM),
             OutputFormat::Zgm
+        );
+        assert_eq!(
+            OutputFormat::from(LibFormat::MID),
+            OutputFormat::Midi
         );
     }
 

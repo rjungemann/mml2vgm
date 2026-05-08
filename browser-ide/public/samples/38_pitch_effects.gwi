@@ -1,0 +1,135 @@
+'{
+
+    TitleName   = Expression and Articulation
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+
+}
+
+; Expression and articulation effects — demonstrating how MML commands and
+; FM operator parameters create a wide palette of note shapes and dynamics.
+;
+; NOTE: Hardware portamento / pitch-slide is not yet implemented in the compiler.
+; Instead, this file shows how the following techniques achieve expressive results:
+;
+;   qN   — quantize / gate time (staccato to legato)
+;   vN   — volume for dynamics (pianissimo → fortissimo)
+;   DT   — FM operator detune (adds chorus depth or chorus effects)
+;   @N   — patch changes for timbral variation mid-melody
+;   Tied chromatic runs — manual "glide" using ^ ties between adjacent semitones
+;
+; Each section uses A1 with a different patch and expression technique.
+
+; ── PATCH DEFINITIONS ────────────────────────────────────────────────────────
+
+; @0 — Staccato patch: fast release, short sustain (pluck feel)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,020,000,012,005,000,000,001,000,000,000
+'@ 031,020,000,012,005,000,000,001,002,000,000
+'@ 031,020,000,012,005,000,000,002,000,000,000
+'@ 031,020,000,012,005,000,000,002,006,000,000
+'@ 004,003
+
+; @1 — Legato patch: slow attack, long sustain, slow release (pad feel)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 008,004,000,004,002,000,000,001,000,000,000
+'@ 008,004,000,004,002,000,000,001,002,000,000
+'@ 008,004,000,004,002,000,000,002,000,000,000
+'@ 008,004,000,004,002,000,000,002,006,000,000
+'@ 007,000
+
+; @2 — Detuned pair: two carriers with opposing DT, creates chorus/drift
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 028,006,000,006,002,000,000,001,003,000,000
+'@ 028,006,000,006,002,000,000,001,005,000,000
+'@ 028,006,000,006,002,000,000,002,003,000,000
+'@ 028,006,000,006,002,000,000,002,005,000,000
+'@ 007,000
+
+; @3 — Bright bell: high feedback on op1, algorithm 4, metallic tone
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,008,002,000,000,001,000,000,000
+'@ 031,012,000,008,002,000,000,003,001,000,000
+'@ 031,008,000,007,002,000,000,001,000,000,000
+'@ 031,008,000,007,002,000,000,004,000,000,000
+'@ 004,007
+
+'A1 T100
+
+; ── SECTION 1: QUANTIZE (gate time / staccato–legato) ───────────────────────
+; The same melody phrase is played three times:
+;   q2 = very staccato (notes sound for 1/4 of their notated length)
+;   q5 = standard (notes sound for ~5/8 of their length)
+;   q8 = full legato (notes sustain their entire notated length)
+
+'A1 @0 v100 o5 l4
+
+; q2 — staccato, punchy
+'A1 q2 c r e r g r >c r< | b r g r e r c r
+
+; q5 — balanced (typical game music feel)
+'A1 q5 c r e r g r >c r< | b r g r e r c r
+
+; q8 — legato, flowing
+'A1 q8 c e g >c< b g e c
+
+; ── SECTION 2: VOLUME DYNAMICS (pianissimo to fortissimo) ────────────────────
+; Same melody at v30 (soft), v70 (medium), v110 (loud), crescendo finish.
+
+'A1 @1 q6 o5 l4
+
+; pp (pianissimo)
+'A1 v30 c e g >c< b g e c
+
+; mf (mezzo-forte)
+'A1 v70 c e g >c< b g e c
+
+; ff (fortissimo)
+'A1 v110 c e g >c< b g e c
+
+; ── SECTION 3: DETUNED PAIR (chorus / ensemble effect) ────────────────────────
+; Patch @2 uses opposing DT values on each operator pair, creating a beating
+; effect between them that sounds like an ensemble or vintage chorus unit.
+
+'A1 @2 v90 q7 o5 l4
+
+'A1 c2 g2 | a2 e2 | f2 >c2< | g2 d2
+'A1 e2 b2 | d2 a2 | c2 g2 | c1
+
+; ── SECTION 4: BELL TIMBRE (feedback and operator ratio effects) ──────────────
+; Patch @3 has high feedback on op1 (feedback=7) and a 4:1 frequency ratio
+; on op4, creating a metallic, inharmonic timbre suitable for mallet sounds.
+; Shorter notes emphasise the attack transient; longer notes reveal the decay.
+
+'A1 @3 v95 q3 o5 l8
+
+'A1 c r r c r r c r | e r r e r r e r
+'A1 g r r g r r g r | >c r r< b r r g r
+
+; ── SECTION 5: MANUAL CHROMATIC GLIDE ───────────────────────────────────────
+; A "portamento" effect built by tieing short chromatic notes.
+; c+16^d16 sounds like a slide from C# into D; each tied pair forms a glide step.
+; The result is a jazz-style "scoop" into and away from target pitches.
+
+'A1 @0 v100 q8 o4 l16
+
+; slide up from C to E (C → C# → D → D# → E)
+'A1 c^c+^d^d+^e4
+
+; slide up from G to B
+'A1 g^g+^a^a+^b4
+
+; slide down from >C to A (>C → B → A#/Bb → A)
+'A1 >c4 b^a+^a4
+
+; final flourish — held chord note
+'A1 l4 o4 e2 c2 | c1

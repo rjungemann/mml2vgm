@@ -1,6 +1,20 @@
 import type * as monaco from 'monaco-editor';
+import { driverService } from '@/services/driverService';
+import type { CompletionSuggestion } from '@/services/driverService';
 
-export function registerMmlLanguage(monacoInstance: typeof monaco): void {
+/**
+ * Register the 'mml' Monaco language with syntax highlighting and
+ * a dynamic, per-driver completion provider.
+ *
+ * @param monacoInstance  The monaco namespace (from @monaco-editor/react)
+ * @param getDriverId     A callback returning the active document's language/driver ID
+ *                        (e.g. 'gwi', 'muc', 'mus', 'mdl', …).  Called at completion time
+ *                        so it always reflects the current document.
+ */
+export function registerMmlLanguage(
+  monacoInstance: typeof monaco,
+  getDriverId: () => string,
+): void {
   monacoInstance.languages.register({
     id: 'mml',
     extensions: ['.mml', '.txt'],
@@ -132,35 +146,47 @@ export function registerMmlLanguage(monacoInstance: typeof monaco): void {
     },
   });
 
-  // Define completion items
+  // Define completion items — delegate to per-driver completions from driverService
   monacoInstance.languages.registerCompletionItemProvider('mml', {
+    triggerCharacters: ['@', '#', "'"],
     provideCompletionItems: (model, position) => {
-      const monaco = monacoInstance;
+      const monacoNs = monacoInstance;
       const word = model.getWordAtPosition(position);
-      const wordRange: monaco.IRange = word 
+      const wordRange: monaco.IRange = word
         ? { startLineNumber: position.lineNumber, startColumn: word.startColumn, endLineNumber: position.lineNumber, endColumn: word.endColumn }
         : { startLineNumber: position.lineNumber, startColumn: position.column, endLineNumber: position.lineNumber, endColumn: position.column };
-      const suggestions: monaco.languages.CompletionItem[] = [
-        { label: '@OPNA', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@OPNA', range: wordRange },
-        { label: '@OPNB', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@OPNB', range: wordRange },
-        { label: '@SSG', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@SSG', range: wordRange },
-        { label: '@ADPCM', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@ADPCM', range: wordRange },
-        { label: '@PCM', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@PCM', range: wordRange },
-        { label: '@rhythm', kind: monaco.languages.CompletionItemKind.Keyword, insertText: '@rhythm', range: wordRange },
-        { label: 'o4', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'o4', range: wordRange },
-        { label: 'l4', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'l4', range: wordRange },
-        { label: 'v100', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'v100', range: wordRange },
-        { label: 't120', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 't120', range: wordRange },
-        { label: 'C', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'C', range: wordRange },
-        { label: 'D', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'D', range: wordRange },
-        { label: 'E', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'E', range: wordRange },
-        { label: 'F', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'F', range: wordRange },
-        { label: 'G', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'G', range: wordRange },
-        { label: 'A', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'A', range: wordRange },
-        { label: 'B', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'B', range: wordRange },
-        { label: 'r', kind: monaco.languages.CompletionItemKind.Keyword, insertText: 'r', range: wordRange },
-      ];
-      
+
+      // Determine prefix for filtering (include trigger chars @ and # if present)
+      const lineUpToCursor = model.getValueInRange({
+        startLineNumber: position.lineNumber,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      });
+      const prefixMatch = lineUpToCursor.match(/[@#']?\w*$/);
+      const prefix = prefixMatch ? prefixMatch[0] : (word?.word ?? '');
+
+      const driverId = getDriverId();
+      const rawSuggestions: CompletionSuggestion[] = driverService.getCompletions(driverId, prefix);
+
+      const kindMap: Record<CompletionSuggestion['kind'], monaco.languages.CompletionItemKind> = {
+        keyword: monacoNs.languages.CompletionItemKind.Keyword,
+        snippet: monacoNs.languages.CompletionItemKind.Snippet,
+        value: monacoNs.languages.CompletionItemKind.Value,
+      };
+
+      const suggestions: monaco.languages.CompletionItem[] = rawSuggestions.map(s => ({
+        label: s.label,
+        kind: kindMap[s.kind],
+        insertText: s.insertText,
+        detail: s.detail,
+        documentation: s.documentation,
+        insertTextRules: s.kind === 'snippet'
+          ? monacoNs.languages.CompletionItemInsertTextRule.InsertAsSnippet
+          : undefined,
+        range: wordRange,
+      }));
+
       return { suggestions };
     },
   });

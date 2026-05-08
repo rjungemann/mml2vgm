@@ -1,0 +1,11 @@
+; System: NES (Ricoh 2A03) + 2×Famicom Disk System (chip) + Namco C30 WSG
+
+$OPN, $UNKNOWN_0x008A, $UNKNOWN_0x008A, $UNKNOWN_0x00BB,
+
+!ALL
+
+$$ALL
+  ; Pattern data not available
+
+$$ALL
+  ; Pattern data not available

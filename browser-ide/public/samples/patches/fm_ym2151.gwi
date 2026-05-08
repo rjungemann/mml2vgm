@@ -1,0 +1,51 @@
+; YM2151 (OPM) Instrument Patch Library
+; =====================================================================
+; Include this file with: + patches/fm_ym2151.gwi
+;
+; NOTE: The mml2vgm compiler does not currently apply FM patches to
+; OPM (YM2151) channels. The compiler initialises each OPM channel
+; with a hardcoded algorithm-7 sine patch. The patch definitions
+; below are retained for documentation and future implementation.
+;
+; OPM differs from OPN (YM2612) in two key ways:
+;   - DT2 parameter: an additional coarse-detune per operator (0-3)
+;     creates interval-based detuning (unison, octave, etc.)
+;   - 8 channels available (vs 6 on YM2612)
+;
+; Format: same as '@ M N but parameters include DT2 after DT:
+;   AR  DR  SR  RR  SL  TL  KS  ML  DT  DT2  AM
+;
+; When compiler support is added, these patches will become active.
+; =====================================================================
+
+; @0 — opm-lead: clean algorithm 7, DT2=0, bright all-carrier lead
+;   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+; '@ 031,010,000,007,002,000,000,001,000,000,000
+; '@ 031,010,000,007,002,000,000,001,002,000,000
+; '@ 031,010,000,007,002,000,000,002,000,000,000
+; '@ 031,010,000,007,002,000,000,002,006,000,000
+; '@ 007,000
+
+; @1 — opm-brass: algorithm 3, DT2=1 (adds octave-up coarse detune)
+;   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+; '@ 031,008,000,007,003,040,000,001,000,000,000
+; '@ 031,008,000,007,003,040,000,001,000,000,000
+; '@ 031,006,000,006,004,020,000,002,001,000,000
+; '@ 031,005,000,005,005,000,000,001,000,000,000
+; '@ 003,004
+
+; @2 — opm-strings: algorithm 7, detuned pair, DT2=2 (wide interval detune)
+;   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+; '@ 018,004,000,006,003,008,000,001,002,000,000
+; '@ 018,004,000,006,003,008,000,001,006,000,000
+; '@ 018,004,000,006,003,008,000,002,001,000,000
+; '@ 018,004,000,006,003,000,000,002,007,000,000
+; '@ 007,000
+
+; @3 — opm-bass: algorithm 0 (stacked), low ratio, DT2=0
+;   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+; '@ 031,010,000,009,002,030,000,001,000,000,000
+; '@ 031,008,000,007,003,025,000,002,000,000,000
+; '@ 031,007,000,006,004,020,000,001,000,000,000
+; '@ 031,005,000,005,005,000,000,002,000,000,000
+; '@ 000,005

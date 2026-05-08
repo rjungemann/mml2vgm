@@ -1,0 +1,42 @@
+; NES APU (2A03) — Example
+; =====================================================================
+; NOTE: NES APU (Ricoh 2A03) is not yet wired into the mml2vgm
+; compiler's VGM code generator. This file is a placeholder that will
+; be expanded once compiler support is added.
+;
+; Chip: Ricoh 2A03 / 2A07 (NES Audio Processing Unit)
+; Channels:
+;   Pulse 1 — square wave, 4 duty cycles (12.5%, 25%, 50%, 75%)
+;   Pulse 2 — square wave, same as Pulse 1
+;   Triangle — triangle wave, fixed volume, bass register
+;   Noise — LFSR noise, two modes (long/short period)
+;   DPCM — delta-encoded PCM sample playback
+; Used in: Nintendo NES / Famicom (1983-1994)
+;
+; Planned example:
+;   - PartNES = A (or PartPulse1, PartPulse2, PartTriangle, PartNoise)
+;   - A1 = Pulse 1 melody with duty cycle commands
+;   - A2 = Pulse 2 harmony
+;   - B1 = Triangle bass (o2)
+;   - B2 = Noise drum pattern
+;   - Genre: NES game music style
+;
+; When compiler support is added, this file will demonstrate:
+;   PartNES = A
+;   'A1 T150 @0 v100 o5 l8 c d e f g a b >c
+; =====================================================================
+
+; Placeholder: compiles as an empty VGM
+'{
+
+    TitleName   = NES APU (Placeholder)
+    SystemName  = Nintendo NES
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+}
+
+; NES APU compiler support not yet available.
+; See docs/Example_Tracks_Plan.md Phase 4 for implementation status.

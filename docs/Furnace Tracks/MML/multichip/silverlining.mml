@@ -1,0 +1,13 @@
+; Eschatos - Silver Lining
+; By: Yousuke Yasui (arr ActualNK358)
+; System: NES (Ricoh 2A03) + Yamaha YM2151 (OPM)
+
+$OPN, $UNKNOWN_0x0082,
+
+!ALL
+
+$$ALL
+  ; Pattern data not available
+
+$$ALL
+  ; Pattern data not available

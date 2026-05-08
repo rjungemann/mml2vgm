@@ -1,0 +1,19 @@
+{
+Title=MIDI Pitch Bend Demo
+Composer=mml2vgm
+ClockCount=192
+}
+
+; Demonstrates MIDI pitch bend commands
+; Compile with: mml2vgm-rs midi_pitch_bend.gwi --format mid -o midi_bend.mid
+
+; Part A1: Pitch bend effects on guitar
+'A1 @ch0 @p24 l4 o4
+; Notes with pitch bend
+c4 @b+100 d4 @b-50 e4 @b0 f4
+; Pitch bend slide
+c2 @bend+500 &c2 @bend-500 &c2
+
+; Part B1: Pitch bend with sustain
+'B1 @ch1 @p0 l2 o4
+@sustain c1 @b+200 &d1 @b-200 &e1 @sustainOff

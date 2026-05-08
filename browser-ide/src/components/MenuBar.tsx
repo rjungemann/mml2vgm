@@ -111,7 +111,13 @@ const EXAMPLE_FILES = [
   // ── Advanced ───────────────────────────────────────────────────────────────
   { filename: '30_ym2608_opna.gwi', label: 'YM2608 (OPNA)' },
   { filename: '31_ymf262_opl3.gwi', label: 'YMF262 (OPL3)' },
+  { filename: '32_scc_k051649.gwi', label: 'K051649 SCC (Placeholder)' },
+  { filename: '33_nes_apu.gwi', label: 'NES APU (Placeholder)' },
+  { filename: '34_dmg_gameboy.gwi', label: 'DMG Game Boy (Placeholder)' },
   { filename: '35_ensemble.gwi', label: 'Full Ensemble' },
+  { filename: '36_nested_loops.gwi', label: 'Nested Loops' },
+  { filename: '37_polyrhythm.gwi', label: 'Polyrhythm' },
+  { filename: '38_pitch_effects.gwi', label: 'Expression & Articulation' },
   // ── Test / Reference ───────────────────────────────────────────────────────
   { filename: 'c140_test.gwi', label: 'C140 Test' },
   { filename: 'general_test.gwi', label: 'General Test' },
@@ -320,6 +326,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
         items.push({ label: 'Export as VGM', onClick: () => onExportBinary('vgm'), disabled: !hasActiveDocument || !hasCompileResult });
         items.push({ label: 'Export as XGM', onClick: () => onExportBinary('xgm'), disabled: !hasActiveDocument || !hasCompileResult });
         items.push({ label: 'Export as ZGM', onClick: () => onExportBinary('zgm'), disabled: !hasActiveDocument || !hasCompileResult });
+        items.push({ label: 'Export as MIDI', onClick: () => onExportBinary('mid'), disabled: !hasActiveDocument || !hasCompileResult });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Import...', disabled: true });
         items.push({ label: 'Upload Samples…', onClick: onUploadSamples, disabled: !onUploadSamples });

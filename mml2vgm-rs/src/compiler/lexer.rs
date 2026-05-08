@@ -79,6 +79,48 @@ pub enum Token {
     // Instrument
     /// Instrument/Definition command: @
     AtSign,
+
+    // MIDI-specific commands
+    /// Control Change: c
+    ControlChangeCommand,
+    /// Program Change: p or pg
+    ProgramChangeCommand,
+    /// Pitch Bend: b or bend
+    PitchBendCommand,
+    /// Aftertouch (Channel Pressure): a or at
+    AftertouchCommand,
+    /// Polyphonic Aftertouch: pa
+    PolyAftertouchCommand,
+    /// System Exclusive: x or sysex
+    SysExCommand,
+    /// MIDI Channel: ch
+    MidiChannelCommand,
+    /// MIDI Program: pr
+    MidiProgramCommand,
+    /// Pan: pan
+    PanCommand,
+    /// Expression: expr
+    ExpressionCommand,
+    /// Sustain: sustain, sustainOff
+    SustainCommand,
+    /// All Notes Off: allNotesOff
+    AllNotesOffCommand,
+    /// Reset All Controllers: resetAllCtrl
+    ResetAllCtrlCommand,
+    /// All Sound Off: allSoundOff
+    AllSoundOffCommand,
+    /// Damper pedal: damper, damperOff
+    DamperCommand,
+    /// Portamento: portamento, portOff
+    PortamentoCommand,
+    /// Sostenuto: sostenuto, sostenutoOff
+    SostenutoCommand,
+    /// Soft pedal: soft, softOff
+    SoftCommand,
+    /// Local Control: localOn, localOff
+    LocalControlCommand,
+    /// Drum note: D
+    DrumNoteCommand,
     
     // Special
     /// Bar line: |
@@ -120,6 +162,31 @@ impl<'a> Lexer<'a> {
         let mut iter = self.source[self.position..].chars();
         let _current = iter.next()?;  // Get current (might be multi-byte)
         iter.next()  // Get next
+    }
+
+    /// Peek at the current character without advancing
+    fn peek_char(&self) -> Option<char> {
+        self.current_char()
+    }
+
+    /// Peek at the next N characters as a string
+    fn peek_chars(&self, n: usize) -> Option<&str> {
+        let remaining = &self.source[self.position..];
+        let char_count = remaining.chars().count();
+        if char_count < n {
+            return None;
+        }
+        // This is a simplified version - we need to account for multi-byte UTF-8
+        // For ASCII-only MML commands, this should work
+        let byte_slice = &remaining.as_bytes()[..n];
+        std::str::from_utf8(byte_slice).ok()
+    }
+
+    /// Advance N characters
+    fn advance_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.advance();
+        }
     }
 
     /// Advance to next character
@@ -351,10 +418,203 @@ impl<'a> Lexer<'a> {
                 Ok(Token::NoteNumberCommand)
             }
 
-            // Instrument/At sign
+            // Instrument/At sign and MIDI commands
             '@' => {
                 self.advance();
-                Ok(Token::AtSign)
+                // Check for MIDI-specific commands by looking at the following characters
+                let next_char = self.peek_char();
+                let next_token = match next_char {
+                    Some('c') => {
+                        self.advance();
+                        // Check if it's 'cc' for control change or 'ch' for channel
+                        if self.peek_char() == Some('c') {
+                            self.advance();
+                            Token::ControlChangeCommand
+                        } else if self.peek_char() == Some('h') {
+                            self.advance();
+                            Token::MidiChannelCommand
+                        } else {
+                            Token::ControlChangeCommand
+                        }
+                    }
+                    Some('p') => {
+                        self.advance();
+                        // Check if it's 'pg' for program change, 'pr' for program, or 'pan'
+                        if self.peek_char() == Some('g') {
+                            self.advance();
+                            Token::ProgramChangeCommand
+                        } else if self.peek_char() == Some('r') {
+                            self.advance();
+                            Token::MidiProgramCommand
+                        } else if self.peek_chars(2) == Some("an") {
+                            self.advance_n(2);
+                            Token::PanCommand
+                        } else {
+                            Token::ProgramChangeCommand
+                        }
+                    }
+                    Some('b') => {
+                        self.advance();
+                        // Check if it's 'bend'
+                        if self.peek_chars(3) == Some("end") {
+                            self.advance_n(3);
+                            Token::PitchBendCommand
+                        } else {
+                            Token::PitchBendCommand
+                        }
+                    }
+                    Some('a') => {
+                        self.advance();
+                        // Check if it's 'at' for aftertouch
+                        if self.peek_char() == Some('t') {
+                            self.advance();
+                            Token::AftertouchCommand
+                        } else {
+                            Token::AftertouchCommand
+                        }
+                    }
+                    Some('x') => {
+                        self.advance();
+                        // Check if it's 'sysex'
+                        if self.peek_chars(4) == Some("ysex") {
+                            self.advance_n(4);
+                            Token::SysExCommand
+                        } else {
+                            Token::SysExCommand
+                        }
+                    }
+                    Some('D') => {
+                        self.advance();
+                        Token::DrumNoteCommand
+                    }
+                    Some('e') => {
+                        self.advance();
+                        // Check for expr
+                        if self.peek_chars(3) == Some("xpr") {
+                            self.advance_n(3);
+                            Token::ExpressionCommand
+                        } else {
+                            Token::Identifier("e".to_string())
+                        }
+                    }
+                    Some('s') => {
+                        self.advance();
+                        // Check for sustain, sustainOff, soft, softOff, sostenuto, sostenutoOff
+                        if self.peek_chars(6) == Some("ustain") {
+                            self.advance_n(6);
+                            // Check for Off
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                                Token::SustainCommand // We'll handle off in parser
+                            } else {
+                                Token::SustainCommand
+                            }
+                        } else if self.peek_chars(4) == Some("oft") {
+                            self.advance_n(4);
+                            // Check for Off - advance and return SoftCommand
+                            if self.peek_char() == Some('O') && self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                                Token::SoftCommand
+                            } else {
+                                Token::SoftCommand
+                            }
+                        } else if self.peek_chars(8) == Some("ostenuto") {
+                            self.advance_n(8);
+                            // Check for Off
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                                Token::SostenutoCommand
+                            } else {
+                                Token::SostenutoCommand
+                            }
+                        } else {
+                            Token::Identifier("s".to_string())
+                        }
+                    }
+                    Some('d') => {
+                        self.advance();
+                        // Check for damper, damperOff
+                        if self.peek_chars(5) == Some("amper") {
+                            self.advance_n(5);
+                            Token::DamperCommand
+                        } else {
+                            Token::Identifier("d".to_string())
+                        }
+                    }
+                    Some('p') => {
+                        self.advance();
+                        // Check for portamento, portOff
+                        if self.peek_chars(8) == Some("ortamento") {
+                            self.advance_n(8);
+                            Token::PortamentoCommand
+                        } else {
+                            // Already handled pg, pr, pan above
+                            Token::ProgramChangeCommand
+                        }
+                    }
+                    Some('l') => {
+                        self.advance();
+                        // Check for localOn, localOff
+                        if self.peek_chars(5) == Some("ocal") {
+                            self.advance_n(5);
+                            // Check for On
+                            if self.peek_char() == Some('O') && self.peek_chars(2) == Some("n") {
+                                self.advance_n(2);
+                                Token::LocalControlCommand
+                            } else if self.peek_char() == Some('f') && self.peek_chars(2) == Some("ff") {
+                                self.advance_n(3);
+                                Token::LocalControlCommand
+                            } else {
+                                Token::LocalControlCommand
+                            }
+                        } else {
+                            Token::Identifier("l".to_string())
+                        }
+                    }
+                    Some('a') => {
+                        self.advance();
+                        // Check for allSoundOff, allNotesOff
+                        if self.peek_chars(8) == Some("llSound") {
+                            self.advance_n(8);
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                                Token::AllSoundOffCommand
+                            } else {
+                                Token::AllSoundOffCommand
+                            }
+                        } else if self.peek_chars(7) == Some("llNotes") {
+                            self.advance_n(7);
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                                Token::AllNotesOffCommand
+                            } else {
+                                Token::AllNotesOffCommand
+                            }
+                        } else if self.peek_char() == Some('t') {
+                            self.advance();
+                            Token::AftertouchCommand
+                        } else {
+                            Token::Identifier("a".to_string())
+                        }
+                    }
+                    Some('r') => {
+                        self.advance();
+                        // Check for resetAllCtrl
+                        if self.peek_chars(9) == Some("esetAllC") {
+                            self.advance_n(9);
+                            if self.peek_chars(4) == Some("trl") {
+                                self.advance_n(4);
+                                Token::ResetAllCtrlCommand
+                            } else {
+                                Token::Identifier("resetAllC".to_string())
+                            }
+                        } else {
+                            Token::Identifier("r".to_string())
+                        }
+                    }
+                    _ => Token::AtSign,
+                };
+                Ok(next_token)
             }
             
             // Bar

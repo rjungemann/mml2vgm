@@ -1,0 +1,8 @@
+{
+Title=MIDI Control Change Test
+Composer=Test
+ClockCount=192
+}
+
+'A1 @ch0 @p0 l4 o4
+@c64=127 c4 d4 e4 f4 @c64=0 g4 f4 e4 d4
