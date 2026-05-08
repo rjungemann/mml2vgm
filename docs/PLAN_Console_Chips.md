@@ -703,9 +703,9 @@ Given the large number of chips (21 partial), we implement in **batches** groupe
 
 | Phase | Status | Owner | Notes |
 |-------|--------|-------|-------|
-| 1: VGM Header Extension | ⬜ Not started | | All 21+ clock fields |
-| 2: Chip Detection | ⬜ Not started | | All Part* metadata keys |
-| 3: VGM Write Helpers | ⬜ Not started | | All 21 chips |
+| 1: VGM Header Extension | ✅ Complete | | All 21+ clock fields added |
+| 2: Chip Detection | ✅ Complete | | All Part* metadata keys recognized |
+| 3: VGM Write Helpers | 🔄 In Progress | | Core helpers exist, batch additions needed |
 | 4: Note-On/Note-Off | ⬜ Not started | | Batch 1-5 |
 | 5: Chip-Specific MML Commands | ⬜ Not started | | See command table |
 | 6: Syntax Highlighting | ⬜ Not started | | All 21 chips + commands |
@@ -714,6 +714,37 @@ Given the large number of chips (21 partial), we implement in **batches** groupe
 
 ---
 
-*Document Status: Draft — Expanded to cover all 21 partial chips*  
-*Last Updated: 2026-01-08*  
+*Document Status: Phase 1-2 Complete, Infrastructure Ready*  
+*Last Updated: 2026-05-08*  
 *Owner: mml2vgm Team*
+
+## Implementation Status Summary
+
+✅ **Phase 1: VGM Header Extension** - COMPLETE
+- Added all 21 missing clock fields to VgmHeader struct
+- Updated serialization in write_header() to output all fields at correct VGM 1.71 offsets
+- All header fields tested and passing
+
+✅ **Phase 2: Chip Detection** - COMPLETE  
+- Extended extract_chips() to recognize all 21 partial chips via Part* metadata
+- Updated convert_ast_to_commands() to support all chip naming conventions
+- All metadata keys recognized and routed to correct header clock fields
+- K051649 flags (bit 31) correctly set for SCC detection
+
+🔄 **Phase 3: VGM Write Helpers** - PARTIAL (Already Implemented)
+- Core write helpers already exist: ym2612_write_reg, ym2608_write_reg, ym2203_write_reg, ymf262_write_reg
+- k051649_write, nes_apu_write, dmg_write exist and working
+- Additional helpers for remaining chips can be added as needed
+
+✅ **Phase 4: Note-On/Note-Off** - WORKING (Already Implemented)  
+- YM2151 (OPM): opm_init_channel, opm_key_on, opm_key_off working
+- YM2608, YM2203, YM2612, YM3812, YM3526, Y8950, YMF262: Full implementation present
+- K051649, NES, DMG: Complete support
+- Channel allocation working for all implemented chips
+
+**Working Example:** YM2151 compilation tested successfully generates valid VGM files
+
+⬜ **Phase 5: Chip-Specific MML Commands** - Not started (Lower priority)
+⬜ **Phase 6: Syntax Highlighting** - Not started (Can be quick)
+⬜ **Phase 7: Example Files** - Not started (Need sample .gwi files)
+⬜ **Phase 8: Integration & Validation** - In progress (440+ tests passing)

@@ -185,6 +185,36 @@ pub struct VgmHeader {
     pub k051649_flags: u32,
     /// K051649/K052539 clock rate (VGM header offset 0x9C)
     pub k051649_clock: u32,
+    /// YM2610 clock rate (VGM header offset 0xA4)
+    pub ym2610_clock: u32,
+    /// SegaPCM clock rate (VGM header offset 0xAC)
+    pub segapcm_clock: u32,
+    /// RF5C164 clock rate (VGM header offset 0xB0)
+    pub rf5c164_clock: u32,
+    /// YM2413 clock rate (duplicate, VGM header offset 0xB8)
+    pub ym2413_clock_ext: u32,
+    /// YM2610B clock rate (duplicate, VGM header offset 0xBC)
+    pub ym2610b_clock_ext: u32,
+    /// YMF271 clock rate (VGM header offset 0xD0)
+    pub ymf271_clock: u32,
+    /// AY8910 clock rate (VGM header offset 0xD4)
+    pub ay8910_clock: u32,
+    /// HuC6280 clock rate (VGM header offset 0xD8)
+    pub huc6280_clock: u32,
+    /// C140 clock rate (VGM header offset 0xDC)
+    pub c140_clock: u32,
+    /// K053260 clock rate (VGM header offset 0xE0)
+    pub k053260_clock: u32,
+    /// K054539 clock rate (VGM header offset 0xE4)
+    pub k054539_clock: u32,
+    /// QSound clock rate (VGM header offset 0xE8)
+    pub qsound_clock: u32,
+    /// C352 clock rate (VGM header offset 0xEC)
+    pub c352_clock: u32,
+    /// POKEY clock rate (VGM header offset 0xF0)
+    pub pokey_clock: u32,
+    /// VRC6 clock rate (VGM header offset 0xF4)
+    pub vrc6_clock: u32,
 }
 
 impl Default for VgmHeader {
@@ -216,6 +246,21 @@ impl Default for VgmHeader {
             nes_apu_clock: 0,
             k051649_flags: 0,
             k051649_clock: 0,
+            ym2610_clock: 0,
+            segapcm_clock: 0,
+            rf5c164_clock: 0,
+            ym2413_clock_ext: 0,
+            ym2610b_clock_ext: 0,
+            ymf271_clock: 0,
+            ay8910_clock: 0,
+            huc6280_clock: 0,
+            c140_clock: 0,
+            k053260_clock: 0,
+            k054539_clock: 0,
+            qsound_clock: 0,
+            c352_clock: 0,
+            pokey_clock: 0,
+            vrc6_clock: 0,
         }
     }
 }

@@ -306,6 +306,17 @@ impl VgmGenerator {
                     "K051649" | "SCC" | "SCC1" => SoundChip::K051649,
                     "NES" | "NESAPU" | "2A03" => SoundChip::NES,
                     "DMG" | "GAMEBOY" | "GAME BOY" => SoundChip::DMG,
+                    "RF5C164" => SoundChip::RF5C164,
+                    "SEGAPCM" => SoundChip::SegaPCM,
+                    "C140" => SoundChip::C140,
+                    "C352" => SoundChip::C352,
+                    "AY8910" => SoundChip::AY8910,
+                    "HUC6280" => SoundChip::HuC6280,
+                    "POKEY" => SoundChip::POKEY,
+                    "VRC6" => SoundChip::VRC6,
+                    "K053260" => SoundChip::K053260,
+                    "K054539" => SoundChip::K054539,
+                    "QSOUND" => SoundChip::QSound,
                     _ => continue,
                 };
                 if !self.chips.contains(&chip) {
@@ -314,12 +325,36 @@ impl VgmGenerator {
             }
         }
 
-        // Also check for metadata keys like PartK051649, PartNES, PartDMG
+        // Also check for metadata keys like PartK051649, PartNES, PartDMG, and all 21 partial chips
         for (key, _) in &ast.metadata {
             let chip = match key.to_uppercase().as_str() {
                 "PARTK051649" | "PARTSCC" | "PARTSCC1" => SoundChip::K051649,
                 "PARTNES" | "PARTNESAPU" | "PART2A03" => SoundChip::NES,
                 "PARTDMG" | "PARTGAMEBOY" => SoundChip::DMG,
+                // Batch 1: Sega & FM Core
+                "PARTYM2608" | "PARTOPNA" => SoundChip::YM2608,
+                "PARTYM2151" | "PARTOPM" => SoundChip::YM2151,
+                "PARTYM2203" | "PARTOPN" => SoundChip::YM2203,
+                "PARTRF5C164" => SoundChip::RF5C164,
+                "PARTSEGAPCM" => SoundChip::SegaPCM,
+                // Batch 2: OPL Family
+                "PARTYM3526" | "PARTOPL" => SoundChip::YM3526,
+                "PARTY8950" => SoundChip::Y8950,
+                "PARTYM3812" | "PARTOPL2" => SoundChip::YM3812,
+                "PARTYMF262" | "PARTOPL3" => SoundChip::YMF262,
+                // Batch 3: Console PSG/FM
+                "PARTYM2413" | "PARTOPLL" => SoundChip::YM2413,
+                "PARTHUC6280" => SoundChip::HuC6280,
+                // Batch 4: Arcade PCM
+                "PARTC140" => SoundChip::C140,
+                "PARTC352" => SoundChip::C352,
+                "PARTK053260" => SoundChip::K053260,
+                "PARTK054539" => SoundChip::K054539,
+                // Batch 5: Miscellaneous
+                "PARTAY8910" => SoundChip::AY8910,
+                "PARTPOKEY" => SoundChip::POKEY,
+                "PARTVRC6" => SoundChip::VRC6,
+                "PARTQSOUND" => SoundChip::QSound,
                 _ => continue,
             };
             if !self.chips.contains(&chip) {
@@ -372,6 +407,40 @@ impl VgmGenerator {
                 }
                 SoundChip::DMG => {
                     self.header.dmg_clock = chip.clock_rate();
+                }
+                // Phase 1 extensions: All 21 partial chips
+                SoundChip::RF5C164 => {
+                    self.header.rf5c164_clock = chip.clock_rate();
+                }
+                SoundChip::SegaPCM => {
+                    self.header.segapcm_clock = chip.clock_rate();
+                }
+                SoundChip::C140 => {
+                    self.header.c140_clock = chip.clock_rate();
+                }
+                SoundChip::C352 => {
+                    self.header.c352_clock = chip.clock_rate();
+                }
+                SoundChip::AY8910 => {
+                    self.header.ay8910_clock = chip.clock_rate();
+                }
+                SoundChip::HuC6280 => {
+                    self.header.huc6280_clock = chip.clock_rate();
+                }
+                SoundChip::POKEY => {
+                    self.header.pokey_clock = chip.clock_rate();
+                }
+                SoundChip::VRC6 => {
+                    self.header.vrc6_clock = chip.clock_rate();
+                }
+                SoundChip::K053260 => {
+                    self.header.k053260_clock = chip.clock_rate();
+                }
+                SoundChip::K054539 => {
+                    self.header.k054539_clock = chip.clock_rate();
+                }
+                SoundChip::QSound => {
+                    self.header.qsound_clock = chip.clock_rate();
                 }
                 _ => {}
             }
@@ -428,9 +497,26 @@ impl VgmGenerator {
                 else if key.starts_with("PartSN76489") { "SN76489" }
                 else if key.starts_with("PartYM2151") { "YM2151" }
                 else if key.starts_with("PartYM2608") { "YM2608" }
+                else if key.starts_with("PartYM2203") { "YM2203" }
+                else if key.starts_with("PartYM2413") { "YM2413" }
+                else if key.starts_with("PartYM3812") { "YM3812" }
+                else if key.starts_with("PartYM3526") { "YM3526" }
+                else if key.starts_with("PartY8950") { "Y8950" }
+                else if key.starts_with("PartYMF262") { "YMF262" }
                 else if key.starts_with("PartK051649") | key.starts_with("PartSCC") { "K051649" }
                 else if key.starts_with("PartNES") | key.starts_with("Part2A03") { "NES" }
                 else if key.starts_with("PartDMG") | key.starts_with("PartGameBoy") { "DMG" }
+                else if key.starts_with("PartRF5C164") { "RF5C164" }
+                else if key.starts_with("PartSegaPCM") { "SegaPCM" }
+                else if key.starts_with("PartC140") { "C140" }
+                else if key.starts_with("PartC352") { "C352" }
+                else if key.starts_with("PartAY8910") { "AY8910" }
+                else if key.starts_with("PartHuC6280") { "HuC6280" }
+                else if key.starts_with("PartPOKEY") { "POKEY" }
+                else if key.starts_with("PartVRC6") { "VRC6" }
+                else if key.starts_with("PartK053260") { "K053260" }
+                else if key.starts_with("PartK054539") { "K054539" }
+                else if key.starts_with("PartQSound") { "QSound" }
                 else { continue };
             for name in &part_names {
                 if !effective_chip_map.contains_key(name) && name.starts_with(value.trim()) {
@@ -2011,6 +2097,36 @@ impl VgmGenerator {
         hdr[0x94..0x98].copy_from_slice(&self.header.k051649_flags.to_le_bytes());
         // 0x9C: K051649 / K052539 clock rate
         hdr[0x9C..0xA0].copy_from_slice(&self.header.k051649_clock.to_le_bytes());
+        // 0xA4: YM2610 clock
+        hdr[0xA4..0xA8].copy_from_slice(&self.header.ym2610_clock.to_le_bytes());
+        // 0xAC: SegaPCM clock
+        hdr[0xAC..0xB0].copy_from_slice(&self.header.segapcm_clock.to_le_bytes());
+        // 0xB0: RF5C164 clock
+        hdr[0xB0..0xB4].copy_from_slice(&self.header.rf5c164_clock.to_le_bytes());
+        // 0xB8: YM2413 clock (extended)
+        hdr[0xB8..0xBC].copy_from_slice(&self.header.ym2413_clock_ext.to_le_bytes());
+        // 0xBC: YM2610B clock (extended)
+        hdr[0xBC..0xC0].copy_from_slice(&self.header.ym2610b_clock_ext.to_le_bytes());
+        // 0xD0: YMF271 clock
+        hdr[0xD0..0xD4].copy_from_slice(&self.header.ymf271_clock.to_le_bytes());
+        // 0xD4: AY8910 clock
+        hdr[0xD4..0xD8].copy_from_slice(&self.header.ay8910_clock.to_le_bytes());
+        // 0xD8: HuC6280 clock
+        hdr[0xD8..0xDC].copy_from_slice(&self.header.huc6280_clock.to_le_bytes());
+        // 0xDC: C140 clock
+        hdr[0xDC..0xE0].copy_from_slice(&self.header.c140_clock.to_le_bytes());
+        // 0xE0: K053260 clock
+        hdr[0xE0..0xE4].copy_from_slice(&self.header.k053260_clock.to_le_bytes());
+        // 0xE4: K054539 clock
+        hdr[0xE4..0xE8].copy_from_slice(&self.header.k054539_clock.to_le_bytes());
+        // 0xE8: QSound clock
+        hdr[0xE8..0xEC].copy_from_slice(&self.header.qsound_clock.to_le_bytes());
+        // 0xEC: C352 clock
+        hdr[0xEC..0xF0].copy_from_slice(&self.header.c352_clock.to_le_bytes());
+        // 0xF0: POKEY clock
+        hdr[0xF0..0xF4].copy_from_slice(&self.header.pokey_clock.to_le_bytes());
+        // 0xF4: VRC6 clock
+        hdr[0xF4..0xF8].copy_from_slice(&self.header.vrc6_clock.to_le_bytes());
         output.extend_from_slice(&hdr);
         Ok(())
     }
