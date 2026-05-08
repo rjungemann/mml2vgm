@@ -12,7 +12,7 @@ import { i18nService } from '@/services/i18nService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
-import type { ChipInfo, PanelType, Position } from '@/types';
+import type { ChipInfo, PanelType, Position, SourceMapEvent } from '@/types';
 import MonacoEditor, { type MonacoEditorHandle } from '@/components/Editor/MonacoEditor';
 import StatusBar from '@/components/StatusBar';
 import MenuBar from '@/components/MenuBar';
@@ -72,6 +72,7 @@ export const App: React.FC = () => {
   const [canUndo, setCanUndo] = useState<boolean>(false);
   const [canRedo, setCanRedo] = useState<boolean>(false);
   const [hasCompileResult, setHasCompileResult] = useState<boolean>(false);
+  const [activeNoteEvents, setActiveNoteEvents] = useState<SourceMapEvent[]>([]);
   // Dialog visibility — one state variable to avoid 8 separate booleans
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const closeDialog = useCallback(() => setOpenDialog(null), []);
@@ -640,6 +641,7 @@ export const App: React.FC = () => {
         partCount: result.partCount,
         duration: durationMs,
         timingMap,
+        sourceMap: result.source_map,
       });
 
       // Start trace playback
@@ -970,8 +972,9 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleTraceUpdate = () => {
       setTraceStatus(traceService.getStatus());
+      setActiveNoteEvents(traceService.getActiveNoteEvents());
     };
-    
+
     const listener = {
       onTraceStart: handleTraceUpdate,
       onTraceStop: handleTraceUpdate,
@@ -981,9 +984,9 @@ export const App: React.FC = () => {
       onPartEvent: handleTraceUpdate,
       onRegisterWrite: handleTraceUpdate,
     };
-    
+
     traceService.addEventListener(listener);
-    
+
     return () => {
       traceService.removeEventListener(listener);
     };
@@ -1278,6 +1281,7 @@ export const App: React.FC = () => {
                 settings={settings.editor}
                 currentPosition={traceStatus.currentPosition}
                 navigationPosition={navigatePosition}
+                activeNoteEvents={activeNoteEvents}
               />
             )}
 

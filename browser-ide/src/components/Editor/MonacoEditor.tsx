@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import type { Document, EditorSettings, Position } from '@/types';
+import type { Document, EditorSettings, Position, SourceMapEvent } from '@/types';
 import { registerMmlLanguage } from './mmlLanguage';
 import { registerMmlTheme } from './mmlTheme';
 
@@ -13,6 +13,8 @@ interface MonacoEditorProps {
   currentPosition?: Position | null;
   // Navigation
   navigationPosition?: Position | null;
+  // Active note events from source map
+  activeNoteEvents?: SourceMapEvent[];
 }
 
 // Expose editor methods to parent components
@@ -26,7 +28,7 @@ export interface MonacoEditorHandle {
 }
 
 const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
-  { document, onChange, settings, currentPosition, navigationPosition },
+  { document, onChange, settings, currentPosition, navigationPosition, activeNoteEvents },
   ref
 ) => {
   const editorRef = useRef<any>(null);
