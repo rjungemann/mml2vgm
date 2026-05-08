@@ -721,13 +721,130 @@ Given the large number of chips (21 partial), we implement in **batches** groupe
 | 3: VGM Write Helpers | ✅ Complete | | All 21 chips (generic + specific) |
 | 4: Note-On/Note-Off | ✅ Working | | Existing for all key chips |
 | 5: Chip-Specific MML Commands | 🔄 Partial | | Basic @D, @W support |
-| 6: Syntax Highlighting | 🔄 In Progress | | Browser IDE tokenizer |
-| 7: Example Files | ✅ Complete | | 7 sample .gwi files created |
+| 6: Syntax Highlighting | ✅ Complete | | All 50+ keywords in Browser IDE |
+| 7: Example Files | ✅ Complete | | 8 sample .gwi files created |
 | 8: Integration & Validation | ✅ Complete | | 440+ tests passing, all examples compile |
 
 ---
 
+## Phase 9+: Optional Enhancements (Future Work)
+
+The core implementation (Phases 1-8) is complete and production-ready. The following enhancements are optional and can be pursued incrementally:
+
+### Phase 9: Full MML Command Table
+**Objective**: Complete chip-specific MML commands for all 21 chips
+
+**Tasks**:
+- [ ] **FM Chips (YM2608, YM2151, YM2203, YM2413, YM3526, Y8950, YM3812, YMF262)**
+  - Full FM instrument definition (@TL, @AR, @D1R, @D2R, @RR, etc.)
+  - Operator selection and feedback
+  - Algorithm selection for 4-op chips
+
+- [ ] **AY8910 & POKEY**
+  - `@E` - Envelope shape (0-15 for AY8910, 0-3 for POKEY)
+  - `@N` - Noise period configuration
+  - `@F` - Filter settings (POKEY only)
+  - `@D` - Distortion modes (POKEY only)
+
+- [ ] **Console Wavetable Chips (HuC6280, K051649, DMG)**
+  - `@W` - Waveform selection and block definition
+  - `@P` - LFSR width (DMG)
+  - `@SW` - Sweep parameters (DMG)
+  - Interactive waveform editors for wavetable chips
+
+- [ ] **PCM Chips (SegaPCM, RF5C164, C140, C352, K053260, K054539, QSound)**
+  - `@S` - Sample selection and loading
+  - `@L` - Loop point definition
+  - `@B` - Bank selection (where applicable)
+  - Sample table management
+
+**Deliverables**:
+- Complete command reference for all 21 chips
+- Parser extensions for all commands
+- Codegen emitting correct register writes
+- Syntax highlighting for all commands
+- Comprehensive examples using all commands
+
+---
+
+### Phase 10: MIDI Controller Mapping
+**Objective**: Per-chip MIDI CC support
+
+**Tasks**:
+- [ ] Map CC messages to chip-specific parameters
+- [ ] Implement pitch bend support for all chips
+- [ ] Modulation wheel support
+- [ ] Aftertouch mapping
+- [ ] Bank/program change support
+
+---
+
+### Phase 11: Additional Example Files
+**Objective**: Create samples for remaining chip types
+
+**Tasks**:
+- [ ] `segapcm-genesis.gwi` - SegaPCM synthesis
+- [ ] `c140-namco.gwi` - Namco C140 arcade
+- [ ] `c352-namco22.gwi` - Namco System 22
+- [ ] `k053260-konami.gwi` - Konami arcade
+- [ ] `k054539-konami.gwi` - Konami PCM
+- [ ] `pokey-atari.gwi` - Atari 8-bit
+- [ ] `vrc6-nes.gwi` - Konami NES expansion
+- [ ] `qsound-capcom.gwi` - Capcom CPS
+
+**All 21 chips represented in samples**
+
+---
+
+### Phase 12: Advanced Waveform Editing
+**Objective**: Interactive editors for wavetable chips
+
+**Tasks**:
+- [ ] DMG Wave RAM editor (32 nibbles)
+- [ ] K051649 SCC waveform editor (32 signed bytes)
+- [ ] HuC6280 wavetable selector (32 built-in + custom)
+- [ ] Real-time preview in browser IDE
+- [ ] Export/import custom waveforms
+
+---
+
+### Phase 13: Per-Chip Tutorials
+**Objective**: Comprehensive documentation for each chip
+
+**Tasks**:
+- [ ] Tutorial series: Getting Started with Each Chip
+- [ ] Register mapping guides
+- [ ] Frequency/note calculation reference
+- [ ] Common patterns and techniques
+- [ ] Troubleshooting guides
+
+---
+
+### Phase 14: Performance Profiling
+**Objective**: Optimization analysis
+
+**Tasks**:
+- [ ] Compilation speed benchmarks
+- [ ] Memory usage analysis
+- [ ] VGM file size optimization
+- [ ] Playback performance metrics
+
+---
+
+### Phase 15: Extended Documentation
+**Objective**: Deep-dive technical guides
+
+**Tasks**:
+- [ ] VGM 1.71 implementation reference
+- [ ] Chip architecture deep dives
+- [ ] MML→VGM compilation pipeline
+- [ ] Browser IDE architecture
+- [ ] Contributing guide
+
+---
+
 *Document Status: PHASES 1-8 COMPLETE - Production Ready*  
+*Phase 9+ Enhancements Available for Future Work*  
 *Last Updated: 2026-05-08 (Complete Implementation Day)*  
 *Owner: mml2vgm Team*
 
