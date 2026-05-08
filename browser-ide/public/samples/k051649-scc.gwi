@@ -1,0 +1,14 @@
+'{
+  TitleName   = K051649 SCC Wavetable
+  Composer    = mml2vgm Team
+  SystemName  = Konami SCC (MSX)
+  Format      = VGM
+  ClockCount  = 192
+  PartK051649 = A
+}
+
+; K051649 (SCC): Wavetable synthesis
+'A:
+  T120
+  @0 v127
+  O4 C2 D2 E2 F2 | G2 A2 B2 >C2 |

@@ -1,0 +1,15 @@
+'{
+  TitleName   = NES APU Chiptune
+  Composer    = mml2vgm Team
+  SystemName  = Nintendo NES (2A03)
+  Format      = VGM
+  ClockCount  = 192
+  PartNES     = A
+}
+
+; NES: Simple melody on pulse 1
+'A:
+  T120
+  @D 2
+  O4 C4 D4 E4 C4 | E4 G2 | G4 A4 B4 G4 | B4 >D2 |
+  >D4 E4 F4 D4 | F4 A2 | A4 B4 >C4 A4 | >C4 E2 |

@@ -1,0 +1,14 @@
+'{
+  TitleName   = YM2413 OPLL Chiptune
+  Composer    = mml2vgm Team
+  SystemName  = MSX Computer
+  Format      = VGM
+  ClockCount  = 192
+  PartYM2413  = A
+}
+
+; YM2413: Simple melody
+'A:
+  T120
+  @0 v127
+  O4 C4 D4 E4 C4 | E4 G2 | G4 A4 B4 G4 | B4 >D2 |

@@ -1,0 +1,14 @@
+'{
+  TitleName   = HuC6280 PC Engine Chiptune
+  Composer    = mml2vgm Team
+  SystemName  = NEC PC Engine (TurboGrafx-16)
+  Format      = VGM
+  ClockCount  = 192
+  PartHuC6280 = A
+}
+
+; HuC6280: Wavetable synthesis
+'A:
+  T120
+  @0 v127
+  O4 C4 D4 E4 F4 | G4 A4 B4 >C4 |

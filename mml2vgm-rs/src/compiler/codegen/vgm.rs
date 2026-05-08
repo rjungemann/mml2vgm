@@ -27,16 +27,29 @@ pub enum VgmCommandType {
     Y8950Write = 0x5C,
     Ymf262WritePort0 = 0x5E,
     Ymf262WritePort1 = 0x5F,
+    // PCM chips
     Rf5c164Write = 0x68,
+    C140Write = 0x7F,
+    C352Write = 0x8E,
+    // PSG/Arcade chips
+    Ay8910Write = 0xA0,
+    SegaPcmWrite = 0xA4,
+    // Console chips
+    DmgWrite = 0xB3,
+    NesApuWrite = 0xB4,
+    Vrc6Write = 0xB6,
+    HuC6280Write = 0xB9,
+    K053260Write = 0xBA,
+    PokeyWrite = 0xBB,
+    QSoundWrite = 0xC4,
+    K051649Write = 0xD2,
+    K054539Write = 0xD3,
+    // Timing/control
     Wait = 0x61,
     Wait1 = 0x62,
     Wait2 = 0x63,
     End = 0x66,
     DataBlock = 0x67,
-    // Console chips
-    DmgWrite = 0xB3,
-    NesApuWrite = 0xB4,
-    K051649Write = 0xD2,
 }
 
 /// A single VGM command
@@ -2444,6 +2457,90 @@ impl VgmGenerator {
                 self.dmg_write((addr - 0xFF10) as u8, 0, t);
             }
         }
+    }
+
+    /// Generic write helper for most 2-byte VGM commands (addr, data)
+    fn generic_chip_write(&mut self, cmd_type: VgmCommandType, addr: u8, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: cmd_type,
+            data: vec![addr, data],
+            time,
+        });
+    }
+
+    /// Generic write helper for 3-byte VGM commands (port, addr, data)
+    fn generic_chip_write_ported(&mut self, cmd_type: VgmCommandType, port: u8, addr: u8, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: cmd_type,
+            data: vec![port, addr, data],
+            time,
+        });
+    }
+
+    /// Write YM2151 (OPM) register
+    fn ym2151_write_reg(&mut self, addr: u8, val: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::Ym2151Write, addr, val, time);
+    }
+
+    /// Write YM2413 (OPLL) register
+    fn ym2413_write_reg(&mut self, addr: u8, val: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::Ym2413Write, addr, val, time);
+    }
+
+    /// Write AY8910 register
+    fn ay8910_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::Ay8910Write, addr, data, time);
+    }
+
+    /// Write HuC6280 (PC Engine) register
+    fn huc6280_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::HuC6280Write, addr, data, time);
+    }
+
+    /// Write RF5C164 (Sega CD) register
+    fn rf5c164_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::Rf5c164Write, addr, data, time);
+    }
+
+    /// Write SegaPCM bank/address
+    fn segapcm_write(&mut self, bank: u8, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write_ported(VgmCommandType::SegaPcmWrite, bank, addr, data, time);
+    }
+
+    /// Write C140 (Namco arcade) register
+    fn c140_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::C140Write, addr, data, time);
+    }
+
+    /// Write C352 (Namco System 21/22) register
+    fn c352_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::C352Write, addr, data, time);
+    }
+
+    /// Write K053260 (Konami arcade PCM) register
+    fn k053260_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::K053260Write, addr, data, time);
+    }
+
+    /// Write K054539 (Konami arcade PCM) register with port
+    fn k054539_write_ported(&mut self, port: u8, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write_ported(VgmCommandType::K054539Write, port, addr, data, time);
+    }
+
+    /// Write POKEY (Atari 8-bit) register
+    fn pokey_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::PokeyWrite, addr, data, time);
+    }
+
+    /// Write VRC6 (Konami NES) register
+    fn vrc6_write(&mut self, addr: u16, data: u8, time: u64) {
+        // VRC6 addresses are 16-bit but VGM only uses lower byte typically
+        self.generic_chip_write(VgmCommandType::Vrc6Write, (addr & 0xFF) as u8, data, time);
+    }
+
+    /// Write QSound (Capcom CPS) register
+    fn qsound_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.generic_chip_write(VgmCommandType::QSoundWrite, addr, data, time);
     }
 }
 

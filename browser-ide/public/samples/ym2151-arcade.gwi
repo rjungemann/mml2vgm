@@ -1,0 +1,21 @@
+'{
+  TitleName   = YM2151 Arcade Test
+  Composer    = mml2vgm Team
+  SystemName  = Arcade (OPM)
+  Format      = VGM
+  ClockCount  = 192
+  PartYM2151  = A
+}
+
+; YM2151 instrument 1: electric organ
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,000,000,001,000,000,000
+
+'A:
+  T120
+  @1 v127
+  O4 C2 E2 G2 B2 >C2

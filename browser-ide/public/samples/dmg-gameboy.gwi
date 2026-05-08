@@ -1,0 +1,13 @@
+'{
+  TitleName   = Game Boy Chiptune
+  Composer    = mml2vgm Team
+  SystemName  = Nintendo Game Boy (DMG)
+  Format      = VGM
+  ClockCount  = 192
+  PartDMG     = A
+}
+
+; Game Boy: Melody on pulse channel 1
+'A:
+  T120
+  O4 C4 D4 E4 C4 | E4 G2 | G4 A4 B4 G4 | B4 >D2 |

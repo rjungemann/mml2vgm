@@ -1,0 +1,14 @@
+'{
+  TitleName   = AY-3-8910 PSG Tune
+  Composer    = mml2vgm Team
+  SystemName  = Sinclair ZX Spectrum
+  Format      = VGM
+  ClockCount  = 192
+  PartAY8910  = A
+}
+
+; AY-3-8910: Simple melody
+'A:
+  T120
+  v200
+  O4 C4 D4 E4 F4 | G4 A4 B4 >C4 |

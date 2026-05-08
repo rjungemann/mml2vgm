@@ -1,0 +1,27 @@
+'{
+  TitleName   = YM2608 PC-98 Test
+  Composer    = mml2vgm Team
+  SystemName  = PC-98 (OPNA)
+  Format      = VGM
+  ClockCount  = 192
+  PartYM2608FM = A
+  PartYM2608SSG = B
+}
+
+; FM instrument for channel A
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,000,000,001,000,000,000
+
+'A:
+  T120
+  @1 v127
+  O4 C4 D4 E4 F4
+
+'B:
+  T120
+  v127
+  O3 G2 A2 B2 >C2
