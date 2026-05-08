@@ -63,7 +63,20 @@ export function registerMmlLanguage(
       'PartPOKEY',
       'PartVRC6',
       'PartQSound',
-      // Chip-specific commands
+      // Phase 9: Chip-Specific Commands
+      // FM Operator Commands
+      'AR', 'DR', 'SR', 'RR', 'SL', 'TL', 'KS', 'ML', 'DT',
+      'AL', 'FB', 'OP',
+      // OPL3 / Special FM Commands
+      'OPL3MODE', '4OP', 'CUSTOM', 'VIB', 'TREM', 'DRUM',
+      // PSG / AY8910 / POKEY Commands
+      'EN', 'MIX', 'FILTER', 'DIST', 'HPOLY', 'NOISE',
+      // Wavetable Commands
+      'WAVE', 'NW', 'SW', 'KEYON', 'KEYOFF', 'NOCTRL',
+      // PCM Commands
+      'BANK', 'START', 'LOOP', 'END', 'REVERSE', 'LOOPSTART', 'LOOPLEN',
+      'LVOL', 'RVOL', 'ADPCM_MODE', 'PAN', 'REVERB', 'PITCH', 'VOLUME',
+      // Metadata
       'ForcedMonoPartYM2612',
     ],
     
