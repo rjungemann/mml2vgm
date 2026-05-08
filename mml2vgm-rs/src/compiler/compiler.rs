@@ -68,6 +68,7 @@ impl MmlCompiler {
             output_path: Some(output_path.to_string_lossy().to_string()),
             warnings: Vec::new(),
             info,
+            source_map: crate::compiler::codegen::SourceMap::default(),
         })
     }
 
@@ -280,6 +281,7 @@ impl MmlCompiler {
             output_path: None,
             warnings: Vec::new(),
             info,
+            source_map: crate::compiler::codegen::SourceMap::default(),
         })
     }
 
@@ -308,6 +310,7 @@ impl MmlCompiler {
             output_path: None,
             warnings: Vec::new(),
             info,
+            source_map: crate::compiler::codegen::SourceMap::default(),
         })
     }
 

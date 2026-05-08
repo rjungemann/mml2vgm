@@ -16,6 +16,34 @@ pub mod zgm;
 use crate::{MmlError, MmlResult, OutputFormat as LibOutputFormat, SoundChip};
 use std::path::Path;
 
+/// A single note event with timing and source location information
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NoteEvent {
+    /// Sample offset at note-on (44100 Hz)
+    pub sample_start: u64,
+    /// Sample offset at note-off (i.e. start + quantized duration)
+    pub sample_end: u64,
+    /// Part name (e.g. "A1", "Y01")
+    pub part: String,
+    /// MIDI note number 0–127
+    pub note_midi: u8,
+    /// Instrument number (from last `@NNN` in this part), or 0 if none
+    pub instrument: u32,
+    /// Source line (1-indexed)
+    pub line: usize,
+    /// Source column start (1-indexed)
+    pub col_start: usize,
+    /// Source column end (1-indexed, inclusive)
+    pub col_end: usize,
+}
+
+/// Source map: collection of note events with timing and source positions
+#[derive(Debug, Default, Clone, serde::Serialize)]
+pub struct SourceMap {
+    /// All note events with timing and source information
+    pub events: Vec<NoteEvent>,
+}
+
 /// Output format for code generation (internal to codegen module)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
@@ -341,7 +369,7 @@ mod tests {
             name: "A1".to_string(),
             chip: Some("SN76489".to_string()),
             tempo: Some(150),
-            commands: vec![MmlNode::Note(note), MmlNode::Rest(Rest { duration: 60, dotted: false })],
+            commands: vec![MmlNode::Note(note), MmlNode::Rest(Rest { duration: 60, dotted: false, span: None })],
         };
 
         ast.parts.insert("A1".to_string(), part);

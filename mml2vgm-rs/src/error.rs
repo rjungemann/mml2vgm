@@ -130,6 +130,19 @@ impl Position {
     }
 }
 
+/// A source span: start and end position in the source file
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,  // inclusive end
+}
+
+impl Span {
+    pub fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+}
+
 /// Error context for better error messages
 #[derive(Debug, Clone)]
 pub struct ErrorContext {

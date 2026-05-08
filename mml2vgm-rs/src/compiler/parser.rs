@@ -855,8 +855,8 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
-        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number })))
+
+        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: None })))
     }
 
     /// Parse MML commands
@@ -941,8 +941,9 @@ impl Parser {
                     let mut rest = Rest {
                         duration: self.current_length,
                         dotted: false,
+                        span: None,
                     };
-                    
+
                     if let Some(Token::Number(d)) = self.current_token() {
                         rest.duration = d;
                         self.advance();
@@ -1029,7 +1030,7 @@ impl Parser {
                     if let Some(Token::Number(n)) = self.current_token() {
                         let number = n as usize;
                         self.advance();
-                        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number })))
+                        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: None })))
                     } else {
                         Ok(None)
                     }

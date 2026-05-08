@@ -3,7 +3,7 @@
 //! This module contains the AST structures for representing MML source code.
 //! The AST is built by the parser and used by the semantic analyzer and code generator.
 
-use crate::{MmlError, MmlResult, Position};
+use crate::{MmlError, MmlResult, Position, Span};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -26,6 +26,8 @@ pub struct Note {
     pub volume: Option<u8>,
     /// Instrument reference
     pub instrument: Option<usize>,
+    /// Source location span
+    pub span: Option<Span>,
 }
 
 impl Note {
@@ -39,6 +41,7 @@ impl Note {
             tied: false,
             volume: None,
             instrument: None,
+            span: None,
         }
     }
 
@@ -68,6 +71,8 @@ pub struct Rest {
     pub duration: u32,
     /// Whether the rest is dotted
     pub dotted: bool,
+    /// Source location span
+    pub span: Option<Span>,
 }
 
 /// Tempo setting
@@ -110,6 +115,8 @@ pub enum OctaveShift {
 pub struct InstrumentSelection {
     /// Instrument number
     pub number: usize,
+    /// Source location span
+    pub span: Option<Span>,
 }
 
 /// Quantize / gate time
@@ -358,10 +365,10 @@ mod tests {
             tempo: Some(120),
             commands: vec![
                 MmlNode::Note(Note::new('C', 0, 4)),
-                MmlNode::Rest(Rest { duration: 4, dotted: false }),
+                MmlNode::Rest(Rest { duration: 4, dotted: false, span: None }),
             ],
         };
-        
+
         assert_eq!(part.name, "A1");
         assert_eq!(part.commands.len(), 2);
     }

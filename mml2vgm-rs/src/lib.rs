@@ -25,7 +25,7 @@ pub mod error;
 pub mod utils;
 
 // Re-export commonly used types
-pub use error::{ErrorContext, MmlError, MmlResult, Position};
+pub use error::{ErrorContext, MmlError, MmlResult, Position, Span};
 
 // Compiler module (will be implemented in Phase 2)
 pub mod compiler;
@@ -607,15 +607,18 @@ impl CompileOptions {
 pub struct CompileResult {
     /// Output data (VGM/XGM/ZGM binary)
     pub data: Vec<u8>,
-    
+
     /// Output file path (if written)
     pub output_path: Option<String>,
-    
+
     /// Warnings generated during compilation
     pub warnings: Vec<ErrorContext>,
-    
+
     /// Information about the compilation
     pub info: CompileInfo,
+
+    /// Source map: note events with timing and source positions
+    pub source_map: crate::compiler::codegen::SourceMap,
 }
 
 /// Information about the compilation
