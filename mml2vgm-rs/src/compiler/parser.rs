@@ -1000,22 +1000,34 @@ impl Parser {
             }
         }
         
-        // Parse regular instrument selection
-        let number = if let Some(Token::Number(n)) = self.current_token() {
-            self.advance();
-            n as usize
-        } else if let Some(Token::Identifier(s)) = self.current_token() {
+        // Parse regular instrument selection or chip-specific command
+        if let Some(Token::Identifier(s)) = self.current_token() {
+            let s_upper = s.to_uppercase();
+            
+            // Check if this is a known chip-specific command
+            if self.is_chip_command(&s_upper) {
+                self.advance();
+                return self.parse_chip_command(&s_upper);
+            }
+            
+            // Otherwise try to parse as instrument number
             if s.parse::<usize>().is_ok() {
                 self.advance();
-                s.parse::<usize>().unwrap()
-            } else {
-                return Ok(None);
+                let number = s.parse::<usize>().unwrap();
+                return Ok(Some(MmlNode::InstrumentSelection(
+                    crate::compiler::ast::InstrumentSelection { number, span: None }
+                )));
             }
-        } else {
-            return Ok(None);
-        };
-
-        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: None })))
+        }
+        
+        if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            return Ok(Some(MmlNode::InstrumentSelection(
+                crate::compiler::ast::InstrumentSelection { number: n as usize, span: None }
+            )));
+        }
+        
+        Ok(None)
     }
 
     /// Helper to create a ControlChange node
@@ -1602,6 +1614,51 @@ impl Parser {
         } else {
             Ok(None)
         }
+    }
+
+    /// Check if a string is a known chip-specific command
+    fn is_chip_command(&self, cmd: &str) -> bool {
+        // FM Chip Commands (operators)
+        matches!(cmd,
+            "AR" | "DR" | "SR" | "RR" | "SL" | "TL" | "KS" | "ML" | "DT" |
+            "AL" | "FB" | "OP" |
+            // PSG Commands
+            "EN" | "MIX" | "FILTER" | "DIST" | "HPOLY" |
+            // Wavetable Commands
+            "WAVE" | "NW" | "SW" | "KEYON" | "KEYOFF" | "NOCTRL" |
+            // PCM Commands
+            "BANK" | "START" | "LOOP" | "END" | "REVERSE" | "LOOPSTART" | "LOOPLEN" |
+            "LVOL" | "RVOL" | "ADPCM" | "OPL3MODE" | "4OP" | "CUSTOM" |
+            "VIB" | "TREM" | "DRUM" | "PAN" | "REVERB" | "PITCH" | "VOLUME"
+        )
+    }
+
+    /// Parse a chip-specific command (e.g., @AR, @DR, @FB, etc.)
+    fn parse_chip_command(&mut self, cmd: &str) -> MmlResult<Option<MmlNode>> {
+        // Parse command arguments (usually a single value or comma-separated values)
+        let mut args = Vec::new();
+        
+        // Check if next token is a number or operator specifier
+        if let Some(Token::Number(n)) = self.current_token() {
+            self.advance();
+            args.push(n);
+            
+            // Parse additional arguments if comma-separated
+            while self.consume(Token::Comma) {
+                if let Some(Token::Number(n)) = self.current_token() {
+                    self.advance();
+                    args.push(n);
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        Ok(Some(MmlNode::ChipCommand {
+            chip: "Generic".to_string(),  // Will be resolved during codegen
+            command: cmd.to_string(),
+            args,
+        }))
     }
 }
 
