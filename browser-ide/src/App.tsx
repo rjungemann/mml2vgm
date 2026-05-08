@@ -5,13 +5,15 @@ import { audioService, type AudioRuntimeDebugInfo } from '@/services/audioServic
 import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
 import { formatService } from '@/services/formatService';
-import { storageService, registerServiceWorker } from '@/services/storageService';
+import { storageService, registerServiceWorker, setUpdateNotificationCallback } from '@/services/storageService';
+import { serialService } from '@/services/serialService';
+import { hidService } from '@/services/hidService';
 import { i18nService } from '@/services/i18nService';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCompileStore } from '@/stores/compileStore';
 import type { ChipInfo, PanelType, Position } from '@/types';
-import MonacoEditor from '@/components/Editor/MonacoEditor';
+import MonacoEditor, { type MonacoEditorHandle } from '@/components/Editor/MonacoEditor';
 import StatusBar from '@/components/StatusBar';
 import MenuBar from '@/components/MenuBar';
 import ErrorListPanel from '@/components/panels/ErrorListPanel';
@@ -28,9 +30,20 @@ import DebugPanel from '@/components/panels/DebugPanel';
 import RuntimePanel from '@/components/panels/RuntimePanel';
 import CompilationPanel from '@/components/panels/CompilationPanel';
 import WaveformPanel from '@/components/panels/WaveformPanel';
+import SamplesPanel from '@/components/panels/SamplesPanel';
 import { TabBar } from '@/components/TabBar';
 import BottomTabs, { type BottomTab } from '@/components/BottomTabs';
 import { useSessionStorageState } from '@/utils/useSessionStorageState';
+import AboutDialog from '@/components/dialogs/AboutDialog';
+import KeyBindingsDialog from '@/components/dialogs/KeyBindingsDialog';
+import AudioSettingsDialog from '@/components/dialogs/AudioSettingsDialog';
+import AdvancedCompileOptionsDialog, { type AdvancedCompileOptions } from '@/components/dialogs/AdvancedCompileOptionsDialog';
+import MidiSettingsDialog from '@/components/dialogs/MidiSettingsDialog';
+import HIDSettingsDialog from '@/components/dialogs/HIDSettingsDialog';
+import SerialSettingsDialog from '@/components/dialogs/SerialSettingsDialog';
+import PreferencesDialog from '@/components/dialogs/PreferencesDialog';
+import HelpDialog from '@/components/dialogs/HelpDialog';
+import MmlReferenceDialog from '@/components/dialogs/MmlReferenceDialog';
 
 export const App: React.FC = () => {
   const MIN_SIDEBAR_WIDTH = 180;
@@ -50,11 +63,32 @@ export const App: React.FC = () => {
   const [bottomPaneHeight, setBottomPaneHeight] = useSessionStorageState<number>('mml2vgm:bottomPaneHeight', 200);
   const [isSidebarVisible, setIsSidebarVisible] = useSessionStorageState<boolean>('mml2vgm:isSidebarVisible', true);
   const [sidebarWidth, setSidebarWidth] = useSessionStorageState<number>('mml2vgm:sidebarWidth', 250);
+  const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [hasSelection, setHasSelection] = useState<boolean>(false);
+  const [canUndo, setCanUndo] = useState<boolean>(false);
+  const [canRedo, setCanRedo] = useState<boolean>(false);
+  const [hasCompileResult, setHasCompileResult] = useState<boolean>(false);
+  // Dialog visibility — one state variable to avoid 8 separate booleans
+  const [openDialog, setOpenDialog] = useState<string | null>(null);
+  const closeDialog = useCallback(() => setOpenDialog(null), []);
+
+  // Advanced compile options state (persisted locally, passed to dialog)
+  const [advancedCompileOptions, setAdvancedCompileOptions] = useState<AdvancedCompileOptions>({
+    targetChips: [],
+    gd3Title: '',
+    gd3Game: '',
+    gd3Author: '',
+    gd3Date: '',
+    strictMode: false,
+  });
+
   const wasmInitialized = useRef(false);
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomPanelRef = useRef<HTMLDivElement | null>(null);
   const suppressSidebarToggleClickRef = useRef(false);
   const suppressBottomToggleClickRef = useRef(false);
+  const editorRef = useRef<MonacoEditorHandle | null>(null);
 
   // Document store
   const { documents, activeDocumentId, createDocument, setActiveDocument, closeDocument, closeAllDocuments } = useDocumentStore(
@@ -69,15 +103,45 @@ export const App: React.FC = () => {
   );
 
   // Settings store
-  const { settings, setSettings } = useSettingsStore(
+  const { settings, setSettings, updateEditorSettings, updateAudioSettings, updateHIDSettings, updateSerialSettings, setOutputFormat, togglePanelVisibility, setPanelVisibility } = useSettingsStore(
     useShallow((state) => ({
       settings: state.settings,
       setSettings: state.setSettings,
+      updateEditorSettings: state.updateEditorSettings,
+      updateAudioSettings: state.updateAudioSettings,
+      updateHIDSettings: state.updateHIDSettings,
+      updateSerialSettings: state.updateSerialSettings,
+      setOutputFormat: state.setOutputFormat,
+      togglePanelVisibility: state.togglePanelVisibility,
+      setPanelVisibility: state.setPanelVisibility,
     }))
   );
 
   // Get active document
   const activeDocument = activeDocumentId ? documents.get(activeDocumentId) || null : null;
+
+  // Update selection and undo/redo state when editor or document changes
+  useEffect(() => {
+    if (editorRef.current && activeDocumentId) {
+      setHasSelection(editorRef.current.hasSelection());
+      setCanUndo(editorRef.current.canUndo());
+      setCanRedo(editorRef.current.canRedo());
+    } else {
+      setHasSelection(false);
+      setCanUndo(false);
+      setCanRedo(false);
+    }
+  }, [activeDocumentId]);
+
+  // Update hasCompileResult when active document or compile results change
+  useEffect(() => {
+    if (activeDocumentId) {
+      const result = getResult(activeDocumentId);
+      setHasCompileResult(!!result?.data);
+    } else {
+      setHasCompileResult(false);
+    }
+  }, [activeDocumentId, getResult]);
 
   const announceRuntimeFeedback = useCallback((message: string | null) => {
     setRuntimeFeedback(message);
@@ -120,6 +184,49 @@ export const App: React.FC = () => {
     // Fall back to the known-safe pair until support metadata has loaded.
     return browserDefaultTargets.length > 0 ? browserDefaultTargets : ['ym2608', 'sn76489'];
   }, [supportedChipInfo]);
+
+  // Auto-reconnect WebHID devices if enabled in settings.
+  useEffect(() => {
+    if (settings.hid?.autoReconnect && hidService.isSupported()) {
+      hidService.setReportFormat(settings.hid.reportFormat);
+      hidService.setReportId(settings.hid.reportId);
+      hidService.setByteOffset(settings.hid.byteOffset);
+      hidService.tryRestoreDevices().then((count) => {
+        if (count > 0) hidService.enable();
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
+  // Auto-reconnect WebSerial port if enabled in settings.
+  // This is intentionally fire-and-forget; a failure is non-fatal.
+  useEffect(() => {
+    if (settings.serial?.autoReconnect && serialService.isSupported()) {
+      serialService.tryRestorePort().then((found) => {
+        if (found) {
+          serialService.connect({
+            baudRate: settings.serial.baudRate,
+            protocol: settings.serial.protocol,
+          });
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
+  // Add beforeunload listener for unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      const hasDirty = useDocumentStore.getState().hasDirtyDocuments();
+      if (hasDirty) {
+        event.preventDefault();
+        event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Compile store
   const { compile, cancel, status, getResult, progress, progressMessage, lastCompileTimingSummary } = useCompileStore(
@@ -186,6 +293,17 @@ export const App: React.FC = () => {
         console.log('Phase 7 services initialized');
       }).catch(e => console.warn('Phase 7 services initialization had an error:', e));
       
+      // Setup service worker update notification callback
+      setUpdateNotificationCallback((available: boolean, version?: string) => {
+        setUpdateAvailable(available);
+        setUpdateVersion(version || null);
+      });
+      
+      // Restore persisted playback settings
+      const { audio } = useSettingsStore.getState().settings;
+      audioService.setPlaybackRate(audio.playbackRate ?? 1.0);
+      audioService.setLoop(audio.loop ?? false);
+
       // Create initial document if none exists
       if (documents.size === 0) {
         createDocument();
@@ -219,10 +337,12 @@ export const App: React.FC = () => {
   }, [createDocument]);
 
   // Get document store setters for file operations
-  const { updateDocumentContent, updateDocumentFilename } = useDocumentStore(
+  const { updateDocumentContent, updateDocumentFilename, updateDocumentFileHandle, setDocumentDirty } = useDocumentStore(
     useShallow((state) => ({
       updateDocumentContent: state.updateDocumentContent,
       updateDocumentFilename: state.updateDocumentFilename,
+      updateDocumentFileHandle: state.updateDocumentFileHandle,
+      setDocumentDirty: state.setDocumentDirty,
     }))
   );
 
@@ -304,6 +424,120 @@ export const App: React.FC = () => {
   const handleCloseAllDocuments = useCallback(() => {
     closeAllDocuments();
   }, [closeAllDocuments]);
+
+  // Handle save as document
+  const handleSaveAs = useCallback(async () => {
+    if (!activeDocumentId || !activeDocument) return;
+    
+    const doc = documents.get(activeDocumentId);
+    if (!doc) return;
+    
+    // Check if File System Access API is supported
+    if ('showSaveFilePicker' in window) {
+      try {
+        const options: any = {
+          suggestedName: doc.filename,
+          types: [
+            {
+              description: 'MML Files',
+              accept: {
+                'text/plain': ['.gwi', '.mml', '.muc', '.mdl', '.mus', '.txt'],
+              },
+            },
+          ],
+        };
+        
+        const handle = await (window as any).showSaveFilePicker(options);
+        if (!handle) return; // User cancelled
+        
+        const writable = await handle.createWritable();
+        await writable.write(doc.content);
+        await writable.close();
+        
+        // Update document with new filename and file handle
+        updateDocumentFilename(activeDocumentId, handle.name);
+        updateDocumentFileHandle(activeDocumentId, handle);
+        setDocumentDirty(activeDocumentId, false);
+        
+        announceRuntimeFeedback(`Saved to ${handle.name}`);
+      } catch (error) {
+        console.error('Failed to save file:', error);
+        announceRuntimeFeedback(`Save error: ${error}`);
+      }
+    } else {
+      // Fallback for browsers without File System Access API (Firefox, Safari)
+      // Use Blob + URL.createObjectURL download pattern
+      try {
+        const blob = new Blob([doc.content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setDocumentDirty(activeDocumentId, false);
+        announceRuntimeFeedback(`Downloaded ${doc.filename}`);
+      } catch (error) {
+        console.error('Failed to download file:', error);
+        announceRuntimeFeedback(`Download error: ${error}`);
+      }
+    }
+  }, [activeDocumentId, activeDocument, documents, updateDocumentFilename, updateDocumentFileHandle, setDocumentDirty, announceRuntimeFeedback]);
+
+  // Handle exit with unsaved changes guard
+  const handleExit = useCallback(() => {
+    const hasDirty = useDocumentStore.getState().hasDirtyDocuments();
+    
+    if (hasDirty) {
+      // Show confirmation dialog
+      const shouldExit = window.confirm(
+        'You have unsaved changes. Are you sure you want to exit?\n\n' +
+        'Click OK to exit without saving, or Cancel to stay.'
+      );
+      
+      if (!shouldExit) {
+        return; // User cancelled
+      }
+    }
+    
+    // Try to close the window (only works if window was opened by script)
+    window.close();
+    
+    // Note: window.close() only works when the tab was opened by script.
+    // On a user-opened tab it silently fails. The beforeunload handler
+    // covers the case when the user closes the tab directly via the browser UI.
+  }, []);
+
+  // Handle save document
+  const handleSave = useCallback(async () => {
+    if (!activeDocumentId || !activeDocument) return;
+    
+    const doc = documents.get(activeDocumentId);
+    if (!doc) return;
+    
+    // If document has a file handle, save to it directly
+    if (doc.fileHandle) {
+      try {
+        const writable = await (doc.fileHandle as any).createWritable();
+        await writable.write(doc.content);
+        await writable.close();
+        
+        // Mark as clean
+        setDocumentDirty(activeDocumentId, false);
+        announceRuntimeFeedback(`Saved to ${doc.filename}`);
+        return;
+      } catch (error) {
+        console.error('Failed to save via file handle:', error);
+        announceRuntimeFeedback(`Save error: ${error}`);
+      }
+    }
+    
+    // Fall through to Save As
+    handleSaveAs();
+  }, [activeDocumentId, activeDocument, documents, setDocumentDirty, announceRuntimeFeedback, handleSaveAs]);
 
   // Handle tab selection
   const handleSelectTab = useCallback((id: string) => {
@@ -433,6 +667,180 @@ export const App: React.FC = () => {
   const handleStop = useCallback(() => {
     audioService.stop();
   }, []);
+
+  // Handle Find (Ctrl+F) - delegates to Monaco's built-in find
+  const handleFind = useCallback(() => {
+    editorRef.current?.triggerCommand('actions.find');
+  }, []);
+
+  // Handle Replace (Ctrl+H) - delegates to Monaco's built-in replace
+  const handleReplace = useCallback(() => {
+    editorRef.current?.triggerCommand('editor.action.startFindReplaceAction');
+  }, []);
+
+  // Handle Select All - delegates to Monaco's built-in select all
+  const handleSelectAll = useCallback(() => {
+    editorRef.current?.triggerCommand('editor.action.selectAll');
+  }, []);
+
+  // Handle Cut - delegates to Monaco's built-in cut
+  const handleCut = useCallback(() => {
+    editorRef.current?.triggerCommand('editor.action.clipboardCutAction');
+  }, []);
+
+  // Handle Copy - delegates to Monaco's built-in copy
+  const handleCopy = useCallback(() => {
+    editorRef.current?.triggerCommand('editor.action.clipboardCopyAction');
+  }, []);
+
+  // Handle Paste - delegates to Monaco's built-in paste
+  const handlePaste = useCallback(() => {
+    editorRef.current?.triggerCommand('editor.action.clipboardPasteAction');
+  }, []);
+
+  // Handle Delete - delegates to Monaco's built-in delete
+  const handleDelete = useCallback(() => {
+    editorRef.current?.triggerCommand('deleteRight');
+  }, []);
+
+  // Handle Undo - delegates to Monaco's built-in undo
+  const handleUndo = useCallback(() => {
+    editorRef.current?.triggerCommand('undo');
+  }, []);
+
+  // Handle Redo - delegates to Monaco's built-in redo
+  const handleRedo = useCallback(() => {
+    editorRef.current?.triggerCommand('redo');
+  }, []);
+
+  // Handle export binary (VGM/XGM/ZGM)
+  const handleExportBinary = useCallback(async (format: string) => {
+    if (!activeDocumentId) return;
+    
+    const doc = documents.get(activeDocumentId);
+    if (!doc) return;
+    
+    // Check if we already have a compile result
+    const result = getResult(activeDocumentId);
+    
+    if (!result || !result.data) {
+      // No compiled output yet, trigger a compile first
+      announceRuntimeFeedback('No compiled output. Compiling first...');
+      
+      try {
+        const options: any = {
+          ...(defaultCompileOptions || {}),
+          format: format as any,
+          target_chips: getBrowserTargetChips(),
+          clock_count: 0,
+        };
+        
+        await compile(activeDocumentId, options);
+        
+        // Wait a moment for the result to be available
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Compile error before export:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        announceRuntimeFeedback(`Compile error: ${message}`);
+        return;
+      }
+    }
+    
+    // Get the result again (in case we just compiled)
+    const exportResult = getResult(activeDocumentId);
+    if (!exportResult || !exportResult.data) {
+      announceRuntimeFeedback('No compiled output available for export.');
+      return;
+    }
+    
+    // Create filename: replace extension with format
+    const baseName = doc.filename.replace(/\.\w+$/, '');
+    const fileName = `${baseName}.${format}`;
+    
+    // Create blob and download
+    const blob = new Blob([exportResult.data], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    announceRuntimeFeedback(`Exported to ${fileName}`);
+  }, [activeDocumentId, documents, getResult, defaultCompileOptions, compile, announceRuntimeFeedback, getBrowserTargetChips]);
+
+  // Phase 5.2: Playback speed and loop
+  const handleSetPlaybackRate = useCallback((rate: number) => {
+    audioService.setPlaybackRate(rate);
+    updateAudioSettings({ playbackRate: rate });
+  }, [updateAudioSettings]);
+
+  const handleToggleLoop = useCallback(() => {
+    const newLoop = !audioService.isLooping();
+    audioService.setLoop(newLoop);
+    updateAudioSettings({ loop: newLoop });
+  }, [updateAudioSettings]);
+
+  // Dialog openers
+  const handleOpenAbout = useCallback(() => setOpenDialog('about'), []);
+  const handleOpenKeyBindings = useCallback(() => setOpenDialog('keyBindings'), []);
+  const handleOpenAudioSettings = useCallback(() => setOpenDialog('audioSettings'), []);
+  const handleOpenAdvancedCompileOptions = useCallback(() => setOpenDialog('advancedCompileOptions'), []);
+  const handleOpenMidiSettings = useCallback(() => setOpenDialog('midiSettings'), []);
+  const handleOpenHIDSettings = useCallback(() => setOpenDialog('hidSettings'), []);
+  const handleOpenSerialSettings = useCallback(() => setOpenDialog('serialSettings'), []);
+  const handleOpenPreferences = useCallback(() => setOpenDialog('preferences'), []);
+  const handleOpenHelp = useCallback(() => setOpenDialog('help'), []);
+  const handleOpenMmlReference = useCallback(() => setOpenDialog('mmlReference'), []);
+
+  // Phase 3.1: Zoom controls (adjust Monaco font size via settings store)
+  const handleZoomIn = useCallback(() => {
+    const current = settings.editor.fontSize ?? 14;
+    updateEditorSettings({ fontSize: Math.min(current + 2, 32) });
+  }, [settings.editor.fontSize, updateEditorSettings]);
+
+  const handleZoomOut = useCallback(() => {
+    const current = settings.editor.fontSize ?? 14;
+    updateEditorSettings({ fontSize: Math.max(current - 2, 8) });
+  }, [settings.editor.fontSize, updateEditorSettings]);
+
+  const handleZoomReset = useCallback(() => {
+    updateEditorSettings({ fontSize: 14 });
+  }, [updateEditorSettings]);
+
+  // Phase 4.1: Output format selection
+  const handleSetOutputFormat = useCallback((format: string) => {
+    setOutputFormat(format as any);
+  }, [setOutputFormat]);
+
+  // Phase 4.2 / 3.2: Show or toggle a panel in the bottom tabs / sidebar
+  const handleShowPanel = useCallback((panelId: string) => {
+    // Map panel keys to bottom tab IDs where applicable
+    const panelToTabId: Record<string, string> = {
+      errorList: 'output',
+      runtime: 'runtime',
+      compilation: 'compilation',
+      waveform: 'waveform',
+      samples: 'samples',
+    };
+    const tabId = panelToTabId[panelId];
+    if (tabId) {
+      setActiveBottomTab(tabId);
+      if (bottomPaneMinimized) setBottomPaneMinimized(false);
+    } else {
+      // For sidebar panels, make them visible and show the sidebar
+      setPanelVisibility(panelId as any, true);
+      setIsSidebarVisible(true);
+    }
+  }, [setActiveBottomTab, bottomPaneMinimized, setBottomPaneMinimized, setPanelVisibility, setIsSidebarVisible]);
+
+  // Phase 3.2: Toggle panel visibility
+  const handleTogglePanel = useCallback((panelId: string) => {
+    togglePanelVisibility(panelId as any);
+  }, [togglePanelVisibility]);
 
   // Handle theme toggle
   const handleToggleTheme = useCallback(() => {
@@ -694,6 +1102,11 @@ export const App: React.FC = () => {
       label: 'Waveform',
       content: <WaveformPanel waveformSamples={waveformSamples} />,
     },
+    {
+      id: 'samples',
+      label: 'Samples',
+      content: <SamplesPanel />,
+    },
   ];
 
   return (
@@ -724,6 +1137,54 @@ export const App: React.FC = () => {
         hasMultipleDocuments={documents.size > 1}
         isCompiling={status === 'compiling'}
         isPlaying={audioService.isPlaying()}
+        // Edit menu
+        onFind={handleFind}
+        onReplace={handleReplace}
+        onSelectAll={handleSelectAll}
+        onCut={handleCut}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onDelete={handleDelete}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        hasSelection={hasSelection}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        // File menu - Export
+        onExportBinary={handleExportBinary}
+        hasCompileResult={hasCompileResult}
+        // File menu - Save
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
+        onExit={handleExit}
+        // Phase 3.1: Zoom
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
+        fontSize={settings.editor.fontSize}
+        // Phase 4.1: Output format
+        onSetOutputFormat={handleSetOutputFormat}
+        outputFormat={settings.outputFormat}
+        // Phase 4.2 / 3.2: Panel access and visibility
+        onShowPanel={handleShowPanel}
+        onTogglePanel={handleTogglePanel}
+        panelVisibility={settings.panelVisibility}
+        // Phase 5.2: Playback speed and loop
+        onSetPlaybackRate={handleSetPlaybackRate}
+        playbackRate={settings.audio.playbackRate}
+        onToggleLoop={handleToggleLoop}
+        isLooping={audioService.isLooping()}
+        // Dialogs
+        onOpenAbout={handleOpenAbout}
+        onOpenKeyBindings={handleOpenKeyBindings}
+        onOpenAudioSettings={handleOpenAudioSettings}
+        onOpenAdvancedCompileOptions={handleOpenAdvancedCompileOptions}
+        onOpenMidiSettings={handleOpenMidiSettings}
+        onOpenHIDSettings={handleOpenHIDSettings}
+        onOpenSerialSettings={handleOpenSerialSettings}
+        onOpenPreferences={handleOpenPreferences}
+        onOpenHelp={handleOpenHelp}
+        onOpenMmlReference={handleOpenMmlReference}
       />
 
       {/* Tab Bar */}
@@ -753,6 +1214,45 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Service Worker Update Notification */}
+      {updateAvailable && (
+        <div
+          role="alert"
+          style={{
+            margin: '0 8px 8px',
+            padding: '8px 12px',
+            border: '1px solid var(--status-info-fg, #4a90d9)',
+            background: 'var(--status-info-bg, rgba(74, 144, 217, 0.12))',
+            color: 'var(--status-info-fg, #4a90d9)',
+            borderRadius: '4px',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>↻ Update available {updateVersion && `(v${updateVersion})`}. Refresh to apply.</span>
+          <button
+            type="button"
+            className="button small"
+            onClick={() => window.location.reload()}
+            style={{ fontSize: '11px', padding: '2px 8px' }}
+            aria-label="Refresh to apply update"
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="button small"
+            onClick={() => setUpdateAvailable(false)}
+            style={{ fontSize: '11px', padding: '2px 8px' }}
+            aria-label="Dismiss update notification"
+          >
+            Later
+          </button>
+        </div>
+      )}
+
       {/* Main Layout */}
       <div className="main-layout">
         <div className="editor-column">
@@ -760,6 +1260,7 @@ export const App: React.FC = () => {
           <div className="editor-container" id="editor-container" role="main" aria-label="MML Editor">
             {activeDocument && (
               <MonacoEditor
+                ref={editorRef}
                 document={activeDocument}
                 onChange={(content) => {
                   useDocumentStore.getState().updateDocumentContent(activeDocumentId!, content);
@@ -852,6 +1353,44 @@ export const App: React.FC = () => {
         lastCompileTimingSummary={lastCompileTimingSummary}
         isAudioPlaying={audioRuntimeDebug.isPlaying}
       />
+
+      {/* Dialogs */}
+      <AboutDialog isOpen={openDialog === 'about'} onClose={closeDialog} />
+      <KeyBindingsDialog isOpen={openDialog === 'keyBindings'} onClose={closeDialog} />
+      <AudioSettingsDialog
+        isOpen={openDialog === 'audioSettings'}
+        onClose={closeDialog}
+        settings={settings.audio}
+        onSave={(updates) => updateAudioSettings(updates)}
+      />
+      <AdvancedCompileOptionsDialog
+        isOpen={openDialog === 'advancedCompileOptions'}
+        onClose={closeDialog}
+        chips={supportedChipInfo}
+        options={advancedCompileOptions}
+        onSave={setAdvancedCompileOptions}
+      />
+      <MidiSettingsDialog isOpen={openDialog === 'midiSettings'} onClose={closeDialog} />
+      <HIDSettingsDialog
+        isOpen={openDialog === 'hidSettings'}
+        onClose={closeDialog}
+        settings={settings.hid}
+        onSave={updateHIDSettings}
+      />
+      <SerialSettingsDialog
+        isOpen={openDialog === 'serialSettings'}
+        onClose={closeDialog}
+        settings={settings.serial}
+        onSave={updateSerialSettings}
+      />
+      <PreferencesDialog
+        isOpen={openDialog === 'preferences'}
+        onClose={closeDialog}
+        settings={settings}
+        onSave={(updates) => setSettings({ ...settings, ...updates })}
+      />
+      <HelpDialog isOpen={openDialog === 'help'} onClose={closeDialog} />
+      <MmlReferenceDialog isOpen={openDialog === 'mmlReference'} onClose={closeDialog} />
     </div>
   );
 };

@@ -24,6 +24,8 @@ pub struct AudioEngine {
 
     /// Downsampled waveform (N points) for display.
     pub waveform: Vec<f32>,
+    /// Separate sink for short on-screen-keyboard preview notes.
+    preview_sink: Option<Sink>,
 }
 
 impl AudioEngine {
@@ -41,6 +43,7 @@ impl AudioEngine {
             looping: false,
             volume: 1.0,
             waveform: Vec::new(),
+            preview_sink: None,
         })
     }
 
@@ -169,6 +172,47 @@ impl AudioEngine {
         }
         if let Some(t) = self.play_started.take() {
             self.paused_elapsed += t.elapsed();
+        }
+    }
+
+    /// Returns a window of left-channel samples centred at the current playback
+    /// position, suitable for oscilloscope display. Values are in [-1.0, 1.0].
+    pub fn scope_samples(&self, window: usize) -> Vec<f32> {
+        let buf = match &self.buffer {
+            Some(b) => b,
+            None => return Vec::new(),
+        };
+        let channels = buf.channels as usize;
+        if channels == 0 || buf.sample_rate == 0 {
+            return Vec::new();
+        }
+        let total_frames = buf.samples.len() / channels;
+        let pos_frames = (self.position_secs() * buf.sample_rate as f64) as usize;
+        let half = window / 2;
+        let start = pos_frames.saturating_sub(half).min(total_frames.saturating_sub(window));
+        let end = (start + window).min(total_frames);
+        (start..end)
+            .map(|f| *buf.samples.get(f * channels).unwrap_or(&0.0))
+            .collect()
+    }
+
+    /// Play a short PCM clip on a dedicated preview sink (stereo f32, 44100 Hz).
+    /// Stops any previously playing preview first.
+    pub fn play_preview(&mut self, pcm: Vec<f32>) {
+        self.stop_preview();
+        if let Ok(sink) = Sink::try_new(&self.stream_handle) {
+            let source = rodio::buffer::SamplesBuffer::new(2, 44100, pcm);
+            sink.set_volume(self.volume);
+            sink.append(source);
+            sink.play();
+            self.preview_sink = Some(sink);
+        }
+    }
+
+    /// Stop any currently playing preview note immediately.
+    pub fn stop_preview(&mut self) {
+        if let Some(sink) = self.preview_sink.take() {
+            sink.stop();
         }
     }
 

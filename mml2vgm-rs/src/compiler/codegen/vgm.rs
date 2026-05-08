@@ -4,6 +4,7 @@
 
 use super::{CodeGenerator, OutputFormat, VgmHeader};
 use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift};
+use crate::compiler::sample_resolver::SampleResolver;
 use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
 use std::collections::{BTreeSet, HashMap};
 
@@ -209,6 +210,49 @@ impl VgmGenerator {
         generator.calculate_header();
 
         Ok(generator)
+    }
+
+    /// Same as `from_ast` but additionally loads PCM sample data for every
+    /// `'@ P` instrument found in the AST.  Samples are fetched via the
+    /// supplied `resolver`; instruments with no matching sample are silently
+    /// skipped (the VGM will still compile, just without that sample embedded).
+    pub fn from_ast_with_resolver(
+        ast: &MmlAst,
+        options: &CompileOptions,
+        resolver: &dyn SampleResolver,
+    ) -> MmlResult<Self> {
+        let mut generator = Self::from_ast(ast, options)?;
+        generator.load_pcm_instruments(ast, resolver);
+        Ok(generator)
+    }
+
+    /// Populate `pcm_data` from PCM instruments in the AST using the resolver.
+    fn load_pcm_instruments(&mut self, ast: &MmlAst, resolver: &dyn SampleResolver) {
+        for inst in ast.pcm_instruments.values() {
+            // Try the bare filename first, then the full path as a fallback.
+            let name = inst
+                .filename
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(inst.name.as_str());
+
+            if let Some(f32_samples) = resolver.resolve(name) {
+                // Convert f32 [-1.0, +1.0] → u8 [0, 255] (RF5C164 8-bit unsigned,
+                // 0x80 = silence).  Clamp first to avoid wrapping artefacts.
+                let raw: Vec<u8> = f32_samples
+                    .iter()
+                    .map(|&s| {
+                        let clamped = s.clamp(-1.0, 1.0);
+                        ((clamped * 127.0) + 128.0).round() as u8
+                    })
+                    .collect();
+
+                self.pcm_data.push(PcmData {
+                    data: raw,
+                    start_offset: 0,
+                });
+            }
+        }
     }
 
     fn extract_chips(&mut self, ast: &MmlAst, options: &CompileOptions) {

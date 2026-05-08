@@ -71,7 +71,28 @@
     "midiKeyboard": "MIDI Keyboard",
     "debug": "Debug",
     "script": "Scripts",
-    "log": "Output Log"
+    "log": "Output Log",
+    "samples": "Samples"
+  },
+  "samples": {
+    "uploadBtn": "Upload WAV…",
+    "dragHint": "or drag & drop .wav files here",
+    "noDocument": "No document open. Open or create a document to manage its samples.",
+    "noSamples": "No samples uploaded yet.",
+    "referenced": "referenced",
+    "missing": "Missing samples referenced in this document:",
+    "nearLimit": "Project storage is near the 64 MB limit. Delete unused samples to free space.",
+    "onlyWav": "Only .wav files are supported.",
+    "alreadyExists": "already exists.",
+    "overwrite": "Overwrite",
+    "rename": "Rename…",
+    "skip": "Skip",
+    "saveAs": "Save as:",
+    "save": "Save",
+    "back": "Back",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "more": "+{{count}} more"
   },
   "status": {
     "ready": "Ready",

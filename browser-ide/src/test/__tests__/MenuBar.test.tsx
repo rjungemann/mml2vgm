@@ -16,15 +16,37 @@ const mockProps = {
     onOpenFile: vi.fn(),
     onCloseDocument: vi.fn(),
     onCloseAllDocuments: vi.fn(),
+    onSave: vi.fn(),
+    onSaveAs: vi.fn(),
+    onExit: vi.fn(),
     onToggleTheme: vi.fn(),
+    onToggleSidebar: vi.fn(),
+    isSidebarVisible: false,
     onCompile: vi.fn(),
     onCompileAndPlay: vi.fn(),
     onPlay: vi.fn(),
     onStop: vi.fn(),
+    onLoadExample: vi.fn(),
     hasActiveDocument: false,
     hasMultipleDocuments: false,
     isCompiling: false,
     isPlaying: false,
+    // Edit menu
+    onFind: vi.fn(),
+    onReplace: vi.fn(),
+    onSelectAll: vi.fn(),
+    onCut: vi.fn(),
+    onCopy: vi.fn(),
+    onPaste: vi.fn(),
+    onDelete: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+    hasSelection: false,
+    canUndo: false,
+    canRedo: false,
+    // File menu - Export
+    onExportBinary: vi.fn(),
+    hasCompileResult: false,
 };
 
 describe('MenuBar', () => {
@@ -332,14 +354,14 @@ describe('MenuBar', () => {
 
         it('should have correct enabled/disabled state for File menu items with no document', () => {
             render(<MenuBar {...mockProps} hasActiveDocument={false} hasMultipleDocuments={false} />);
-            
+
             const fileButton = screen.getByText('File');
             fireEvent.click(fileButton);
-            
+
             // New and Open should be enabled
             expect(screen.getByText('New')).not.toHaveClass('disabled');
             expect(screen.getByText('Open...')).not.toHaveClass('disabled');
-            
+
             // Most items should be disabled
             expect(screen.getByText('Save')).toHaveClass('disabled');
             expect(screen.getByText('Save As...')).toHaveClass('disabled');
@@ -348,7 +370,8 @@ describe('MenuBar', () => {
             // Close and Close All should be disabled when no active document
             expect(screen.getByText('Close')).toHaveClass('disabled');
             expect(screen.getByText('Close All')).toHaveClass('disabled');
-            expect(screen.getByText('Exit')).toHaveClass('disabled');
+            // Exit is always enabled (closes the browser tab/window)
+            expect(screen.getByText('Exit')).not.toHaveClass('disabled');
         });
 
         it('should enable Close when document is active', () => {

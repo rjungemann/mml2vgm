@@ -6,10 +6,12 @@
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { 
-    IDESettings, 
-    EditorSettings, 
+import type {
+    IDESettings,
+    EditorSettings,
     AudioSettings,
+    HIDSettings,
+    SerialSettings,
     PanelType,
     PanelPosition,
     OutputFormat,
@@ -40,6 +42,22 @@ const defaultAudioSettings: AudioSettings = {
     reverbLevel: 0.5,
     loopCount: 0,
     fadeOutDuration: 1000,
+    playbackRate: 1.0,
+    loop: false,
+};
+
+const defaultHIDSettings: HIDSettings = {
+    enabled: false,
+    reportFormat: 'usb-midi-class',
+    reportId: null,
+    byteOffset: 0,
+    autoReconnect: false,
+};
+
+const defaultSerialSettings: SerialSettings = {
+    baudRate: 38400,
+    protocol: 'gimic',
+    autoReconnect: false,
 };
 
 const defaultPanelVisibility: Record<PanelType, boolean> = {
@@ -100,7 +118,13 @@ export const defaultSettings: IDESettings = {
     // MIDI
     midiMode: 'preview',
     midiChannel: 0,
-    
+
+    // HID MIDI controllers (experimental)
+    hid: defaultHIDSettings,
+
+    // Serial / Hardware (experimental)
+    serial: defaultSerialSettings,
+
     // UI
     panelVisibility: defaultPanelVisibility,
     panelPositions: defaultPanelPositions,
@@ -159,6 +183,12 @@ interface SettingsActions {
     setMidiMode: (mode: 'preview' | 'input') => void;
     setMidiChannel: (channel: number) => void;
     
+    // HID settings
+    updateHIDSettings: (updates: Partial<HIDSettings>) => void;
+
+    // Serial settings
+    updateSerialSettings: (updates: Partial<SerialSettings>) => void;
+
     // Panel visibility
     setPanelVisibility: (panel: PanelType, visible: boolean) => void;
     togglePanelVisibility: (panel: PanelType) => void;
@@ -379,6 +409,28 @@ export const useSettingsStore = create<SettingsStore>()(
                 });
             },
             
+            // HID settings
+            updateHIDSettings: (updates: Partial<HIDSettings>) => {
+                const current = get().settings;
+                set({
+                    settings: {
+                        ...current,
+                        hid: { ...current.hid, ...updates },
+                    },
+                });
+            },
+
+            // Serial settings
+            updateSerialSettings: (updates: Partial<SerialSettings>) => {
+                const current = get().settings;
+                set({
+                    settings: {
+                        ...current,
+                        serial: { ...current.serial, ...updates },
+                    },
+                });
+            },
+
             // Panel visibility
             setPanelVisibility: (panel: PanelType, visible: boolean) => {
                 const current = get().settings;

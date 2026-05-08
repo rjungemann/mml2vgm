@@ -218,6 +218,61 @@ export function extractResultData(result: any): {
 }
 
 /**
+ * Compile MML with pre-decoded PCM samples.
+ *
+ * If the WASM build exports `compile_with_samples`, samples are passed via a
+ * js_sys::Map so large Float32Arrays are not JSON-serialised.  Otherwise falls
+ * back to `compileMml` and surfaces a warning for each referenced sample that
+ * could not be embedded.
+ */
+export function compileMmlWithSamples(
+  mml: string,
+  optionsJson: string,
+  samples: Map<string, Float32Array>,
+  requestId: string = 'unknown'
+): any {
+  if (!wasmModule) {
+    throw new Error('WASM module not initialized');
+  }
+
+  // If the WASM export is available, use it
+  if (typeof wasmModule.compile_with_samples === 'function') {
+    console.log(`[WasmWrapper][${requestId}] Calling compile_with_samples with ${samples.size} sample(s)`);
+    // Rust side expects { "filename.wav": [f32, f32, ...] }.
+    // Float32Array does NOT JSON-stringify as an array by default — convert explicitly.
+    const samplesObj: Record<string, number[]> = {};
+    samples.forEach((pcm, name) => { samplesObj[name] = Array.from(pcm); });
+    return wasmModule.compile_with_samples(mml, optionsJson, JSON.stringify(samplesObj));
+  }
+
+  // Fallback: compile without samples, inject warnings for missing PCM data
+  console.warn(
+    `[WasmWrapper][${requestId}] compile_with_samples not available — falling back to compile_mml. ` +
+    `${samples.size} sample(s) will not be embedded.`
+  );
+  const result = compileMml(mml, optionsJson, requestId);
+
+  // Attach missing-sample warnings so the UI can surface them
+  if (samples.size > 0) {
+    const missing = Array.from(samples.keys());
+    if (!result.warnings) result.warnings = [];
+    missing.forEach((name) => {
+      result.warnings.push({
+        type: 'warning',
+        message: `PCM instruments require sample upload: "${name}" could not be embedded (WASM build does not yet support compile_with_samples).`,
+        line: 0,
+        column: 0,
+        length: 0,
+        severity: 'warning',
+        code: 'MISSING_SAMPLE_SUPPORT',
+      });
+    });
+  }
+
+  return result;
+}
+
+/**
  * Get the WASM module (for advanced usage)
  */
 export function getWasmModule(): any {

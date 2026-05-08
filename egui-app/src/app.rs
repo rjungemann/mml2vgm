@@ -44,6 +44,12 @@ pub struct MmlApp {
 
     /// Optional socket command receiver (present when `--socket` flag is set).
     socket_rx: Option<Receiver<SocketCmd>>,
+
+    /// Channel selected for on-screen keyboard note preview (e.g. "A1").
+    keyboard_preview_channel: String,
+    /// Receives (note, pcm) pairs from background preview-compile threads.
+    preview_rx: Receiver<(u8, Vec<f32>)>,
+    preview_tx: Sender<(u8, Vec<f32>)>,
 }
 
 type PendingSlot<T> = Option<std::sync::Arc<std::sync::Mutex<Option<T>>>>;
@@ -61,6 +67,7 @@ impl MmlApp {
         let settings = Settings::load();
         let compile_opts = CompileOptions::from_settings(&settings);
         let (worker_tx, worker_rx) = mpsc::channel();
+        let (preview_tx, preview_rx) = mpsc::channel();
         let audio = AudioEngine::new();
 
         apply_theme(&cc.egui_ctx, &settings);
@@ -79,8 +86,11 @@ impl MmlApp {
             }
         }
 
+        let mut docs = DocumentStore::new();
+        docs.open_untitled();
+
         Self {
-            docs: DocumentStore::new(),
+            docs,
             settings,
             compile_opts,
             worker_tx,
@@ -94,23 +104,25 @@ impl MmlApp {
             pending_open: None,
             pending_save_as: None,
             socket_rx,
+            keyboard_preview_channel: String::new(),
+            preview_rx,
+            preview_tx,
         }
     }
 
     // ── compilation ───────────────────────────────────────────────────────────
 
     fn trigger_compile(&mut self, doc_id: usize) {
-        let path = match self.docs.get_mut(doc_id).and_then(|d| d.path.clone()) {
-            Some(p) => p,
+        let doc = match self.docs.get_mut(doc_id) {
+            Some(d) => d,
             None => return,
         };
-        if let Some(doc) = self.docs.get_mut(doc_id) {
-            doc.compile_status = CompileStatus::Compiling;
-        }
+        doc.compile_status = CompileStatus::Compiling;
+        let content = doc.content.clone();
         let tx = self.worker_tx.clone();
         let format = self.compile_opts.format.clone();
         std::thread::spawn(move || {
-            match compiler::compile(&path, &format) {
+            match compiler::compile_content(&content, &format) {
                 Ok(out) => {
                     let pcm = render_pcm(&out.bytes);
                     let _ = tx.send(WorkerMsg::CompileOk { doc_id, bytes: out.bytes, pcm, warnings: out.warnings });
@@ -151,8 +163,7 @@ impl MmlApp {
         if !self.compile_opts.auto_compile { return; }
         let delay = self.settings.auto_compile_delay_ms as f64 / 1000.0;
         let ids: Vec<usize> = self.docs.docs().iter()
-            .filter(|d| d.path.is_some()
-                && !matches!(d.compile_status, CompileStatus::Compiling)
+            .filter(|d| !matches!(d.compile_status, CompileStatus::Compiling)
                 && d.last_edit_time.map(|t| now - t >= delay).unwrap_or(false))
             .map(|d| d.id)
             .collect();
@@ -377,6 +388,7 @@ impl eframe::App for MmlApp {
         let now = ctx.input(|i| i.time);
 
         self.poll_workers();
+        self.poll_preview();
         self.poll_file_dialogs();
         self.handle_dropped_files(ctx);
         self.check_auto_compile(now);
@@ -447,6 +459,24 @@ impl eframe::App for MmlApp {
                     }
                     ui.separator();
                     if ui.button("Quit").clicked() { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
+                });
+
+                ui.menu_button("Examples", |ui| {
+                    const EXAMPLES: &[(&str, &str)] = &[
+                        ("Hello World",        include_str!("../../examples/hello.gwi")),
+                        ("FM Chord",           include_str!("../../examples/fm_chord.gwi")),
+                        ("Loop Arp",           include_str!("../../examples/loop_arp.gwi")),
+                        ("PSG Melody",         include_str!("../../examples/psg_melody.gwi")),
+                    ];
+                    for (label, content) in EXAMPLES {
+                        if ui.button(*label).clicked() {
+                            let id = self.docs.open_untitled();
+                            if let Some(doc) = self.docs.get_mut(id) {
+                                doc.content = content.to_string();
+                            }
+                            ui.close_menu();
+                        }
+                    }
                 });
 
                 ui.menu_button("Edit", |ui| {
@@ -589,8 +619,10 @@ impl eframe::App for MmlApp {
                         }
                     }
                     BottomTab::Waveform => {
-                        let waveform: Vec<f32> = self.audio.as_ref().map(|e| e.waveform.clone()).unwrap_or_default();
-                        crate::panels::waveform::show(ui, &waveform);
+                        let scope: Vec<f32> = self.audio.as_ref()
+                            .map(|e| e.scope_samples(2048))
+                            .unwrap_or_default();
+                        crate::panels::waveform::show(ui, &scope);
                     }
                     BottomTab::Midi => {
                         self.show_midi_panel(ui);
@@ -619,6 +651,17 @@ impl eframe::App for MmlApp {
 // ── MIDI panel (inline, to avoid borrow conflicts) ────────────────────────────
 
 impl MmlApp {
+    /// Drain preview PCM from background threads and start playback if the note is still held.
+    fn poll_preview(&mut self) {
+        while let Ok((note, pcm)) = self.preview_rx.try_recv() {
+            if self.keyboard_held == Some(note) {
+                if let Some(engine) = &mut self.audio {
+                    engine.play_preview(pcm);
+                }
+            }
+        }
+    }
+
     fn show_midi_panel(&mut self, ui: &mut egui::Ui) {
         // Port selectors
         ui.horizontal(|ui| {
@@ -675,6 +718,32 @@ impl MmlApp {
 
         ui.separator();
 
+        // Preview channel selector
+        let channels = compiler::detect_channels(
+            self.docs.active().map(|d| d.content.as_str()).unwrap_or(""),
+        );
+        if !channels.is_empty() {
+            if self.keyboard_preview_channel.is_empty()
+                || !channels.contains(&self.keyboard_preview_channel)
+            {
+                self.keyboard_preview_channel = channels[0].clone();
+            }
+            ui.horizontal(|ui| {
+                ui.label("Preview channel:");
+                egui::ComboBox::from_id_salt("preview_channel_sel")
+                    .selected_text(&self.keyboard_preview_channel)
+                    .show_ui(ui, |ui| {
+                        for ch in &channels {
+                            ui.selectable_value(
+                                &mut self.keyboard_preview_channel,
+                                ch.clone(),
+                                ch,
+                            );
+                        }
+                    });
+            });
+        }
+
         // On-screen keyboard
         let (note_on, note_off) = crate::panels::midi_keyboard::show(
             ui,
@@ -684,10 +753,28 @@ impl MmlApp {
         if let Some(note) = note_on {
             self.midi.send_note_on(0, note, 100);
             if (note as usize) < 128 { self.active_notes[note as usize] = true; }
+            // Trigger a synthesized preview note on the selected MML channel.
+            if self.audio.is_some() && !self.keyboard_preview_channel.is_empty() {
+                let content = self.docs.active().map(|d| d.content.clone()).unwrap_or_default();
+                let channel = self.keyboard_preview_channel.clone();
+                let tx = self.preview_tx.clone();
+                let format = self.compile_opts.format.clone();
+                std::thread::spawn(move || {
+                    if let Some(snippet) = compiler::build_note_preview(&content, note, &channel) {
+                        if let Ok(out) = compiler::compile_content(&snippet, &format) {
+                            let pcm = render_pcm_pub(&out.bytes);
+                            let _ = tx.send((note, pcm));
+                        }
+                    }
+                });
+            }
         }
         if let Some(note) = note_off {
             self.midi.send_note_off(0, note);
             if (note as usize) < 128 { self.active_notes[note as usize] = false; }
+            if let Some(engine) = &mut self.audio {
+                engine.stop_preview();
+            }
         }
     }
 }

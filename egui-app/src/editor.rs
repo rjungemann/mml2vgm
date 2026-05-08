@@ -17,6 +17,13 @@ pub fn show(ui: &mut Ui, content: &mut String, jump_to_line: Option<usize>) -> b
         state.store(ui.ctx(), te_id);
     }
 
+    let body_font = egui::TextStyle::Monospace.resolve(ui.style());
+    let mut layouter = |_ui: &egui::Ui, string: &str, wrap_width: f32| {
+        let mut job = crate::highlight::highlight(string, body_font.clone());
+        job.wrap.max_width = wrap_width;
+        _ui.fonts(|f| f.layout_job(job))
+    };
+
     let mut changed = false;
     ScrollArea::both()
         .id_salt("editor_scroll")
@@ -29,7 +36,7 @@ pub fn show(ui: &mut Ui, content: &mut String, jump_to_line: Option<usize>) -> b
                     .desired_width(f32::INFINITY)
                     .desired_rows(40)
                     .lock_focus(true)
-                    .code_editor(),
+                    .layouter(&mut layouter),
             );
             if response.changed() {
                 changed = true;

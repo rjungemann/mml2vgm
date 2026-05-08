@@ -65,29 +65,6 @@ wasm-pack build      # Build WASM module
 - `src/player/` - VGM/chip players
 - `src/error.rs` - Error handling
 
-### Tauri Desktop App Development
-
-**Directory:** `tauri-app/`
-
-**Tech Stack:**
-- Tauri 2.0
-- Rust 1.70+
-- TypeScript/React (shared with browser-ide)
-
-**Development Commands:**
-```bash
-cd tauri-app
-npm install
-npm run tauri:dev    # Start development
-npm run tauri:build  # Build desktop app
-```
-
-**Key Files:**
-- `tauri.conf.json` - Tauri configuration
-- `src-tauri/Cargo.toml` - Rust dependencies
-- `src-tauri/src/main.rs` - Rust entry point
-- `src/main.tsx` - Frontend entry point
-
 ---
 
 ## Legacy .NET Development Notes

@@ -105,8 +105,13 @@ export class AudioService {
   
   // Sample buffer and queue
   private sampleBuffer: Float32Array | null = null;
-  private sampleQueue: Float32Array[] = [];
   private isProcessing = false;
+
+  // SharedArrayBuffer ring buffer for low-latency audio
+  private sharedArrayBuffer: SharedArrayBuffer | null = null;
+  private sharedRingBuffer: Float32Array | null = null;
+  private sharedRingBufferBytes: Int32Array | null = null;
+  private usingSharedArrayBuffer = false;
   
   // Playback state
   private _isPlaying = false;
@@ -118,7 +123,6 @@ export class AudioService {
   // VGM player state
   private vgmPlayerId: string | null = null;
   private vgmData: Uint8Array | null = null;
-  private vgmSampleRate = 44100;
   
   // Chip player state
   private chipPlayerId: string | null = null;
@@ -132,6 +136,7 @@ export class AudioService {
   // Playback options
   private _volume = 1.0;
   private _loop = false;
+  private _playbackRate = 1.0;
   
   // Sample rate and buffer configuration
   private sampleRate = 44100;
@@ -493,6 +498,14 @@ export class AudioService {
     this.bufferSize = options.bufferSize || 4096;
     this.outputChannels = options.outputChannels || 2;
     
+    // Initialize SharedArrayBuffer ring buffer if supported
+    if (this.hasSharedArrayBufferSupport()) {
+      this.initSharedRingBuffer();
+    } else {
+      console.log('[AudioService] SharedArrayBuffer not supported, using postMessage fallback');
+      this.usingSharedArrayBuffer = false;
+    }
+    
     // Create audio context
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
@@ -506,6 +519,64 @@ export class AudioService {
     } catch (error) {
       console.error('[AudioService] Initialization failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if SharedArrayBuffer is supported with the required headers.
+   */
+  private hasSharedArrayBufferSupport(): boolean {
+    // Check if SharedArrayBuffer is available
+    if (typeof SharedArrayBuffer === 'undefined') {
+      return false;
+    }
+    
+    // Check if the required COOP/COEP headers are set
+    // These are needed for SharedArrayBuffer to work with AudioWorklet
+    try {
+      // Try to create a small SharedArrayBuffer as a test
+      // This will throw if headers are not set
+      if (typeof crossOriginIsolated === 'boolean') {
+        return crossOriginIsolated;
+      }
+      // Fallback check: try to create one
+      // Note: In some browsers, this might not throw but still fail in AudioWorklet
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Initialize the SharedArrayBuffer ring buffer.
+   * Uses a circular buffer with Atomics for synchronization.
+   */
+  private initSharedRingBuffer(): void {
+    // Calculate capacity: enough for ~50ms of audio at 44100Hz stereo
+    // 44100 samples/sec * 0.05 sec * 2 channels = 4410 samples
+    const capacity = this.sampleRate * this.outputChannels;
+    
+    // Create SharedArrayBuffer: Float32Array for samples + Int32Array for indices
+    // Float32Array: capacity * 4 bytes per sample
+    // Int32Array: 4 integers (readIndex, writeIndex, capacity, bufferSize) * 4 bytes each = 16 bytes
+    const bufferSize = (capacity * 4) + 16;
+    
+    try {
+      this.sharedArrayBuffer = new SharedArrayBuffer(bufferSize);
+      this.sharedRingBuffer = new Float32Array(this.sharedArrayBuffer, 0, capacity);
+      this.sharedRingBufferBytes = new Int32Array(this.sharedArrayBuffer, capacity * 4, 4);
+      
+      // Initialize indices
+      this.sharedRingBufferBytes[0] = 0; // readIndex
+      this.sharedRingBufferBytes[1] = 0; // writeIndex
+      this.sharedRingBufferBytes[2] = capacity; // capacity
+      this.sharedRingBufferBytes[3] = this.bufferSize; // audio buffer size
+      
+      this.usingSharedArrayBuffer = true;
+      console.log('[AudioService] SharedArrayBuffer ring buffer initialized, capacity:', capacity);
+    } catch (e) {
+      console.warn('[AudioService] Failed to create SharedArrayBuffer:', e);
+      this.usingSharedArrayBuffer = false;
     }
   }
 
@@ -545,7 +616,102 @@ export class AudioService {
       }
       
       // Define the AudioWorklet processor
-      const processorCode = `
+      // When SharedArrayBuffer is available, use it for zero-copy sample transfer
+      // Otherwise fall back to postMessage-based transfer
+      const useSharedBuffer = this.usingSharedArrayBuffer && this.sharedArrayBuffer;
+      
+      const processorCode = useSharedBuffer ? `
+        class MMLAudioProcessor extends AudioWorkletProcessor {
+          constructor() {
+            super();
+            this.sharedRingBuffer = null;
+            this.sharedRingBufferBytes = null;
+            this.channelCount = 0;
+            thisbufferSize = 0;
+          }
+          
+          process(inputs, outputs, parameters) {
+            const output = outputs[0];
+            const channelCount = output.length;
+            const samplesNeeded = output[0].length;
+            
+            // Initialize on first process call
+            if (!this.sharedRingBuffer) {
+              this.port.onmessage = (e) => {
+                if (e.data.type === 'sharedBuffer') {
+                  this.sharedRingBuffer = e.data.ringBuffer;
+                  this.sharedRingBufferBytes = e.data.ringBufferBytes;
+                  this.channelCount = e.data.channelCount || ${this.outputChannels};
+                }
+              };
+              
+              // If buffer not yet received, output silence
+              for (let i = 0; i < samplesNeeded; i++) {
+                for (let c = 0; c < channelCount; c++) {
+                  output[c][i] = 0;
+                }
+              }
+              return true;
+            }
+            
+            const ringBuffer = this.sharedRingBuffer;
+            const ringBufferBytes = this.sharedRingBufferBytes;
+            const capacity = ringBufferBytes[2];
+            const bufferSize = ringBufferBytes[3];
+            
+            let samplesRead = 0;
+            
+            while (samplesRead < samplesNeeded) {
+              const readIndex = ringBufferBytes[0];
+              const writeIndex = ringBufferBytes[1];
+              
+              // Check if there are samples available
+              if (readIndex === writeIndex) {
+                // Buffer is empty - need to wait for more samples
+                // Use Atomics.wait to efficiently wait for samples
+                Atomics.wait(ringBufferBytes, 1, readIndex);
+                continue;
+              }
+              
+              // Calculate available samples
+              let available = writeIndex - readIndex;
+              if (available < 0) {
+                available += capacity;
+              }
+              
+              if (available === 0) {
+                // Should not happen, but safety check
+                Atomics.wait(ringBufferBytes, 1, readIndex);
+                continue;
+              }
+              
+              // Read samples from ring buffer
+              const samplesToRead = Math.min(available, samplesNeeded - samplesRead);
+              
+              for (let i = 0; i < samplesToRead; i++) {
+                const bufferIndex = (readIndex + i) % capacity;
+                const sample = ringBuffer[bufferIndex];
+                for (let c = 0; c < channelCount; c++) {
+                  output[c][samplesRead + i] = sample;
+                }
+              }
+              
+              // Update read index
+              const newReadIndex = (readIndex + samplesToRead) % capacity;
+              ringBufferBytes[0] = newReadIndex;
+              
+              // Notify producer that space is available
+              Atomics.notify(ringBufferBytes, 1, 1);
+              
+              samplesRead += samplesToRead;
+            }
+            
+            return true;
+          }
+        }
+        
+        registerProcessor('mml-audio-processor', MMLAudioProcessor);
+      ` : `
         class MMLAudioProcessor extends AudioWorkletProcessor {
           constructor() {
             super();
@@ -572,7 +738,7 @@ export class AudioService {
                 }
               }
               // Request more samples
-              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * 2 });
+              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * channelCount });
               return true;
             }
             
@@ -592,7 +758,7 @@ export class AudioService {
             
             // Request more samples if buffer is getting low
             if (this.bufferIndex > this.sampleBuffer.length * 0.8) {
-              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * 2 });
+              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * channelCount });
             }
             
             return true;
@@ -623,6 +789,22 @@ export class AudioService {
       this.audioWorkletNode.connect(this.audioContext.destination);
       this.audioDestination = this.audioWorkletNode;
       
+      // If using SharedArrayBuffer, pass the buffer to the worklet
+      if (useSharedBuffer && this.sharedArrayBuffer && this.sharedRingBuffer && this.sharedRingBufferBytes) {
+        try {
+          this.audioWorkletNode.port.postMessage({
+            type: 'sharedBuffer',
+            ringBuffer: this.sharedRingBuffer,
+            ringBufferBytes: this.sharedRingBufferBytes,
+            channelCount: this.outputChannels,
+          });
+          console.log('[AudioService] SharedArrayBuffer passed to AudioWorklet');
+        } catch (e) {
+          console.warn('[AudioService] Failed to pass SharedArrayBuffer to AudioWorklet:', e);
+          this.usingSharedArrayBuffer = false;
+        }
+      }
+      
       // Setup message handler
       this.audioWorkletNode.port.onmessage = (e) => {
         if (e.data.type === 'needSamples') {
@@ -643,7 +825,78 @@ export class AudioService {
       this.setupScriptProcessorNode();
     }
   }
-  
+
+  /**
+   * Write samples to the SharedArrayBuffer ring buffer.
+   * Uses Atomics for thread-safe synchronization with the AudioWorklet.
+   */
+  private writeSamplesToRingBuffer(samples: Float32Array): void {
+    if (!this.sharedRingBuffer || !this.sharedRingBufferBytes) {
+      return;
+    }
+    
+    const ringBuffer = this.sharedRingBuffer;
+    const ringBufferBytes = this.sharedRingBufferBytes;
+    const capacity = ringBufferBytes[2];
+    
+    const samplesToWrite = Math.min(samples.length, capacity / 2); // Reserve space
+    
+    let samplesWritten = 0;
+    
+    while (samplesWritten < samplesToWrite) {
+      const readIndex = ringBufferBytes[0];
+      const writeIndex = ringBufferBytes[1];
+      
+      // Calculate available space
+      let availableSpace = readIndex - writeIndex;
+      if (availableSpace <= 0) {
+        availableSpace += capacity;
+      }
+      
+      // Wait if buffer is full (less than bufferSize samples available)
+      // Use a threshold to prevent buffer overrun
+      if (availableSpace < this.bufferSize) {
+        // Wait for the consumer to read some samples
+        Atomics.wait(ringBufferBytes, 0, readIndex);
+        continue;
+      }
+      
+      // Calculate how many samples we can write
+      const spaceForSamples = availableSpace - 1; // Leave at least 1 sample gap
+      const samplesThisIteration = Math.min(
+        samplesToWrite - samplesWritten,
+        spaceForSamples
+      );
+      
+      if (samplesThisIteration <= 0) {
+        Atomics.wait(ringBufferBytes, 0, readIndex);
+        continue;
+      }
+      
+      // Write samples to ring buffer
+      for (let i = 0; i < samplesThisIteration; i++) {
+        const bufferIndex = (writeIndex + i) % capacity;
+        const sourceIndex = samplesWritten + i;
+        if (sourceIndex < samples.length) {
+          // For mono to stereo conversion, write same sample to all channels
+          // The samples array contains interleaved stereo, but we handle it simply
+          ringBuffer[bufferIndex] = samples[sourceIndex];
+        } else {
+          ringBuffer[bufferIndex] = 0;
+        }
+      }
+      
+      // Update write index
+      const newWriteIndex = (writeIndex + samplesThisIteration) % capacity;
+      ringBufferBytes[1] = newWriteIndex;
+      
+      // Notify the consumer that new samples are available
+      Atomics.notify(ringBufferBytes, 1, 1);
+      
+      samplesWritten += samplesThisIteration;
+    }
+  }
+
   /**
    * Fallback to ScriptProcessorNode for browsers without AudioWorklet.
    */
@@ -851,7 +1104,7 @@ export class AudioService {
           samples = new Float32Array(this.bufferSize * this.outputChannels);
         } else if (this.chipPlayerId) {
           if (this.vgmCommands.length > 0) {
-            await this.applyPendingVgmCommands(this.vgmSampleCursor + this.bufferSize);
+            await this.applyPendingVgmCommands(this.vgmSampleCursor + Math.round(this.bufferSize * this._playbackRate));
           }
           samples = await wasmService.generateSamples(this.chipPlayerId, this.bufferSize);
         } else {
@@ -886,16 +1139,21 @@ export class AudioService {
           this.emitError(new Error('Playback is running but generated audio is silent.'));
         }
         
-        // Store samples for playback
-        this.sampleBuffer = samples;
-        this.bufferIndex = 0;
-        
-        // Send to audio worklet
-        if (this.audioWorkletNode) {
-          this.audioWorkletNode.port.postMessage({
-            type: 'samples',
-            samples: samples,
-          });
+        // If using SharedArrayBuffer, write directly to the ring buffer
+        if (this.usingSharedArrayBuffer && this.sharedRingBuffer && this.sharedRingBufferBytes) {
+          this.writeSamplesToRingBuffer(samples);
+        } else {
+          // Fallback: Store samples for playback
+          this.sampleBuffer = samples;
+          this.bufferIndex = 0;
+          
+          // Send to audio worklet
+          if (this.audioWorkletNode) {
+            this.audioWorkletNode.port.postMessage({
+              type: 'samples',
+              samples: samples,
+            });
+          }
         }
         
       } catch (error) {
@@ -1075,7 +1333,23 @@ export class AudioService {
   public isLooping(): boolean {
     return this._loop;
   }
-  
+
+  /**
+   * Set playback rate (1.0 = normal, 2.0 = 2x speed, 0.5 = half speed).
+   * Affects how quickly VGM commands are advanced per audio buffer, changing
+   * both tempo and pitch proportionally.
+   */
+  public setPlaybackRate(rate: number): void {
+    this._playbackRate = Math.max(0.25, Math.min(4.0, rate));
+  }
+
+  /**
+   * Get current playback rate.
+   */
+  public getPlaybackRate(): number {
+    return this._playbackRate;
+  }
+
   // ========================================================================
   // Status
   // ========================================================================

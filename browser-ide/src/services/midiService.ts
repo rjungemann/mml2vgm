@@ -483,6 +483,16 @@ export class MidiService {
     }
     
     /**
+     * Inject a note event from an external source (e.g. HID service) into the
+     * existing listener chain, applying the same mode/preview logic as native
+     * Web MIDI input.
+     */
+    public injectNoteEvent(event: MidiNoteEvent): void {
+        this.handleNoteEvent(event);
+        this.emitNoteEvent(event);
+    }
+
+    /**
      * Emit note event to all listeners.
      */
     private emitNoteEvent(event: MidiNoteEvent): void {

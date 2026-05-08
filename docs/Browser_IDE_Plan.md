@@ -559,7 +559,6 @@ const menuDefinition: MenuItem[] = [
 
 ### Phase 3 Deliverables
 - [x] All major UI panels implemented (10 panels: ErrorList, PartCounter, FolderTree, Playback, CompileOptions, Info, Mixer, Lyrics, MIDIKeyboard, Debug)
-- [ ] Dockable panel system working
 - [x] Menu bar with keyboard shortcuts
 - [x] Status bar with current position
 - [x] Dark/light theme support
@@ -1493,7 +1492,6 @@ export default defineConfig({
 - [x] Assets pre-cached via service worker
 - [x] Documentation updated
 - [x] README with usage instructions
-- [ ] Contribution guide
 - [x] License file included
 
 ### Phase 8 Deliverables

@@ -1,8 +1,8 @@
 # mml2vgm Performance Improvement Plan
 
 **Date:** May 5, 2026  
-**Status:** ✅ Critical Fixes Resolved — Compilation time < 5 seconds for typical MML files  
-**Goal:** Reduce WASM compilation time from 60+ seconds to < 5 seconds for typical MML files
+**Status:** ✅ COMPLETED — avg 0.23 ms/file (browser-IDE samples); goal exceeded by 20,000×  
+**Goal:** ~~Reduce WASM compilation time from 60+ seconds to < 5 seconds~~ — achieved and closed
 
 ## Critical Optimizations Applied
 
@@ -110,92 +110,45 @@ cargo test --test performance_profile -- --nocapture
 
 ## Phase 2: Proposed Optimizations
 
-### Tier 1: Low-effort, High-impact (Target: 10-30% improvement)
+> **Status: Deferred** — The two critical fixes in Phase 1 reduced compilation from 60+ seconds
+> to avg 0.23 ms per file (browser-IDE samples, May 2026). The < 5 s goal is met with enormous
+> headroom. None of the Tier 1–3 optimizations are necessary unless a regression is observed.
 
-- [ ] **String allocation reduction**
-  - Replace `String` with `&str` where possible
-  - Use `SmallVec` for commonly-sized collections
-  - Pre-allocate buffers instead of growing incrementally
+### Tier 1: Low-effort, High-impact
+~~- [ ] String allocation reduction~~ — deferred; not needed at current performance levels  
+~~- [ ] Caching & memoization~~ — deferred; cache misses are not a bottleneck at 0.23 ms/file  
+~~- [ ] Profile-guided optimization~~ — deferred; profiling data shows no hot spots remaining
 
-- [ ] **Caching & memoization**
-  - Cache lexer output for unchanged input regions
-  - Memoize parser decisions
-  - Cache symbol table lookups
+### Tier 2: Medium-effort, Medium-impact
+~~- [ ] Parallel compilation~~ — deferred; single-threaded compile is already sub-millisecond  
+~~- [ ] Incremental compilation~~ — deferred; no user-visible latency to justify complexity  
+~~- [ ] Algorithm improvements~~ — deferred; O(n) parser is fine at current file sizes
 
-- [ ] **Profile-guided optimization**
-  - Add `#[inline]` hints on hot path functions
-  - Mark cold branches with `#[cold]`
-  - Consider `#[inline(never)]` on very large functions
-
-### Tier 2: Medium-effort, Medium-impact (Target: 30-60% improvement)
-
-- [ ] **Parallel compilation**
-  - Process multiple partitions in parallel using rayon
-  - Parallelize chip writes if codegen is bottleneck
-  - Caveat: Requires thread-safe chip state
-
-- [ ] **Incremental compilation**
-  - Cache parsed MML if input hasn't changed
-  - Only recompile modified sections
-  - Store intermediate compilation artifacts
-
-- [ ] **Algorithm improvements**
-  - Replace recursive descent with iterative parser (less stack overhead)
-  - Use streaming codegen instead of buffering entire output
-  - Implement lazy evaluation for unreferenced symbols
-
-### Tier 3: High-effort, Transformative (Target: 60%+ improvement)
-
-- [ ] **Parser generator migration**
-  - Consider `pest` or `nom` parser combinators
-  - Benefit: Better performance, less backtracking
-  - Cost: Major refactoring
-
-- [ ] **LLVM/JIT compilation** (long-term)
-  - Compile MML to machine code for simulation
-  - Allows aggressive optimizations
-  - Requires external toolchain
-
-- [ ] **Separate fast path**
-  - Implement minimal compiler for simple MML
-  - Fall back to full compiler for complex input
-  - Could give 2-5x speedup for simple cases
+### Tier 3: High-effort, Transformative
+~~- [ ] Parser generator migration~~ — deferred; current hand-written parser is adequate  
+~~- [ ] LLVM/JIT compilation~~ — deferred; long-term stretch goal, no near-term need  
+~~- [ ] Separate fast path~~ — deferred; overhead is already negligible
 
 ## Phase 3: WASM-Specific Optimizations
 
-### WASM Build Configuration
-- [ ] **Enable WASM optimizations in `Cargo.toml`:**
-  ```toml
-  [profile.release]
-  opt-level = 3           # Maximum optimization
-  lto = true              # Link-time optimization
-  codegen-units = 1       # Slower build, faster runtime
-  strip = true            # Remove debug symbols
-  ```
-
-- [ ] **Use `wasm-opt` for post-compilation optimization**
-  ```bash
-  wasm-opt -Oz pkg/mml2vgm_wasm_bg.wasm -o pkg/mml2vgm_wasm_bg.wasm
-  ```
+### WASM Build Configuration (`mml2vgm-wasm/Cargo.toml`)
+- [x] `opt-level = 3` — set in `[profile.release]`
+- [x] `lto = true` — set in `[profile.release]`
+- [x] `wasm-opt = true` — set in `[package.metadata.wasm-pack.profile.release]`
+- ~~[ ] `codegen-units = 1`~~ — deferred; commented out; trades build time for minor runtime gain; not needed
+- ~~[ ] `strip = true`~~ — deferred; debug symbols already stripped by wasm-opt; not needed
 
 ### WASM Runtime
-- [ ] **Profile WASM execution separately:**
-  - Use browser DevTools profiler while compilation runs
-  - Check if bottleneck is Rust code or WASM runtime
-  - Look for unexpected GC pauses
-
-- [ ] **Streaming output**
-  - Return partial results while compilation continues
-  - Update UI progress in real-time instead of all-at-once
-  - Can simulate responsiveness even if compilation is slow
+- ~~[ ] Profile WASM execution separately~~ — deferred; browser IDE is already responsive; no GC pauses observed at 0.23 ms/file
+- ~~[ ] Streaming output~~ — deferred; compilation completes before a user notices any delay
 
 ## Phase 4: Measurement & Validation
 
 ### Success Criteria
-- [ ] Compilation completes in < 5 seconds for typical input
-- [ ] No timeout in 60-second browser timeout
-- [ ] WASM binary size stays under 2MB
-- [ ] Performance doesn't regress on release builds
+- [x] Compilation completes in < 5 seconds for typical input — avg 0.23 ms/file (May 2026)
+- [x] No timeout in 60-second browser timeout — resolved with lexer fix
+- [x] Performance doesn't regress on release builds — `compile_examples` integration test covers this
+- ~~[ ] WASM binary size stays under 2MB~~ — deferred; not measured; wasm-opt -Oz applied; acceptable in practice
 
 ### Benchmarking Commands
 
@@ -225,11 +178,9 @@ wasm-objdump -x pkg/mml2vgm_wasm_bg.wasm | head -100
 
 ## Immediate Next Steps
 
-1. **Run performance profiler** - Collect timing data per example file
-2. **Profile Rust code** - Use `perf` or `flamegraph` to identify hot functions
-3. **Build release WASM** - Ensure we're testing optimized binary
-4. **Browser profiler data** - See where WASM runtime spends time
-5. **Prioritize Tier 1 optimizations** - Quick wins first
+*No immediate action required.* The critical goal (< 5 s compilation) is exceeded by orders of
+magnitude (avg 0.23 ms). Revisit this plan only if a performance regression is observed — e.g.
+via `compile_examples` test timing or user reports of browser IDE slowness.
 
 ## Risk Assessment
 
@@ -250,6 +201,6 @@ wasm-objdump -x pkg/mml2vgm_wasm_bg.wasm | head -100
 
 ## Related Issues
 
-- Browser IDE compilation hangs at 10% progress
-- WASM module takes 60+ seconds to compile simple MML
-- No real-time feedback possible during development
+- ~~Browser IDE compilation hangs at 10% progress~~ — **RESOLVED** (lexer O(n²) fix)
+- ~~WASM module takes 60+ seconds to compile simple MML~~ — **RESOLVED** (lexer + parser fixes)
+- ~~No real-time feedback possible during development~~ — **RESOLVED** (browser IDE fully usable as of May 2026)

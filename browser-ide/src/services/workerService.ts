@@ -26,6 +26,8 @@ interface WorkerCompileMessage {
   requestId: string;
   mml: string;
   options: CompileOptions;
+  // sample name → ArrayBuffer (underlying buffer transferred, not copied)
+  samples?: Record<string, ArrayBuffer>;
 }
 
 interface WorkerCancelMessage {
@@ -70,6 +72,7 @@ interface CompileRequest {
   requestId: string;
   mml: string;
   options: CompileOptions;
+  samples?: Record<string, ArrayBuffer>;
   resolve: (result: CompileResult) => void;
   reject: (error: Error) => void;
   timestamp: number;
@@ -428,11 +431,14 @@ export class WorkerManager {
   }
   
   /**
-   * Compile MML in a worker (or fallback to main thread)
+   * Compile MML in a worker (or fallback to main thread).
+   * Pass `samples` as a Map<name, Float32Array>; the underlying ArrayBuffers
+   * are transferred to the worker so large PCM data is not copied.
    */
   async compile(
     mml: string,
-    options: CompileOptions
+    options: CompileOptions,
+    samples?: Map<string, Float32Array>
   ): Promise<CompileResult> {
     if (this.isTerminated) {
       throw new Error('WorkerManager has been terminated');
@@ -442,7 +448,18 @@ export class WorkerManager {
     const normalizedMml = this.preprocessMml(mml);
     const status = this.getStatus();
     console.log(`[WorkerManager] Compile requested. Status:`, status);
-    
+
+    // Convert Map<name, Float32Array> to Record<name, ArrayBuffer> for transfer
+    let samplesRecord: Record<string, ArrayBuffer> | undefined;
+    if (samples && samples.size > 0) {
+      samplesRecord = {};
+      samples.forEach((pcm, name) => {
+        // slice() copies into a new ArrayBuffer (avoids SharedArrayBuffer type issues
+        // and prevents detaching the caller's buffer on transfer)
+        samplesRecord![name] = pcm.slice().buffer as ArrayBuffer;
+      });
+    }
+
     // If we have active workers, try to use them
     if (this.workersActive && this.workers.length > 0) {
       console.log(`[WorkerManager] Using worker for compilation`);
@@ -451,19 +468,20 @@ export class WorkerManager {
           requestId,
           mml: normalizedMml,
           options,
+          samples: samplesRecord,
           resolve,
           reject,
           timestamp: Date.now(),
         };
-        
+
         this.activeRequests.set(requestId, request);
         this.requestTimings.set(requestId, { createdAt: Date.now() });
         this.queue.push(request);
-        
+
         this.processQueue();
       });
     }
-    
+
     // Fallback to main thread if no workers are active
     if (this.useFallback && this.fallbackCompile) {
       console.log(`[WorkerManager] Using fallback to main thread (workersActive=${this.workersActive}, workers=${this.workers.length})`);
@@ -558,12 +576,18 @@ export class WorkerManager {
     // Send the compile request
     console.log(`[WorkerManager] Sending COMPILE message to worker for request ${request.requestId}`);
     try {
-      availableWorker.worker.postMessage({
+      const msg: WorkerCompileMessage = {
         type: 'COMPILE',
         requestId: request.requestId,
         mml: request.mml,
         options: request.options,
-      } as WorkerCompileMessage);
+        samples: request.samples,
+      };
+      // Transfer ArrayBuffers so large PCM data is zero-copy
+      const transferables = request.samples
+        ? Object.values(request.samples).map((ab) => ab)
+        : [];
+      availableWorker.worker.postMessage(msg, transferables);
       console.log(`[WorkerManager] COMPILE message sent successfully`);
     } catch (e) {
       this.clearWorkerTimeout(availableWorker);

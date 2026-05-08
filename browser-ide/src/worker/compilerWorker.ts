@@ -10,7 +10,7 @@
 console.log('[Worker] Worker script started loading');
 
 // Import the WASM wrapper
-import { initializeWasm, compileMml, extractResultData } from './wasmWrapper';
+import { initializeWasm, compileMml, compileMmlWithSamples, extractResultData } from './wasmWrapper';
 
 // Worker state
 let isInitialized = false;
@@ -26,6 +26,8 @@ interface CompileMessage {
   requestId: string;
   mml: string;
   options: any;
+  // sample name → ArrayBuffer (underlying buffer of Float32Array, transferred)
+  samples?: Record<string, ArrayBuffer>;
 }
 
 interface CancelMessage {
@@ -86,7 +88,12 @@ async function initWasm(): Promise<void> {
 /**
  * Handle a compile request
  */
-async function handleCompile(requestId: string, mml: string, options: any): Promise<void> {
+async function handleCompile(
+  requestId: string,
+  mml: string,
+  options: any,
+  samplesRaw?: Record<string, ArrayBuffer>
+): Promise<void> {
   try {
     const compileStart = performance.now();
     const phase = (label: string) => {
@@ -109,22 +116,29 @@ async function handleCompile(requestId: string, mml: string, options: any): Prom
     const optionsJson = JSON.stringify(options);
     phase(`Options prepared (length=${optionsJson.length})`);
 
+    // Reconstruct Float32Array map from transferred ArrayBuffers
+    const samples: Map<string, Float32Array> | undefined = samplesRaw
+      ? new Map(Object.entries(samplesRaw).map(([k, v]) => [k, new Float32Array(v)]))
+      : undefined;
+
     // Call the WASM compile function.
     // Note: compile_mml is synchronous; timeout protection must happen in the main thread.
     phase('Preparing synchronous WASM compile call');
     const result: any = await Promise.resolve().then(() => {
-      phase('Starting synchronous compile_mml call');
+      phase('Starting synchronous compile call');
       const startTime = performance.now();
       try {
-        phase('Invoking compileMml');
-        const result: any = compileMml(mml, optionsJson, requestId);
+        phase(samples ? 'Invoking compileMmlWithSamples' : 'Invoking compileMml');
+        const result: any = samples
+          ? compileMmlWithSamples(mml, optionsJson, samples, requestId)
+          : compileMml(mml, optionsJson, requestId);
         const endTime = performance.now();
-        phase(`compileMml returned after ${(endTime - startTime).toFixed(1)}ms`);
+        phase(`compile returned after ${(endTime - startTime).toFixed(1)}ms`);
         console.log(`[Worker][${requestId}] Result is:`, result ? 'defined' : 'undefined');
         return result;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
-        console.error(`[Worker][${requestId}] compileMml threw error:`, errorMsg);
+        console.error(`[Worker][${requestId}] compile threw error:`, errorMsg);
         console.error(`[Worker][${requestId}] Full error:`, e);
         throw e;
       }
@@ -233,7 +247,7 @@ self.onmessage = async (e: MessageEvent) => {
       console.log(`[Worker] Received COMPILE request: ${message.requestId}`);
       console.log(`[Worker] MML length: ${message.mml.length}, options keys: ${Object.keys(message.options).join(',')}`);
       try {
-        await handleCompile(message.requestId, message.mml, message.options);
+        await handleCompile(message.requestId, message.mml, message.options, message.samples);
         console.log(`[Worker] COMPILE request ${message.requestId} completed`);
       } catch (err) {
         console.error(`[Worker] COMPILE request ${message.requestId} failed:`, err);

@@ -14,8 +14,6 @@ clean:
     set -e
     echo "Cleaning browser-ide..."
     (cd browser-ide && rm -rf node_modules dist)
-    echo "Cleaning tauri-app..."
-    (cd tauri-app && rm -rf node_modules dist src-tauri/target)
     echo "Cleaning Rust..."
     (cd mml2vgm-rs && cargo clean)
     (cd mml2vgm-wasm && cargo clean)
@@ -29,8 +27,6 @@ install:
     set -e
     echo "Installing browser-ide dependencies..."
     (cd browser-ide && npm install)
-    echo "Installing tauri-app dependencies..."
-    (cd tauri-app && npm install)
     echo "Done!"
 
 # ============ BROWSER IDE COMMANDS ============
@@ -120,20 +116,6 @@ egui-socket:
 # Run egui smoke test suite (requires egui-app binary to be built)
 egui-smoke:
     cd egui-app && cargo test --test smoke -- --test-threads=1
-
-# ============ TAURI DESKTOP COMMANDS (DEPRECATED) ============
-
-# Start Tauri dev
-tauri-dev:
-    cd tauri-app && npm run tauri:dev
-
-# Build Tauri app
-tauri-build:
-    cd tauri-app && npm run tauri:build
-
-# Build Tauri app for release
-tauri-build-release:
-    cd tauri-app && npm run tauri:build -- --release
 
 # ============ COMBINED COMMANDS ============
 
@@ -267,7 +249,6 @@ format:
     cargo fmt --manifest-path mml2vgm-wasm/Cargo.toml
     echo "Formatting TypeScript..."
     cd browser-ide && npx prettier --write src/
-    cd tauri-app && npx prettier --write src/
 
 # Check for outdated dependencies
 outdated:
@@ -276,7 +257,6 @@ outdated:
     cd mml2vgm-rs && cargo outdated --workspace
     echo "Checking npm dependencies..."
     cd browser-ide && npm outdated
-    cd tauri-app && npm outdated
 
 # ============ DEPLOY COMMANDS ============
 
@@ -295,30 +275,6 @@ deploy:
     echo "Deployment complete!"
 
 # ============ CROSS-PLATFORM BUILD COMMANDS ============
-
-# Build Tauri for Linux
-tauri-build-linux:
-    (cd tauri-app && npm run tauri:build -- --release --target x86_64-unknown-linux-gnu)
-
-# Build Tauri for Windows
-tauri-build-windows:
-    (cd tauri-app && npm run tauri:build -- --release --target x86_64-pc-windows-msvc)
-
-# Build Tauri for macOS
-tauri-build-macos:
-    (cd tauri-app && npm run tauri:build -- --release --target x86_64-apple-darwin)
-
-# Build Tauri for all platforms
-tauri-build-all:
-    #!/usr/bin/env bash
-    set -e
-    echo "Building Tauri for Linux..."
-    just tauri-build-linux
-    echo "Building Tauri for Windows..."
-    just tauri-build-windows
-    echo "Building Tauri for macOS..."
-    just tauri-build-macos
-    echo "Tauri builds complete in tauri-app/src-tauri/target/release/"
 
 # Build Rust CLI for all platforms
 rust-build-all:
@@ -342,6 +298,6 @@ build-all-release:
     just wasm-build-release
     echo "Building browser IDE..."
     just ide-build
-    echo "Building Tauri desktop app..."
-    just tauri-build-release
+    echo "Building egui desktop app..."
+    just egui-build-release
     echo "All builds complete!"

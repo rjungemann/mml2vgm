@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { Document, EditorSettings, Position } from '@/types';
@@ -15,18 +15,51 @@ interface MonacoEditorProps {
   navigationPosition?: Position | null;
 }
 
-const MonacoEditor: React.FC<MonacoEditorProps> = ({
-  document,
-  onChange,
-  settings,
-  currentPosition,
-  navigationPosition,
-}) => {
+// Expose editor methods to parent components
+export interface MonacoEditorHandle {
+  getEditor: () => any | null;
+  triggerCommand: (command: string) => void;
+  focus: () => void;
+  hasSelection: () => boolean;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+}
+
+const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
+  { document, onChange, settings, currentPosition, navigationPosition },
+  ref
+) => {
   const editorRef = useRef<any>(null);
   const monaco = useMonaco();
   const languageId = 'mml';
   const [currentLineDecorations, setCurrentLineDecorations] = useState<string[]>([]);
   const [navDecorations, setNavDecorations] = useState<string[]>([]);
+
+  // Expose editor methods via ref
+  useImperativeHandle(ref, () => ({
+    getEditor: () => editorRef.current,
+    triggerCommand: (command: string) => {
+      if (editorRef.current) {
+        editorRef.current.trigger('menu', command, null);
+      }
+    },
+    focus: () => {
+      editorRef.current?.focus();
+    },
+    hasSelection: () => {
+      if (!editorRef.current) return false;
+      const selection = editorRef.current.getModel()?.getSelection();
+      return selection ? !selection.isEmpty() : false;
+    },
+    canUndo: () => {
+      if (!editorRef.current) return false;
+      return editorRef.current.getModel()?.canUndo() || false;
+    },
+    canRedo: () => {
+      if (!editorRef.current) return false;
+      return editorRef.current.getModel()?.canRedo() || false;
+    },
+  }));
 
   // Register MML language and theme when Monaco is loaded
   useEffect(() => {
@@ -220,6 +253,8 @@ const MonacoEditor: React.FC<MonacoEditorProps> = ({
       />
     </div>
   );
-};
+});
+
+MonacoEditor.displayName = 'MonacoEditor';
 
 export default MonacoEditor;

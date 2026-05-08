@@ -6,8 +6,8 @@ interface MenuBarProps {
   onCloseDocument: () => void;
   onCloseAllDocuments: () => void;
   onToggleTheme: () => void;
-  onToggleSidebar: () => void;
-  isSidebarVisible: boolean;
+  onToggleSidebar?: () => void;
+  isSidebarVisible?: boolean;
   onCompile: () => void;
   onCompileAndPlay: () => void;
   onPlay: () => void;
@@ -17,6 +17,64 @@ interface MenuBarProps {
   hasMultipleDocuments: boolean;
   isCompiling: boolean;
   isPlaying: boolean;
+  // File menu - Save
+  onSave: () => void;
+  onSaveAs: () => void;
+  // File menu - Exit
+  onExit: () => void;
+  // File menu - Export
+  onExportBinary: (format: string) => void;
+  hasCompileResult: boolean;
+  // Edit menu
+  onFind: () => void;
+  onReplace: () => void;
+  onSelectAll: () => void;
+  onCut: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
+  onDelete: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  hasSelection: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  // Phase 3.1: Zoom controls
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
+  fontSize?: number;
+  // Phase 5.2: Playback speed and loop
+  onSetPlaybackRate?: (rate: number) => void;
+  playbackRate?: number;
+  onToggleLoop?: () => void;
+  isLooping?: boolean;
+  // Phase 4.1: Output format selection
+  onSetOutputFormat?: (format: string) => void;
+  outputFormat?: string;
+  // Phase 4.2 / 3.2: Panel access and visibility
+  onShowPanel?: (panel: string) => void;
+  onTogglePanel?: (panel: string) => void;
+  panelVisibility?: Record<string, boolean>;
+  // Phase 4.3: Advanced compile options dialog
+  onOpenAdvancedCompileOptions?: () => void;
+  // Phase 5.3: Audio settings dialog
+  onOpenAudioSettings?: () => void;
+  // Phase 6.4: MIDI settings dialog
+  onOpenMidiSettings?: () => void;
+  // WebHID: HID MIDI controller settings dialog (experimental)
+  onOpenHIDSettings?: () => void;
+  // WebSerial: Hardware serial settings dialog (experimental)
+  onOpenSerialSettings?: () => void;
+  // Phase 6.5: Key bindings dialog
+  onOpenKeyBindings?: () => void;
+  // Phase 6.6: Preferences dialog
+  onOpenPreferences?: () => void;
+  // Phase 7.1: Help topics dialog
+  onOpenHelp?: () => void;
+  // Phase 7.2: MML reference dialog
+  onOpenMmlReference?: () => void;
+  // Phase 7.3: About dialog
+  onOpenAbout?: () => void;
 }
 
 // Menu definitions for keyboard navigation
@@ -37,11 +95,27 @@ const EXAMPLE_FILES = [
   { filename: 'sega_pcm_test.gwi', label: 'Sega PCM Test' },
 ] as const;
 
+// Panels available in the View → Panels submenu
+const VIEW_PANELS: Array<{ key: string; label: string }> = [
+  { key: 'errorList', label: 'Error List' },
+  { key: 'runtime', label: 'Runtime' },
+  { key: 'compilation', label: 'Compilation' },
+  { key: 'waveform', label: 'Waveform' },
+  { key: 'compileOptions', label: 'Compile Options' },
+  { key: 'folderTree', label: 'Folder Tree' },
+  { key: 'partCounter', label: 'Part Counter' },
+];
+
 const MenuBar: React.FC<MenuBarProps> = ({
   onNewDocument,
   onOpenFile,
   onCloseDocument,
   onCloseAllDocuments,
+  onSave,
+  onSaveAs,
+  onExit,
+  onExportBinary,
+  hasCompileResult,
   onToggleTheme,
   onToggleSidebar,
   isSidebarVisible,
@@ -54,6 +128,47 @@ const MenuBar: React.FC<MenuBarProps> = ({
   hasMultipleDocuments,
   isCompiling,
   isPlaying,
+  // Edit menu
+  onFind,
+  onReplace,
+  onSelectAll,
+  onCut,
+  onCopy,
+  onPaste,
+  onDelete,
+  onUndo,
+  onRedo,
+  hasSelection,
+  canUndo,
+  canRedo,
+  // Phase 3.1
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  // fontSize is available for future zoom-percentage display in labels
+  // Phase 5.2
+  onSetPlaybackRate,
+  playbackRate,
+  onToggleLoop,
+  isLooping,
+  // Phase 4.1
+  onSetOutputFormat,
+  outputFormat,
+  // Phase 4.2 / 3.2
+  onShowPanel,
+  onTogglePanel,
+  panelVisibility,
+  // Dialogs
+  onOpenAdvancedCompileOptions,
+  onOpenAudioSettings,
+  onOpenMidiSettings,
+  onOpenHIDSettings,
+  onOpenSerialSettings,
+  onOpenKeyBindings,
+  onOpenPreferences,
+  onOpenHelp,
+  onOpenMmlReference,
+  onOpenAbout,
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeMenuItemIndex, setActiveMenuItemIndex] = useState<number>(0);
@@ -83,14 +198,14 @@ const MenuBar: React.FC<MenuBarProps> = ({
             const btn = menuButtonRefs.current.get(m);
             return btn && btn === document.activeElement;
           });
-          
+
           let newIndex: number;
           if (event.key === 'ArrowRight') {
             newIndex = currentIndex < MENUS.length - 1 ? currentIndex + 1 : 0;
           } else {
             newIndex = currentIndex > 0 ? currentIndex - 1 : MENUS.length - 1;
           }
-          
+
           menuButtonRefs.current.get(MENUS[newIndex])?.focus();
         } else if (event.key === 'ArrowDown') {
           event.preventDefault();
@@ -160,61 +275,112 @@ const MenuBar: React.FC<MenuBarProps> = ({
 
   // Get menu items for a specific menu
   const getMenuItems = useCallback((menu: string) => {
-    const items: Array<{ label: string; onClick?: () => void; disabled: boolean; key?: string }> = [];
-    
+    const items: Array<{
+      label: string;
+      onClick?: () => void;
+      disabled: boolean;
+      key?: string;
+      checked?: boolean;
+    }> = [];
+
     switch (menu) {
       case 'file':
         items.push({ label: 'New', onClick: onNewDocument, disabled: false });
         items.push({ label: 'Open...', onClick: onOpenFile, disabled: false });
-        items.push({ label: 'Save', disabled: true });
-        items.push({ label: 'Save As...', disabled: true });
+        items.push({ label: 'Save', onClick: onSave, disabled: !hasActiveDocument });
+        items.push({ label: 'Save As...', onClick: onSaveAs, disabled: !hasActiveDocument });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Export...', disabled: true });
+        items.push({ label: 'Export as VGM', onClick: () => onExportBinary('vgm'), disabled: !hasActiveDocument || !hasCompileResult });
+        items.push({ label: 'Export as XGM', onClick: () => onExportBinary('xgm'), disabled: !hasActiveDocument || !hasCompileResult });
+        items.push({ label: 'Export as ZGM', onClick: () => onExportBinary('zgm'), disabled: !hasActiveDocument || !hasCompileResult });
+        items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Import...', disabled: true });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Close', onClick: onCloseDocument, disabled: !hasActiveDocument });
         items.push({ label: 'Close All', onClick: onCloseAllDocuments, disabled: !hasMultipleDocuments });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Exit', disabled: true });
+        items.push({ label: 'Exit', onClick: onExit, disabled: false });
         break;
       case 'edit':
-        items.push({ label: 'Undo', disabled: true });
-        items.push({ label: 'Redo', disabled: true });
+        items.push({ label: 'Undo', onClick: onUndo, disabled: !hasActiveDocument || !canUndo });
+        items.push({ label: 'Redo', onClick: onRedo, disabled: !hasActiveDocument || !canRedo });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Cut', disabled: true });
-        items.push({ label: 'Copy', disabled: true });
-        items.push({ label: 'Paste', disabled: true });
-        items.push({ label: 'Delete', disabled: true });
+        items.push({ label: 'Cut', onClick: onCut, disabled: !hasActiveDocument || !hasSelection });
+        items.push({ label: 'Copy', onClick: onCopy, disabled: !hasActiveDocument || !hasSelection });
+        items.push({ label: 'Paste', onClick: onPaste, disabled: !hasActiveDocument });
+        items.push({ label: 'Delete', onClick: onDelete, disabled: !hasActiveDocument || !hasSelection });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Select All', disabled: true });
-        items.push({ label: 'Find...', disabled: true });
-        items.push({ label: 'Replace...', disabled: true });
+        items.push({ label: 'Select All', onClick: onSelectAll, disabled: !hasActiveDocument });
+        items.push({ label: 'Find...', onClick: onFind, disabled: !hasActiveDocument });
+        items.push({ label: 'Replace...', onClick: onReplace, disabled: !hasActiveDocument });
         break;
       case 'view':
         items.push({ label: 'Toggle Theme', onClick: onToggleTheme, disabled: false });
         items.push({
           label: isSidebarVisible ? 'Hide Sidebar' : 'Show Sidebar',
           onClick: onToggleSidebar,
-          disabled: false,
+          disabled: !onToggleSidebar,
         });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Zoom In', disabled: true });
-        items.push({ label: 'Zoom Out', disabled: true });
-        items.push({ label: 'Reset Zoom', disabled: true });
+        items.push({ label: 'Zoom In', onClick: onZoomIn, disabled: !onZoomIn });
+        items.push({ label: 'Zoom Out', onClick: onZoomOut, disabled: !onZoomOut });
+        items.push({ label: 'Reset Zoom', onClick: onZoomReset, disabled: !onZoomReset });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Show/Hide Panels', disabled: true });
+        if (onTogglePanel && panelVisibility) {
+          VIEW_PANELS.forEach(p => {
+            items.push({
+              label: p.label,
+              onClick: () => onTogglePanel(p.key),
+              disabled: false,
+              checked: !!panelVisibility[p.key],
+            });
+          });
+        } else {
+          items.push({ label: 'Show/Hide Panels', disabled: true });
+        }
         break;
       case 'compile':
         items.push({ label: 'Compile (F7)', onClick: onCompile, disabled: false });
         items.push({ label: 'Compile & Play (F5)', onClick: onCompileAndPlay, disabled: false, key: 'bold' });
         items.push({ label: 'Stop Compilation', onClick: () => {}, disabled: false });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'Compile to VGM', disabled: true });
-        items.push({ label: 'Compile to XGM', disabled: true });
-        items.push({ label: 'Compile to ZGM', disabled: true });
+        items.push({
+          label: 'Compile to VGM',
+          onClick: onSetOutputFormat ? () => onSetOutputFormat('vgm') : undefined,
+          disabled: !onSetOutputFormat,
+          checked: outputFormat === 'vgm',
+        });
+        items.push({
+          label: 'Compile to XGM',
+          onClick: onSetOutputFormat ? () => onSetOutputFormat('xgm') : undefined,
+          disabled: !onSetOutputFormat,
+          checked: outputFormat === 'xgm',
+        });
+        items.push({
+          label: 'Compile to XGM2',
+          onClick: onSetOutputFormat ? () => onSetOutputFormat('xgm2') : undefined,
+          disabled: !onSetOutputFormat,
+          checked: outputFormat === 'xgm2',
+        });
+        items.push({
+          label: 'Compile to ZGM',
+          onClick: onSetOutputFormat ? () => onSetOutputFormat('zgm') : undefined,
+          disabled: !onSetOutputFormat,
+          checked: outputFormat === 'zgm',
+        });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Output Format Settings...', disabled: true });
-        items.push({ label: 'Compile Options...', disabled: true });
+        items.push({
+          label: 'Compile Options...',
+          onClick: onShowPanel ? () => onShowPanel('compileOptions') : undefined,
+          disabled: !onShowPanel,
+        });
+        items.push({
+          label: 'Advanced Options...',
+          onClick: onOpenAdvancedCompileOptions,
+          disabled: !onOpenAdvancedCompileOptions,
+        });
         break;
       case 'play':
         items.push({ label: 'Play (F5)', onClick: onCompileAndPlay, disabled: false, key: 'bold' });
@@ -224,17 +390,76 @@ const MenuBar: React.FC<MenuBarProps> = ({
         items.push({ label: 'Play from Start', disabled: true });
         items.push({ label: 'Play Selection', disabled: true });
         items.push({ label: 'Separator', disabled: true });
+        // Playback speed
+        if (onSetPlaybackRate) {
+          const rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+          rates.forEach(rate => {
+            items.push({
+              label: `Speed ${Math.round(rate * 100)}%`,
+              onClick: () => onSetPlaybackRate(rate),
+              disabled: false,
+              checked: playbackRate === rate,
+            });
+          });
+          items.push({ label: 'Separator', disabled: true });
+        }
+        // Loop toggle
+        items.push({
+          label: 'Loop',
+          onClick: onToggleLoop,
+          disabled: !onToggleLoop,
+          checked: !!isLooping,
+        });
+        items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Playback Settings...', disabled: true });
-        items.push({ label: 'Audio Settings...', disabled: true });
+        items.push({
+          label: 'Audio Settings...',
+          onClick: onOpenAudioSettings,
+          disabled: !onOpenAudioSettings,
+        });
         break;
       case 'tools':
-        items.push({ label: 'Part Counter', disabled: true });
-        items.push({ label: 'Error List', disabled: true });
-        items.push({ label: 'Folder Tree', disabled: true });
+        items.push({
+          label: 'Part Counter',
+          onClick: onShowPanel ? () => onShowPanel('partCounter') : undefined,
+          disabled: !onShowPanel,
+        });
+        items.push({
+          label: 'Error List',
+          onClick: onShowPanel ? () => onShowPanel('errorList') : undefined,
+          disabled: !onShowPanel,
+        });
+        items.push({
+          label: 'Folder Tree',
+          onClick: onShowPanel ? () => onShowPanel('folderTree') : undefined,
+          disabled: !onShowPanel,
+        });
         items.push({ label: 'Separator', disabled: true });
-        items.push({ label: 'MIDI Settings...', disabled: true });
-        items.push({ label: 'Key Bindings...', disabled: true });
-        items.push({ label: 'Preferences...', disabled: true });
+        items.push({
+          label: 'MIDI Settings...',
+          onClick: onOpenMidiSettings,
+          disabled: !onOpenMidiSettings,
+        });
+        items.push({
+          label: 'HID MIDI Controller... (Experimental)',
+          onClick: onOpenHIDSettings,
+          disabled: !onOpenHIDSettings,
+        });
+        items.push({
+          label: 'Hardware Serial... (Experimental)',
+          onClick: onOpenSerialSettings,
+          disabled: !onOpenSerialSettings,
+        });
+        items.push({
+          label: 'Key Bindings...',
+          onClick: onOpenKeyBindings,
+          disabled: !onOpenKeyBindings,
+        });
+        items.push({
+          label: 'Preferences...',
+          onClick: onOpenPreferences,
+          disabled: !onOpenPreferences,
+        });
         break;
       case 'examples':
         EXAMPLE_FILES.forEach((example) => {
@@ -242,14 +467,18 @@ const MenuBar: React.FC<MenuBarProps> = ({
         });
         break;
       case 'help':
-        items.push({ label: 'Help Topics', disabled: true });
-        items.push({ label: 'MML Reference', disabled: true });
-        items.push({ label: 'About...', disabled: true });
+        items.push({ label: 'Help Topics', onClick: onOpenHelp, disabled: !onOpenHelp });
+        items.push({ label: 'MML Reference', onClick: onOpenMmlReference, disabled: !onOpenMmlReference });
+        items.push({ label: 'About...', onClick: onOpenAbout, disabled: !onOpenAbout });
+        items.push({ label: 'Check for Updates', disabled: true });
         break;
     }
     return items;
   }, [
     onNewDocument,
+    onSave,
+    onSaveAs,
+    onExit,
     onToggleTheme,
     onToggleSidebar,
     isSidebarVisible,
@@ -259,6 +488,44 @@ const MenuBar: React.FC<MenuBarProps> = ({
     onStop,
     isPlaying,
     onLoadExample,
+    onFind,
+    onReplace,
+    onSelectAll,
+    onCut,
+    onCopy,
+    onPaste,
+    onDelete,
+    onUndo,
+    onRedo,
+    onExportBinary,
+    hasActiveDocument,
+    hasMultipleDocuments,
+    hasSelection,
+    canUndo,
+    canRedo,
+    hasCompileResult,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
+    onSetOutputFormat,
+    outputFormat,
+    onShowPanel,
+    onTogglePanel,
+    panelVisibility,
+    onSetPlaybackRate,
+    playbackRate,
+    onToggleLoop,
+    isLooping,
+    onOpenAdvancedCompileOptions,
+    onOpenAudioSettings,
+    onOpenMidiSettings,
+    onOpenHIDSettings,
+    onOpenSerialSettings,
+    onOpenKeyBindings,
+    onOpenPreferences,
+    onOpenHelp,
+    onOpenMmlReference,
+    onOpenAbout,
   ]);
 
   const toggleMenu = useCallback((menu: string) => {
@@ -282,7 +549,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
     const items = getMenuItems(menu);
     const isOpen = activeMenu === menu;
     const hasItems = items.length > 0;
-    
+
     return (
       <div className="dropdown" key={menu}>
         <button
@@ -306,10 +573,10 @@ const MenuBar: React.FC<MenuBarProps> = ({
               if (item.label === 'Separator') {
                 return <div className="context-menu-separator" role="separator" key={`sep-${menu}-${index}`} />;
               }
-              
+
               const isActive = activeMenu === menu && activeMenuItemIndex === index;
               const isDisabled = item.disabled || !item.onClick;
-              
+
               return (
                 <div
                   key={`${menu}-${index}`}
@@ -323,6 +590,9 @@ const MenuBar: React.FC<MenuBarProps> = ({
                   ref={(el) => { if (isActive && el) el.focus(); }}
                   style={item.key === 'bold' ? { fontWeight: 'bold' } : undefined}
                 >
+                  <span style={{ width: '1em', display: 'inline-block', flexShrink: 0 }}>
+                    {item.checked ? '✓' : ''}
+                  </span>
                   {item.label}
                 </div>
               );
@@ -347,7 +617,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
 
       {/* Quick Actions */}
       <div style={{ flex: 1 }} />
-      
+
       {/* Compile Button */}
       <button
         className="menu-item"

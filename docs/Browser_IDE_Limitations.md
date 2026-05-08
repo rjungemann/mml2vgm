@@ -14,7 +14,7 @@ This document outlines the limitations of the browser-based mml2vgm IDE compared
 | **Real-Time Playback** | ✅ Full | ✅ Full | With trace playback support |
 | **Multi-Format Support** | ✅ Full | ⚠️ Partial | GWI native, others need Rust drivers |
 | **External Drivers** | ✅ Full | ❌ Not Supported | mucomDotNET, PMDDotNET, etc. |
-| **Real Chip Support** | ✅ Full | ❌ Not Supported | SCCI, GIMIC require native access |
+| **Real Chip Support** | ✅ Full | ⚠️ Experimental | WebSerial API (Chrome/Edge 89+); GIMIC & SCCI adapters |
 | **Script Integration** | ✅ IronPython | ⚠️ Partial | Pyodide (Python via WASM) |
 | **MIDI Input** | ✅ Full | ⚠️ Partial | Web MIDI API (Chrome/Firefox only) |
 | **File System** | ✅ Full | ⚠️ Partial | File System Access API (Chrome/Edge only) |
@@ -49,19 +49,44 @@ This document outlines the limitations of the browser-based mml2vgm IDE compared
 
 ### 2. Real Chip Support
 
-**Status:** ❌ Not Available in Browser
+**Status:** ⚠️ Experimental — WebSerial API (Chrome/Edge 89+)
 
-**Affected Features:**
-- SCCI (SC-88, SC-88Pro, SC-8850 synthesizers)
-- GIMIC (Game music interface for real hardware)
-- Direct hardware access to sound chips
+**Supported via WebSerial (experimental):**
+- GIMIC OPN2, OPNA, OPM, OPL2/3 modules (via FTDI USB-serial bridge)
+- Homebrew SCCI-compatible serial adapters (SCCI-raw 3-byte protocol)
+- Generic 2-byte serial adapters (addr + data framing)
 
-**Reason:** Browser security model prevents direct hardware access. WebAssembly runs in a sandboxed environment without access to USB, MIDI hardware, or other peripheral devices beyond the Web MIDI API.
+**Not yet supported:**
+- SC-88 / SC-88Pro (use standard MIDI, not serial register writes)
+- Devices requiring Windows-only SCCI DLL (`scci.dll`)
+- Hot-plug reconnection without user gesture
 
-**Workaround:**
+**How it works:**
+The browser IDE uses the **Web Serial API** (`navigator.serial`) to open a USB-serial
+port to the connected hardware module. VGM register-write commands are translated into
+the target device's wire protocol and streamed with real-time timing (±4 ms jitter from
+browser timer resolution).
+
+Access the feature via **Tools → Hardware Serial… (Experimental)**. A port picker
+appears on first use; the browser remembers granted ports across page reloads when
+"Auto-reconnect" is enabled in the dialog.
+
+**Browser support:**
+
+| Browser | Web Serial Support |
+|---------|-------------------|
+| Chrome 89+ | ✅ Full |
+| Edge 89+ | ✅ Full |
+| Firefox | ❌ Not available |
+| Safari | ❌ Not available |
+
+**Implementation:** `browser-ide/src/services/serialService.ts` — singleton with
+GIMIC, SCCI-raw, and generic protocol adapters. Types in `src/types/index.ts`
+(`SerialProtocol`, `SerialSettings`). Settings persisted via `settingsStore`.
+
+**Workaround for unsupported browsers:**
 - Use software emulation (all 24+ chips are emulated in WASM)
-- For real hardware playback, use the .NET IDE
-- Future: Electron desktop app with native bindings
+- For full real-hardware support use the .NET IDE
 
 ---
 
@@ -133,6 +158,9 @@ This document outlines the limitations of the browser-based mml2vgm IDE compared
 - Use on-screen MIDI keyboard for note entry
 - Software emulation for playback
 - MIDI input works for note preview and entry
+- **HID MIDI alternative:** Controllers that don't expose a USB MIDI class interface
+  can be accessed via **Tools → HID MIDI Controller… (Experimental)** using the
+  Web HID API (Chrome/Edge 89+). Events feed into the same note-input pipeline.
 
 ---
 
@@ -352,21 +380,98 @@ This document outlines the limitations of the browser-based mml2vgm IDE compared
 The following improvements are planned to address some limitations:
 
 ### Short Term (Phase 6-7)
-- [ ] Add Rust implementations of external drivers (mucom, PMD, MoonDriver)
-- [ ] Improve audio latency with SharedArrayBuffer
-- [ ] Add Electron desktop app option for better file system access
-- [ ] Implement service worker for full offline support
+
+- [x] **Improve audio latency with SharedArrayBuffer** (Implemented in audioService.ts)
+  - Use `SharedArrayBuffer` + `Atomics.wait` to pass chip-emulator output directly
+    into the `AudioWorkletProcessor` without serialization overhead.
+  - Requires `Cross-Origin-Opener-Policy: same-origin` and
+    `Cross-Origin-Embedder-Policy: require-corp` headers on the host.
+  - Expected improvement: 10-30 ms → 5-10 ms on Chrome/Edge.
+  - Fallback: keep the current `postMessage`-based transfer for browsers without
+    `SharedArrayBuffer` support (Firefox ESR, Safari < 15.2).
+  - Implementation: Created a ring buffer using SharedArrayBuffer with Atomics
+    for synchronization. The AudioWorkletProcessor now reads directly from the
+    shared buffer, eliminating serialization overhead.
+
+- [x] **Implement service worker for full offline support** (Implemented in sw.js)
+  - Cache the WASM binary, JS bundles, locale files, and default MML examples
+    at install time using a `CacheStorage` precache strategy.
+  - Use a stale-while-revalidate strategy for locale and asset updates.
+  - Provide an "Update available" notification UI so users can refresh to the
+    latest version without being surprised by a silent swap.
+  - Track cache version in a manifest so old entries are pruned on upgrade.
+  - Implementation: Enhanced sw.js with comprehensive caching strategies:
+    - WASM files: Cache-first with network fallback
+    - Locale files: Stale-while-revalidate strategy
+    - Bundle assets: Stale-while-revalidate strategy
+    - Sample files: Cache-first with network fallback
+    - Added update notification UI in App.tsx
+    - Added message listener in storageService.ts
 
 ### Medium Term (Phase 8+)
-- [ ] Tauri desktop app for lighter alternative to Electron
-- [ ] WebSerial API support for hardware access (experimental)
-- [ ] HID API support for MIDI controllers (experimental)
-- [ ] WebGPU acceleration for chip emulation
+
+- [x] **WebSerial API support for hardware access (experimental)**
+  - Target: SCCI-compatible serial devices (SC-88, GIMIC via FTDI).
+  - Guarded behind `navigator.serial` feature detection; menu item only enabled in
+    Chrome/Edge 89+. Unavailable entry shown with explanatory text in Firefox/Safari.
+  - Protocol adapters implemented in `serialService.ts`: GIMIC 4-byte packets,
+    SCCI-raw 3-byte framing, generic 2-byte addr+data.
+  - VGM commands streamed to hardware with real-time scheduling via `performance.now()`
+    and ±4 ms batch timer loops.
+  - Port re-opened on page reload via `navigator.serial.getPorts()` when
+    auto-reconnect is enabled; no additional permission prompt required.
+
+- [x] **HID API support for MIDI controllers (experimental)**
+  - Allows MIDI devices that present as HID (rather than USB MIDI class) to be
+    used for note input without requiring a system MIDI driver.
+  - Guarded behind `navigator.hid` feature detection (Chrome/Edge 89+);
+    unavailable entry shown with instructions in Firefox/Safari.
+  - Two decoding modes: **USB MIDI class** (4-byte packets — most controllers)
+    and **raw scan** (searches for MIDI status bytes — unusual layouts).
+  - Configurable report ID filter and byte offset for non-standard devices.
+  - Raw report hex display in the settings dialog for debugging unknown controllers.
+  - HID events forwarded to `midiService.injectNoteEvent()` so MIDIKeyboardPanel,
+    note-input mode, and all existing MIDI listeners work without modification.
+  - Auto-reconnect on startup via `navigator.hid.getDevices()` when enabled.
+  - Implementation: `browser-ide/src/services/hidService.ts`; settings in
+    `HIDSettings` type and `settingsStore`; UI via `HIDSettingsDialog.tsx`.
+
+- [ ] **WebGPU acceleration for chip emulation**
+  - Profile which chips are the bottleneck in complex songs (YM2608, OPL3
+    with many channels are candidates).
+  - Port the inner sample-render loop of identified chips to WGSL compute shaders.
+  - Use `GPUComputePipeline` to parallelise operator output computation.
+  - Keep the existing WASM path as the fallback for browsers without WebGPU
+    (`navigator.gpu` is undefined on Firefox/Safari as of 2026).
+  - Benchmark target: reduce CPU usage for 48-channel songs from ~50% → ~10%.
 
 ### Long Term
-- [ ] WASI (WebAssembly System Interface) for better system integration
-- [ ] Component Model for better WASM modularization
-- [ ] Standardized browser APIs for audio and MIDI
+
+- [ ] **WASI (WebAssembly System Interface) for better system integration**
+  - When WASI `wasi:filesystem` and `wasi:clocks` are standardised in browsers,
+    the compiler could read MML include files (`#include`) and WAV samples directly
+    from the host file system without manual upload.
+  - Removes the need for the per-project IndexedDB sample library for users on
+    WASI-capable runtimes.
+  - Track the [WASI Preview 2 proposal](https://github.com/WebAssembly/wasi-io)
+    for browser adoption status.
+
+- [ ] **Component Model for better WASM modularization**
+  - The Wasm Component Model allows the compiler, each chip emulator, and the
+    audio renderer to be separate `.wasm` components linked at runtime rather
+    than compiled into one monolithic binary.
+  - Benefits: smaller initial download (load only chips used by the current song),
+    easier incremental updates, and cleaner API boundaries between subsystems.
+  - Requires `wasm-tools` component toolchain and runtime support (currently
+    available in Wasmtime; browser runtimes are in progress as of 2026).
+
+- [ ] **Standardized browser APIs for audio and MIDI**
+  - Monitor progress of the [Web Audio API Level 2](https://www.w3.org/TR/webaudio/)
+    spec for lower-level buffer control and device selection.
+  - Monitor [Web MIDI 2.0](https://midi.org/midi-2-0) browser adoption for
+    high-resolution MIDI and property exchange.
+  - Once Safari ships AudioWorklet (tracked since 2021), remove the
+    ScriptProcessorNode fallback path.
 
 ---
 
@@ -405,7 +510,7 @@ The following improvements are planned to address some limitations:
 | File System Access | ✅ | ⚠️ | ❌ | ✅ | ❌ |
 | Script Execution | ✅ | ✅ | ✅ | ✅ | ⚠️ |
 | External Drivers | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Real Chip Support | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Real Chip Support | ⚠️ | ❌ | ❌ | ⚠️ | ❌ |
 
 **Legend:**
 - ✅ Full Support

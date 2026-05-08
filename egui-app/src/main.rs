@@ -3,6 +3,7 @@ mod audio;
 mod compiler;
 mod document;
 mod editor;
+mod highlight;
 mod midi;
 mod panels;
 mod settings;

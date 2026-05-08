@@ -17,7 +17,6 @@ The project consists of three main components:
 | **[Browser IDE](browser-ide/)** | ✅ Complete | Web-based IDE with Monaco Editor, WASM compilation |
 | **[Rust CLI](mml2vgm-rs/)** | 🚧 Active Development | Cross-platform CLI compiler in Rust |
 | **[egui Desktop](egui-app/)** | ✅ Active | Native Rust desktop IDE (egui + rodio + midir) |
-| **[Tauri Desktop](tauri-app/)** | ⚠️ Deprecated | Replaced by egui-app; retained until egui smoke tests pass |
 
 ---
 
@@ -69,19 +68,6 @@ just egui-dev
 ```
 
 Requires: Rust 1.70+
-
-### Option 3 (Deprecated): Tauri Desktop App
-
-> **Note:** The Tauri desktop app is deprecated and will be removed once the egui app
-> passes smoke tests. Use `egui-app` instead.
-
-```bash
-cd tauri-app
-npm install
-npm run tauri:dev
-```
-
-Requires: Node.js 18+, Rust 1.70+, [Tauri CLI](https://tauri.app/)
 
 ### Option 3: Rust CLI (Development)
 
@@ -149,14 +135,6 @@ mml2vgm/
 │   │   ├── socket.rs             # TCP socket interface (--socket flag)
 │   │   └── panels/               # UI panels
 │   └── Cargo.toml                # Dependencies
-│
-├── tauri-app/                    # ⚠️ DEPRECATED — Desktop application (Tauri)
-│   │                             #   Replaced by egui-app; will be removed
-│   ├── src/                      # Frontend (loads browser-ide)
-│   ├── src-tauri/                # Rust backend
-│   │   └── src/main.rs           # Tauri entry point
-│   ├── tauri.conf.json           # Tauri configuration
-│   └── package.json              # Dependencies
 │
 ├── mml2vgmTest/                  # Test data (VGM samples, etc.)
 │   └── samples/                  # Test MML and VGM files
@@ -249,14 +227,6 @@ See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
   - Enable in Chrome/Edge flags: `#enable-experimental-web-platform-features`
   - Or set headers: `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`
 
-### Tauri Desktop App
-- **Node.js** 18 or later
-- **Rust** 1.70 or later
-- **Tauri CLI** (`npm install -g @tauri-apps/cli`)
-- macOS: Xcode command line tools
-- Windows: Visual Studio 2022 (for Rust)
-- Linux: GCC, libwebkit2gtk, libgtk-3
-
 ### Rust CLI
 - **Rust** 1.70 or later
 - **wasm-pack** (for WASM build)
@@ -273,7 +243,6 @@ See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
 | [Browser_IDE_Limitations.md](docs/Browser_IDE_Limitations.md) | Known limitations and workarounds |
 | [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) | Rust CLI development plan |
 | [Cloudflare_Pages_Deployment.md](docs/Cloudflare_Pages_Deployment.md) | Cloudflare Pages hosting guide |
-| [Tauri_Desktop_Setup.md](docs/Tauri_Desktop_Setup.md) | Tauri desktop app setup guide |
 | [MML_Commands.md](docs/MML_Commands.md) | MML command reference |
 | [ZGM_Specification.md](docs/ZGM_Specification.md) | ZGM format specification |
 | [External_Driver_Support.md](docs/External_Driver_Support.md) | External driver support details |
@@ -297,14 +266,6 @@ cd mml2vgm-rs
 cargo build          # Build library
 cargo test           # Run tests
 wasm-pack build      # Build WASM module
-```
-
-### Tauri Desktop
-```bash
-cd tauri-app
-npm install
-npm run tauri:dev    # Start development
-npm run tauri:build  # Build desktop app
 ```
 
 ---

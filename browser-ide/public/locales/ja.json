@@ -71,7 +71,28 @@
     "midiKeyboard": "MIDIキーボード",
     "debug": "デバッグ",
     "script": "スクリプト",
-    "log": "出力ログ"
+    "log": "出力ログ",
+    "samples": "サンプル"
+  },
+  "samples": {
+    "uploadBtn": "WAVをアップロード…",
+    "dragHint": "または .wav ファイルをここにドラッグ＆ドロップ",
+    "noDocument": "ドキュメントが開かれていません。サンプルを管理するにはドキュメントを開くか作成してください。",
+    "noSamples": "サンプルはまだアップロードされていません。",
+    "referenced": "参照済み",
+    "missing": "このドキュメントで参照されているサンプルが見つかりません:",
+    "nearLimit": "プロジェクトのストレージが 64 MB の上限に近づいています。不要なサンプルを削除して空き容量を増やしてください。",
+    "onlyWav": ".wav ファイルのみ対応しています。",
+    "alreadyExists": "はすでに存在します。",
+    "overwrite": "上書き",
+    "rename": "名前を変更…",
+    "skip": "スキップ",
+    "saveAs": "名前を付けて保存:",
+    "save": "保存",
+    "back": "戻る",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "more": "他{{count}}件"
   },
   "status": {
     "ready": "準備完了",

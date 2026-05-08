@@ -29,8 +29,10 @@ use mml2vgm::{
     ALL_OUTPUT_FORMATS, ALL_SOUND_CHIPS, CompileOptions, OutputFormat, SoundChip,
     compiler::compiler::MmlCompiler,
     compiler::lexer,
+    compiler::sample_resolver::MemorySampleResolver,
     error::MmlError,
 };
+use std::collections::HashMap as StdHashMap;
 use wasm_bindgen::prelude::*;
 
 // ============================================================================
@@ -123,6 +125,54 @@ pub fn compile_mml(mml: &str, options_json: &str) -> Result<JsCompileResult, JsV
             let info = result.info;
             let chips_json = serde_json::to_string(&info.chips_used).unwrap();
             
+            Ok(JsCompileResult {
+                data: result.data,
+                part_count: info.part_count,
+                command_count: info.command_count,
+                duration_samples: info.duration_samples,
+                duration_seconds: info.duration_seconds,
+                chips_used: chips_json,
+            })
+        }
+        Err(e) => Err(JsValue::from_str(&format!("Compilation error: {}", e))),
+    }
+}
+
+/// Compile MML source code with pre-decoded PCM samples.
+///
+/// # Arguments
+/// * `mml` - The MML source code
+/// * `options_json` - JSON string containing CompileOptions
+/// * `samples_json` - JSON object mapping filename → array of f32 PCM samples,
+///   e.g. `{ "str.wav": [0.0, 0.1, ...] }`.  Only VGM output embeds samples;
+///   other formats ignore this argument.
+///
+/// # Returns
+/// Same `JsCompileResult` as `compile_mml`.
+#[wasm_bindgen(catch)]
+pub fn compile_with_samples(
+    mml: &str,
+    options_json: &str,
+    samples_json: &str,
+) -> Result<JsCompileResult, JsValue> {
+    let options: CompileOptions = match serde_json::from_str(options_json) {
+        Ok(opts) => opts,
+        Err(e) => return Err(JsValue::from_str(&format!("Invalid options: {}", e))),
+    };
+
+    // Deserialise samples map: { "filename.wav": [f32, f32, ...] }
+    let raw: StdHashMap<String, Vec<f32>> = match serde_json::from_str(samples_json) {
+        Ok(m) => m,
+        Err(e) => return Err(JsValue::from_str(&format!("Invalid samples JSON: {}", e))),
+    };
+
+    let resolver = MemorySampleResolver::new(raw);
+    let compiler = MmlCompiler::new(options);
+
+    match compiler.compile_from_source_with_resolver(mml, &resolver) {
+        Ok(result) => {
+            let info = result.info;
+            let chips_json = serde_json::to_string(&info.chips_used).unwrap();
             Ok(JsCompileResult {
                 data: result.data,
                 part_count: info.part_count,

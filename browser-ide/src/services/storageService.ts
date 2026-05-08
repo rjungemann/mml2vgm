@@ -11,6 +11,11 @@
 // Types
 // ============================================================================
 
+/**
+ * Service Worker update notification callback
+ */
+export type UpdateNotificationCallback = (updateAvailable: boolean, version?: string) => void;
+
 /** Document for offline storage */
 export interface StoredDocument {
     id: string;
@@ -773,6 +778,86 @@ export async function unregisterServiceWorker(): Promise<void> {
         console.log('[SW] Service worker unregistered');
     }
 }
+
+// ============================================================================
+// Service Worker Update Notifications
+// ============================================================================
+
+/**
+ * Callback to notify when service worker update is available
+ */
+let updateNotificationCallback: UpdateNotificationCallback | null = null;
+
+/**
+ * Set callback for service worker update notifications
+ */
+export function setUpdateNotificationCallback(callback: UpdateNotificationCallback): void {
+    updateNotificationCallback = callback;
+}
+
+/**
+ * Setup service worker message listener for update notifications
+ */
+function setupServiceWorkerMessageListener(): void {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            const data = event.data;
+            
+            if (!data || !data.type) {
+                return;
+            }
+            
+            console.log('[SW Message] Received:', data.type);
+            
+            switch (data.type) {
+                case 'SW_UPDATE_AVAILABLE':
+                    console.log('[SW] Update available:', data.version);
+                    if (updateNotificationCallback) {
+                        updateNotificationCallback(true, data.version);
+                    }
+                    break;
+                    
+                case 'UPDATE_AVAILABLE':
+                    console.log('[SW] Update available (from check):', data.version);
+                    if (updateNotificationCallback) {
+                        updateNotificationCallback(true, data.version);
+                    }
+                    break;
+                    
+                case 'NO_UPDATE':
+                    if (updateNotificationCallback) {
+                        updateNotificationCallback(false);
+                    }
+                    break;
+                    
+                case 'LOCALE_UPDATED':
+                    console.log('[SW] Locale updated:', data.path);
+                    // Notify the i18n service to reload the locale
+                    if (window.location.pathname.includes(data.path)) {
+                        window.location.reload();
+                    }
+                    break;
+                    
+                case 'ASSET_UPDATED':
+                    console.log('[SW] Asset updated:', data.path);
+                    // For critical assets, suggest reload
+                    if (data.path.includes('index-') || data.path.includes('wasm')) {
+                        if (updateNotificationCallback) {
+                            updateNotificationCallback(true, 'asset-update');
+                        }
+                    }
+                    break;
+                    
+                case 'CACHE_VERSION':
+                    console.log('[SW] Cache version:', data.version);
+                    break;
+            }
+        });
+    }
+}
+
+// Setup the message listener when the module loads
+setupServiceWorkerMessageListener();
 
 // ============================================================================
 // Singleton Instance

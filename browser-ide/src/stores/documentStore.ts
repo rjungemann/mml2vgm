@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Document, MMLLanguage, CompileError } from '@/types';
 import { formatService, getFormatFromExtension } from '@/services/formatService';
+import { sampleService } from '@/services/sampleService';
 
 // ============================================================================
 // Types
@@ -45,6 +46,9 @@ interface DocumentActions {
     
     // Update document filename
     updateDocumentFilename: (id: string, filename: string) => void;
+    
+    // Update document file handle
+    updateDocumentFileHandle: (id: string, handle: FileSystemFileHandle | undefined) => void;
     
     // Update document language
     updateDocumentLanguage: (id: string, language: MMLLanguage) => void;
@@ -157,23 +161,30 @@ export const useDocumentStore = create<DocumentStore>()(
                 const state = get();
                 const docs = new Map(state.documents);
                 docs.delete(id);
-                
+
                 let newActiveId = state.activeDocumentId;
                 if (newActiveId === id) {
                     newActiveId = docs.keys().next().value || null;
                 }
-                
+
                 set({
                     documents: docs,
                     activeDocumentId: newActiveId,
                 });
+
+                // Clean up IndexedDB samples for this project
+                sampleService.deleteProject(id).catch(console.error);
             },
-            
+
             closeAllDocuments: () => {
+                const state = get();
+                const ids = Array.from(state.documents.keys());
                 set({
                     documents: new Map(),
                     activeDocumentId: null,
                 });
+                // Clean up all associated sample data
+                ids.forEach((id) => sampleService.deleteProject(id).catch(console.error));
             },
             
             setActiveDocument: (id: string) => {
@@ -196,6 +207,17 @@ export const useDocumentStore = create<DocumentStore>()(
                 const doc = state.documents.get(id);
                 if (doc) {
                     const updatedDoc = { ...doc, filename };
+                    set({
+                        documents: new Map(state.documents).set(id, updatedDoc),
+                    });
+                }
+            },
+            
+            updateDocumentFileHandle: (id: string, handle: FileSystemFileHandle | undefined) => {
+                const state = get();
+                const doc = state.documents.get(id);
+                if (doc) {
+                    const updatedDoc = { ...doc, fileHandle: handle };
                     set({
                         documents: new Map(state.documents).set(id, updatedDoc),
                     });

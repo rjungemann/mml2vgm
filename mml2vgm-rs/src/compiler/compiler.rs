@@ -7,6 +7,7 @@ use crate::compiler::ast::{MmlAst, PartDefinition};
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::lexer::Lexer;
 use crate::compiler::parser::Parser;
+use crate::compiler::sample_resolver::{NoopSampleResolver, SampleResolver};
 use crate::compiler::sema::Sema;
 use crate::{CompileOptions, CompileResult, MmlError, MmlResult, OutputFormat};
 use std::collections::HashMap;
@@ -280,6 +281,54 @@ impl MmlCompiler {
             warnings: Vec::new(),
             info,
         })
+    }
+
+    /// Compile MML source code with pre-decoded PCM samples.
+    ///
+    /// Works like `compile_from_source` but passes the resolver to the VGM
+    /// code generator so `'@ P` instruments can embed their PCM data blocks.
+    pub fn compile_from_source_with_resolver(
+        &self,
+        source: &str,
+        resolver: &dyn SampleResolver,
+    ) -> MmlResult<CompileResult> {
+        let source = self.normalize_source(source);
+        let pre = self.preprocess_song_info(&source);
+        let tokens = self.lex(&pre.source)?;
+        let mut ast = self.parse(tokens)?;
+        for (k, v) in pre.metadata {
+            ast.metadata.entry(k).or_insert(v);
+        }
+        self.apply_chip_assignments(&mut ast, &pre.chip_map);
+        let part_count = ast.parts.len();
+        let output_data = self.generate_code_with_resolver(&ast, resolver)?;
+        let info = Self::info_from_vgm(&output_data, part_count);
+        Ok(CompileResult {
+            data: output_data,
+            output_path: None,
+            warnings: Vec::new(),
+            info,
+        })
+    }
+
+    /// Generate code using a sample resolver (VGM only; other formats ignore samples).
+    fn generate_code_with_resolver(
+        &self,
+        ast: &MmlAst,
+        resolver: &dyn SampleResolver,
+    ) -> MmlResult<Vec<u8>> {
+        match self.options.format {
+            OutputFormat::VGM => {
+                let generator = crate::compiler::codegen::vgm::VgmGenerator::from_ast_with_resolver(
+                    ast,
+                    &self.options,
+                    resolver,
+                )?;
+                generator.generate()
+            }
+            // XGM, XGM2, ZGM don't yet support embedded PCM samples; fall through.
+            _ => self.generate_code(ast),
+        }
     }
 
     /// Build CompileInfo from generated output data (VGM only; other formats return defaults).

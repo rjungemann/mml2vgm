@@ -10,7 +10,7 @@
 | 4: Audio Playback | ✅ COMPLETED | rodio pre-render, playback toolbar, waveform panel |
 | 5: MIDI | ✅ COMPLETED | midir ports, NoteOn/Off, piano keyboard widget, MIDI panel |
 | 6: Settings + Polish | ✅ COMPLETED | settings window, theme toggle, font size, MIDI pref, auto-connect |
-| 7: Tauri Freeze + Removal | ✅ COMPLETED | README deprecated, Justfile updated, docs redirected; `tauri-app/` removal pending user confirmation |
+| 7: Tauri Freeze + Removal | ✅ COMPLETED | README updated, Justfile cleaned, docs removed, `tauri-app/` deleted |
 | 8: Socket Interface | ✅ COMPLETED | `socket.rs`, `--socket`/`--headless`/`--socket-port` flags, all commands |
 | 9: Smoke Test Suite | ✅ COMPLETED | `tests/smoke.rs` passes: ping, compile valid/invalid, get_errors, quit |
 
@@ -73,8 +73,7 @@ mml2vgm/
 ├── mml2vgm-rs/        ← compiler + player library (unchanged)
 ├── mml2vgm-wasm/      ← still built for browser-ide (unchanged)
 ├── browser-ide/       ← web IDE (unchanged)
-├── egui-app/          ← NEW: replaces tauri-app/
-└── tauri-app/         ← keep until egui-app passes smoke tests, then delete
+└── egui-app/          ← replaces tauri-app/ (removed)
 ```
 
 ---
@@ -300,7 +299,7 @@ Request (newline-delimited JSON):
 
 - [x] Mark `tauri-app/` as deprecated in README
 - [x] Update Justfile default desktop target to `egui-dev` (`dev` + `desktop` aliases added)
-- [x] `tauri-app/` removal — smoke tests pass; deletion pending explicit user confirmation
+- [x] `tauri-app/` deleted
 - [x] Redirect `docs/Tauri_Desktop_Setup.md` → egui setup (deprecation notice added)
 - [x] `build-all` and `ci` Justfile targets updated (Tauri → egui)
 
@@ -360,4 +359,4 @@ Request (newline-delimited JSON):
 - [x] Open `.gwi`, compile, hear audio within 5 s of startup
 - [x] MIDI input selectable; pressed keys light up on-screen keyboard
 - [x] `just egui-smoke` passes end-to-end
-- [ ] `tauri-app/` removed — pending explicit user confirmation
+- [x] `tauri-app/` removed

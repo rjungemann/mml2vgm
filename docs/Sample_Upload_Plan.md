@@ -1,10 +1,22 @@
 # Plan: PCM Sample Upload for the Browser IDE
 
+## Status
+
+| Phase | Status |
+|-------|--------|
+| 1: Sample Store (IndexedDB) | ✅ COMPLETED |
+| 2: Sample Upload UI | ✅ COMPLETED |
+| 3: Compiler Integration | ✅ COMPLETED |
+| 4: WASM / Rust Side | ✅ COMPLETED |
+| 5: UX Polish | ✅ COMPLETED |
+
+---
+
 ## Goal
 
 Allow users to upload WAV sample files to the browser IDE so that MML/GWI files
 that reference PCM instruments (`'@ P`) can compile successfully in the browser.
-Samples are stored locally in IndexedDB — nothing is sent to a server.
+Samples are stored **per-project in IndexedDB** — nothing is sent to a server.
 
 ---
 
@@ -21,9 +33,20 @@ The C# MML format defines PCM instruments with lines like:
 At compile time the C# compiler reads these WAV files from disk, converts the
 PCM data, and embeds it in the VGM stream.  The browser IDE has no file system
 access during WASM compilation, so these lines currently either error or produce
-silent output.  The fix is a sample library: users upload their WAVs once, the
-IDE stores them in IndexedDB, and the compiler worker receives the binary data
-alongside the MML source string.
+silent output.  The fix is a per-project sample library: users upload their WAVs
+once per project, the IDE stores them in IndexedDB keyed by project, and the
+compiler worker receives the decoded PCM data alongside the MML source string.
+
+---
+
+## Design Decisions
+
+| Question | Decision |
+|----------|----------|
+| Storage backend | **IndexedDB only** — entirely client-side; no server required; compatible with Cloudflare Pages offline deploy |
+| Format support | **WAV only** for now — see [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md) for future OGG/ADPCM/raw-PCM work |
+| WAV decoding | **JS-side** via Web Audio API `decodeAudioData` — avoids embedding a WAV decoder in the WASM binary |
+| Sample scope | **Project-local** — each open document has its own sample library keyed by project ID; no global shared library |
 
 ---
 
@@ -33,82 +56,116 @@ alongside the MML source string.
 User uploads WAV
       │
       ▼
-SampleStore (IndexedDB)
+SampleService.put(projectId, name, wavData)
+      │  Web Audio API decodeAudioData → raw f32 PCM
+      │  Store decoded PCM in IndexedDB (samples store, keyed by projectId)
+      ▼
+IndexedDB { projectId, name, pcm: Float32Array, ... }
       │
-      ▼  (on compile, scan MML for '@ P refs)
-CompilerWorker ◄── { mml: string, samples: Map<name,Uint8Array> }
+      ▼  (on compile: scan MML for '@ P refs)
+compileStore ──► sampleService.resolve(projectId, names)
+      │                       │
+      │          Map<name, Float32Array>
+      ▼
+WorkerService.compile(mml, options, samples)
+      │  postMessage COMPILE { mml, options, samples }
+      ▼
+compilerWorker ──► wasmWrapper.compileMmlWithSamples()
       │
       ▼
-WASM compile_with_samples(mml, samples_js)
+WASM compile_with_samples() → MemorySampleResolver
       │
       ▼
-VGM with embedded PCM data
+VGM with embedded PCM data blocks
 ```
 
 ---
 
-## Phase 1 — Sample Store (IndexedDB)
+## Phase 1 — Sample Store (IndexedDB) ✅ COMPLETED
 
-**Files to create / modify:**
+**Implemented:**
+- `browser-ide/src/services/sampleService.ts` — created; `SampleService` singleton with `put`, `get`, `list`, `delete`, `deleteProject`, `rename`, `resolve`
+- `browser-ide/src/services/storageService.ts` — `DATABASE_VERSION` bumped to 2; `StoredSample` interface added; `samples` object store created in `onupgradeneeded`
+
+**Files created / modified:**
 - `browser-ide/src/services/sampleService.ts` (new)
-- `browser-ide/src/services/storageService.ts` (extend schema)
+- `browser-ide/src/services/storageService.ts` (extended schema)
 
 ### 1.1  Extend the IndexedDB schema
 
-Add a `samples` object store to `storageService.ts`:
+Add a `samples` object store to `storageService.ts`.  The compound key
+`[projectId, name]` isolates each project's samples from other projects:
 
 ```ts
 // in DATABASE_VERSION bump and onupgradeneeded handler:
-db.createObjectStore('samples', { keyPath: 'name' });
+const store = db.createObjectStore('samples', { keyPath: ['projectId', 'name'] });
+store.createIndex('by_project', 'projectId');
 ```
 
 Schema for a stored sample:
 
 ```ts
 export interface StoredSample {
+  projectId: string;     // document path or UUID from documentStore
   name: string;          // filename as it appears in '@ P (e.g. "str.wav")
-  size: number;          // byte length of raw data
-  mimeType: string;      // "audio/wav" or "audio/x-raw-pcm"
-  data: ArrayBuffer;     // raw bytes
+  size: number;          // byte length of original WAV
+  channels: number;      // 1 or 2
+  sampleRate: number;    // native sample rate from WAV header
+  pcm: Float32Array;     // decoded f32 PCM (from Web Audio decodeAudioData)
   uploadedAt: Date;
   updatedAt: Date;
 }
 ```
 
-### 1.2  Create `sampleService.ts`
+WAV decoding happens in `put()` before writing to IndexedDB, using
+`AudioContext.decodeAudioData()`.  The decoded `AudioBuffer` is converted
+to an interleaved `Float32Array` for storage.
 
-Provide:
+### 1.2  Create `sampleService.ts`
 
 ```ts
 class SampleService {
-  /** Store or replace a sample. */
-  async put(name: string, data: ArrayBuffer, mimeType?: string): Promise<StoredSample>;
+  /** Decode a WAV ArrayBuffer and store it under the given project + name. */
+  async put(projectId: string, name: string, wav: ArrayBuffer): Promise<StoredSample>;
 
-  /** Retrieve sample bytes by name. Returns null if not found. */
-  async get(name: string): Promise<StoredSample | null>;
+  /** Retrieve a decoded sample.  Returns null if not found. */
+  async get(projectId: string, name: string): Promise<StoredSample | null>;
 
-  /** List all stored samples (metadata only, no data). */
-  async list(): Promise<Omit<StoredSample, 'data'>[]>;
+  /** List all samples for a project (no PCM data — metadata only). */
+  async list(projectId: string): Promise<Omit<StoredSample, 'pcm'>[]>;
 
-  /** Delete a sample by name. */
-  async delete(name: string): Promise<void>;
+  /** Delete a sample. */
+  async delete(projectId: string, name: string): Promise<void>;
 
-  /** Resolve a set of filenames to their data (for compilation). */
-  async resolve(names: string[]): Promise<Map<string, Uint8Array>>;
+  /** Delete all samples for a project (e.g. when a document is closed/deleted). */
+  async deleteProject(projectId: string): Promise<void>;
+
+  /** Resolve a set of filenames to their PCM for compilation. */
+  async resolve(projectId: string, names: string[]): Promise<Map<string, Float32Array>>;
 }
 ```
 
-> **Size limits:** Enforce a per-file cap (4 MB) and a total-library cap (64 MB)
-> at the `put()` boundary.  Reject with a descriptive error if exceeded.
+> **Size limits:** Enforce a per-file cap (4 MB WAV input) and a per-project cap
+> (64 MB decoded PCM total).  Reject with a descriptive error if exceeded.
+
+### 1.3  Project ID
+
+Use the document's file path (or a UUID stored in `documentStore` for untitled
+documents) as the `projectId`.  The same path used to open a file identifies its
+project across browser sessions.
 
 ---
 
-## Phase 2 — Sample Upload UI
+## Phase 2 — Sample Upload UI ✅ COMPLETED
 
-**Files to create / modify:**
+**Implemented:**
+- `browser-ide/src/components/panels/SamplesPanel.tsx` — created; upload button + drag-and-drop, sample list with referenced/missing badges, inline rename (double-click), delete with confirmation
+- `browser-ide/src/App.tsx` — "Samples" tab added to `bottomTabs` array
+- `browser-ide/src/components/MenuBar.tsx` — not modified (deferred; upload button in panel is sufficient)
+
+**Files created / modified:**
 - `browser-ide/src/components/panels/SamplesPanel.tsx` (new)
-- `browser-ide/src/components/BottomTabs.tsx` (add "Samples" tab)
-- `browser-ide/src/components/MenuBar.tsx` (optional "Upload Samples…" menu item)
+- `browser-ide/src/App.tsx` (Samples tab added)
 
 ### 2.1  `SamplesPanel` features
 
@@ -116,29 +173,35 @@ class SampleService {
 |---|---|
 | Upload button | `<input type="file" multiple accept=".wav">` wrapped in a styled button |
 | Drag-and-drop zone | Accepts `.wav` files dropped onto the panel |
-| Sample list | Name, size, upload date; scrollable |
+| Sample list | Name, size, upload date; scrollable; scoped to the active document's project |
 | Delete button | Per-row; confirmation prompt |
 | Rename | Inline edit of the name key (rename must match `'@ P` string exactly) |
 | Import from folder | Uses `showDirectoryPicker()` (File System Access API); walks the directory and imports all `.wav` files found |
-| Status indicators | "Referenced in document" badge when a loaded GWI references the sample |
+| Status indicators | "Referenced in document" badge when a loaded GWI references the sample; "Missing" badge when a `'@ P` reference has no matching upload |
 
 ### 2.2  "Referenced in document" detection
 
 When the active document changes or is edited, parse `'@ P` lines client-side
-(simple regex: `/'@\s+P\s+\d+\s*,\s*"([^"]+)"/g`) and highlight the sample
+(simple regex: `/'@\s+P\s+\d+\s*,\s*"([^"]+)"/g`) and highlight sample
 names that are currently loaded vs. missing.
 
 ### 2.3  MenuBar addition (optional)
 
 Add an `onUploadSamples` callback and a **File → Upload Samples…** menu item
-that opens a file picker constrained to `.wav`.  This is a convenience alias for
-the panel's upload button.
+that opens a file picker constrained to `.wav`.  Convenience alias for the
+panel's upload button.
 
 ---
 
-## Phase 3 — Compiler Integration
+## Phase 3 — Compiler Integration ✅ COMPLETED
 
-**Files to modify:**
+**Implemented:**
+- `compilerWorker.ts` — `CompileMessage.samples?: Record<string, ArrayBuffer>` added; `handleCompile` reconstructs `Map<string, Float32Array>` and calls `compileMmlWithSamples`
+- `wasmWrapper.ts` — `compileMmlWithSamples` added; uses `compile_with_samples` WASM export if present, otherwise falls back to `compileMml` with per-sample warnings
+- `workerService.ts` — `compile()` accepts `samples?: Map<string, Float32Array>`; converts to `Record<string, ArrayBuffer>` and transfers ArrayBuffers zero-copy via `postMessage(..., transferables)`
+- `compileStore.ts` — before compile, scans MML for `'@ P` references, calls `sampleService.resolve()`, passes resolved `Map<string, Float32Array>` to worker
+
+**Files modified:**
 - `browser-ide/src/worker/compilerWorker.ts`
 - `browser-ide/src/worker/wasmWrapper.ts`
 - `browser-ide/src/services/workerService.ts`
@@ -152,8 +215,8 @@ interface CompileMessage {
   requestId: string;
   mml: string;
   options: any;
-  // NEW: sample name → raw bytes
-  samples?: Record<string, Uint8Array>;
+  // NEW: sample name → decoded f32 PCM
+  samples?: Record<string, Float32Array>;
 }
 ```
 
@@ -162,19 +225,18 @@ interface CompileMessage {
 Before dispatching the compile message:
 
 1. Scan the MML source for `'@ P` references (same regex as §2.2).
-2. Call `sampleService.resolve(referencedNames)` to fetch `Map<string,Uint8Array>`.
+2. Call `sampleService.resolve(projectId, referencedNames)` to fetch
+   `Map<string, Float32Array>`.
 3. Include the result as `samples` in the worker message.
 4. Emit a warning for any referenced names that returned `null`.
 
 ### 3.3  Extend `wasmWrapper.ts`
 
-Add an overload that passes samples to WASM:
-
 ```ts
 export async function compileMmlWithSamples(
   mml: string,
   options: CompileOptions,
-  samples: Map<string, Uint8Array>
+  samples: Map<string, Float32Array>
 ): Promise<CompileResult>;
 ```
 
@@ -184,7 +246,14 @@ affected parts.
 
 ---
 
-## Phase 4 — WASM / Rust Side
+## Phase 4 — WASM / Rust Side ✅ COMPLETED
+
+**Implemented:**
+- `mml2vgm-rs/src/compiler/sample_resolver.rs` — new; `SampleResolver` trait, `MemorySampleResolver` (case-insensitive fallback), `DiskSampleResolver` (stub), `NoopSampleResolver`
+- `mml2vgm-rs/src/compiler/mod.rs` — added `pub mod sample_resolver`
+- `mml2vgm-rs/src/compiler/codegen/vgm.rs` — added `from_ast_with_resolver` + `load_pcm_instruments` (f32 → u8 RF5C164 encoding)
+- `mml2vgm-rs/src/compiler/compiler.rs` — added `compile_from_source_with_resolver` + `generate_code_with_resolver`
+- `mml2vgm-wasm/src/lib.rs` — added `compile_with_samples` WASM export; JSON-deserializes `HashMap<String, Vec<f32>>` → `MemorySampleResolver`
 
 **Files to modify:**
 - `mml2vgm-wasm/src/lib.rs`
@@ -192,36 +261,39 @@ affected parts.
 
 ### 4.1  New WASM export
 
+The JS side passes already-decoded f32 PCM (from `decodeAudioData`), so no WAV
+decoder is needed inside WASM.  This keeps the WASM binary size unchanged.
+
 ```rust
 #[wasm_bindgen]
 pub fn compile_with_samples(
     mml: &str,
     options_json: &str,
-    samples_json: &str,   // JSON: { "str.wav": [u8, u8, ...], ... }
+    // JSON: { "str.wav": [f32, f32, ...], ... }
+    samples_json: &str,
 ) -> JsValue {
-    // deserialize samples map
-    // pass to compiler as a virtual FS overlay
+    // deserialize samples map (name → Vec<f32>)
+    // pass to compiler as MemorySampleResolver
     // return CompileResult JSON
 }
 ```
 
-Accepting samples as a flat JSON array of bytes is simple and avoids JS
-`SharedArrayBuffer` requirements.  For larger files, consider accepting a
-`js_sys::Map` of `Uint8Array` values instead to avoid JSON overhead.
+For large samples, accept a `js_sys::Map` of `js_sys::Float32Array` values
+instead of JSON to avoid serialization overhead.
 
-### 4.2  Virtual file resolver in the Rust compiler
-
-Add a `SampleResolver` trait to `mml2vgm-rs/src/compiler/`:
+### 4.2  `SampleResolver` trait in `mml2vgm-rs`
 
 ```rust
 pub trait SampleResolver {
-    fn resolve(&self, name: &str) -> Option<Vec<u8>>;
+    fn resolve(&self, name: &str) -> Option<Vec<f32>>;
 }
 
+/// Used by WASM: samples pre-decoded on the JS side.
 pub struct MemorySampleResolver {
-    map: HashMap<String, Vec<u8>>,
+    map: HashMap<String, Vec<f32>>,
 }
 
+/// Used by the CLI: reads WAV files from disk and decodes them in Rust.
 pub struct DiskSampleResolver {
     base_dir: PathBuf,
 }
@@ -229,89 +301,94 @@ pub struct DiskSampleResolver {
 
 The PCM instrument codegen path looks up sample data through this trait.
 - CLI uses `DiskSampleResolver` (current behaviour, unchanged).
-- WASM uses `MemorySampleResolver` populated from the incoming samples map.
+- WASM uses `MemorySampleResolver` populated from the JS-decoded samples.
 
 ---
 
-## Phase 5 — UX Polish
+## Phase 5 — UX Polish ✅ COMPLETED
 
-| Item | Description |
-|---|---|
-| Missing sample warning | In ErrorListPanel, show a distinct "Missing sample: str.wav" diagnostic at compile time |
-| Size exceeded warning | In SamplesPanel, show a red banner when near the 64 MB limit |
-| Duplicate name dialog | When uploading a file whose name already exists, prompt: Overwrite / Rename / Cancel |
-| Export | "Download Samples as ZIP" button in SamplesPanel (uses `JSZip` or `fflate`) |
-| Drag onto editor | Drag a `.wav` file onto the editor area to add it to the sample library |
-| Localization | Add sample-panel strings to `public/locales/` |
+**Implemented:**
+- `SamplesPanel.tsx` — duplicate name dialog (Overwrite / Rename… / Skip with queue); size limit warning banner (≥87.5% of 64 MB decoded PCM)
+- `documentStore.ts` — `closeDocument` and `closeAllDocuments` now call `sampleService.deleteProject()` to clean up IndexedDB on document removal
+- `public/locales/en.json`, `public/locales/ja.json` — added `panels.samples` key and full `samples.*` string section
+
+**Deferred (future work):**
+- "Download Samples as ZIP" button (requires `fflate`)
+- Drag `.wav` onto the editor area
+- Missing-sample diagnostic in ErrorListPanel at compile time
+
+| Item | Status | Description |
+|---|---|---|
+| Duplicate name dialog | ✅ Done | Upload queue; Overwrite / Rename… / Skip per conflicting file |
+| Size exceeded warning | ✅ Done | Red banner at ≥87.5% of 64 MB decoded-PCM budget |
+| Localization | ✅ Done | `panels.samples` + `samples.*` keys in `en.json` and `ja.json` |
+| Project cleanup | ✅ Done | `closeDocument` / `closeAllDocuments` delete IndexedDB samples |
+| Export ZIP | ⬜ Deferred | `fflate`-based ZIP download |
+| Drag onto editor | ⬜ Deferred | Drop `.wav` on editor area to add to library |
 
 ---
 
 ## Data Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Browser Main Thread                                      │
-│                                                           │
-│  SamplesPanel ──upload──► SampleService (IndexedDB)       │
-│                                 │                         │
-│  compileStore.compile()         │ resolve(names)          │
-│       │                         ▼                         │
-│       │              Map<string,Uint8Array>                │
-│       │                         │                         │
-│       └─────────────────────────►                         │
-│                                 │                         │
-│                         WorkerService.compile(            │
-│                           mml, options, samples)          │
-└─────────────────────────────────┬───────────────────────┘
-                                  │  postMessage COMPILE
-                                  ▼
-┌──────────────────────────────────────────────────────────┐
-│  Web Worker                                               │
-│                                                           │
-│  compilerWorker.ts                                        │
-│       │                                                   │
-│       └──► wasmWrapper.compileMmlWithSamples()            │
-│                   │                                       │
-│                   ▼                                       │
-│            WASM compile_with_samples()                    │
-│            MemorySampleResolver                           │
-│                   │                                       │
-│                   ▼                                       │
-│            VGM bytes (with PCM data blocks embedded)      │
-└──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Browser Main Thread                                          │
+│                                                               │
+│  SamplesPanel ──upload WAV──► decodeAudioData (Web Audio API) │
+│                                     │ Float32Array            │
+│                                     ▼                         │
+│                             SampleService.put(projectId, ...) │
+│                             IndexedDB { projectId, name, pcm }│
+│                                     │                         │
+│  compileStore.compile()             │ resolve(projectId,names)│
+│       │                             ▼                         │
+│       │                  Map<string, Float32Array>             │
+│       └─────────────────────────────►                         │
+│                                     │                         │
+│                         WorkerService.compile(                │
+│                           mml, options, samples)              │
+└─────────────────────────────────────┬──────────────────────── ┘
+                                      │  postMessage COMPILE
+                                      ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Web Worker                                                   │
+│                                                               │
+│  compilerWorker.ts                                            │
+│       └──► wasmWrapper.compileMmlWithSamples()                │
+│                   │                                           │
+│                   ▼                                           │
+│            WASM compile_with_samples()                        │
+│            MemorySampleResolver (no WAV decode needed)        │
+│                   │                                           │
+│                   ▼                                           │
+│            VGM bytes (with PCM data blocks embedded)          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## File Checklist
 
-| File | Action |
-|---|---|
-| `src/services/sampleService.ts` | Create |
-| `src/services/storageService.ts` | Extend schema (new `samples` store, bump DB version) |
-| `src/components/panels/SamplesPanel.tsx` | Create |
-| `src/components/BottomTabs.tsx` | Add Samples tab |
-| `src/components/MenuBar.tsx` | Add Upload Samples menu item (optional) |
-| `src/worker/compilerWorker.ts` | Extend `CompileMessage` type; pass samples to wrapper |
-| `src/worker/wasmWrapper.ts` | Add `compileMmlWithSamples` export |
-| `src/services/workerService.ts` | Pass samples through to worker |
-| `src/stores/compileStore.ts` | Resolve samples before dispatching |
-| `mml2vgm-wasm/src/lib.rs` | Add `compile_with_samples` WASM export |
-| `mml2vgm-rs/src/compiler/` | Add `SampleResolver` trait + `MemorySampleResolver` |
+| File | Status | Action |
+|---|---|---|
+| `src/services/sampleService.ts` | ✅ Done | Created — project-scoped IndexedDB CRUD + resolve |
+| `src/services/storageService.ts` | ✅ Done | Extended schema: `samples` store, DB version → 2 |
+| `src/components/panels/SamplesPanel.tsx` | ✅ Done | Created |
+| `src/App.tsx` | ✅ Done | Added Samples tab to `bottomTabs` |
+| `src/components/MenuBar.tsx` | ⬜ Deferred | Upload Samples menu item (optional) |
+| `src/worker/compilerWorker.ts` | ✅ Done | Extended `CompileMessage` with `samples` field |
+| `src/worker/wasmWrapper.ts` | ✅ Done | Added `compileMmlWithSamples` with fallback |
+| `src/services/workerService.ts` | ✅ Done | Pass samples through to worker (zero-copy transfer) |
+| `src/stores/compileStore.ts` | ✅ Done | Resolve samples before dispatching |
+| `mml2vgm-wasm/src/lib.rs` | ✅ Done | Added `compile_with_samples` WASM export |
+| `mml2vgm-rs/src/compiler/sample_resolver.rs` | ✅ Done | `SampleResolver` trait + `MemorySampleResolver` + `DiskSampleResolver` + `NoopSampleResolver` |
+| `src/stores/documentStore.ts` | ✅ Done | `closeDocument`/`closeAllDocuments` call `deleteProject` |
+| `public/locales/en.json` | ✅ Done | Added `panels.samples` + `samples.*` strings |
+| `public/locales/ja.json` | ✅ Done | Added `panels.samples` + `samples.*` strings (Japanese) |
 
 ---
 
-## Open Questions
+## Future Work
 
-1. **Format support beyond WAV** — Should raw PCM, ADPCM-encoded, or OGG files
-   be accepted?  The C# compiler accepts WAV only; start with WAV.
-
-2. **WASM binary size** — Embedding a WAV decoder in WASM adds size.  Evaluate
-   whether to decode on the JS side (Web Audio API `decodeAudioData`) and pass
-   raw PCM to WASM, or decode inside Rust.
-
-3. **Shared samples across documents** — The library is global (not per-document).
-   A future enhancement could let users tag samples as "project-local".
-
-4. **Cloudflare Pages / offline** — No server-side storage is needed.  The plan
-   is entirely client-side, compatible with the existing Cloudflare Pages deploy.
+See [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md) for
+planned support beyond WAV: OGG Vorbis, raw PCM, and ADPCM-encoded files.

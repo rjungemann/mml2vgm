@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import type { CompileOptions, CompileError } from '@/types';
 import { WorkerManager, getWorkerManager, resetWorkerManager, configureWorkerManager, preWarmWorkers } from '@/services/workerService';
 import { wasmService } from '@/services/wasmService';
+import { sampleService } from '@/services/sampleService';
 
 // ============================================================================
 // Types
@@ -377,6 +378,37 @@ export const useCompileStore = create<CompileStore>()(
                 // Update progress
                 get().setProgress(10, `Document ready (${documentLookupMs}ms)`);
 
+                // Resolve PCM samples referenced by '@ P lines in the MML source
+                const pcmRefRegex = /'@\s+P\s+\d+\s*,\s*"([^"]+)"/g;
+                const referencedSampleNames: string[] = [];
+                let refMatch: RegExpExecArray | null;
+                while ((refMatch = pcmRefRegex.exec(doc.content)) !== null) {
+                    if (!referencedSampleNames.includes(refMatch[1])) {
+                        referencedSampleNames.push(refMatch[1]);
+                    }
+                }
+
+                let resolvedSamples: Map<string, Float32Array> | undefined;
+                if (referencedSampleNames.length > 0) {
+                    try {
+                        const sampleMap = await sampleService.resolve(request.documentId, referencedSampleNames);
+                        resolvedSamples = new Map<string, Float32Array>();
+                        const missingNames: string[] = [];
+                        sampleMap.forEach((pcm, name) => {
+                            if (pcm !== null) {
+                                resolvedSamples!.set(name, pcm);
+                            } else {
+                                missingNames.push(name);
+                            }
+                        });
+                        if (missingNames.length > 0) {
+                            console.warn(`[compileStore] Missing samples for document ${request.documentId}: ${missingNames.join(', ')}`);
+                        }
+                    } catch (e) {
+                        console.warn('[compileStore] Failed to resolve samples:', e);
+                    }
+                }
+
                 // Try to use WorkerManager if available, otherwise fall back to wasmService
                 const currentState = get();
                 let result;
@@ -390,7 +422,7 @@ export const useCompileStore = create<CompileStore>()(
                     compilePath = 'worker';
                     get().setProgress(20, 'Compiling via worker...');
                     console.log('[compileStore] Using WorkerManager for compilation');
-                    result = await currentState.workerManager.compile(doc.content, request.options);
+                    result = await currentState.workerManager.compile(doc.content, request.options, resolvedSamples);
                 } else {
                     compilePath = 'fallback';
                     get().setProgress(20, 'Compiling on main thread fallback...');

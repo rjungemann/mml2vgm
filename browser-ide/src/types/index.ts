@@ -127,6 +127,8 @@ export interface Document {
     lastCompileTime: Date | null;
     lastCompileSuccess: boolean;
     lastCompileErrors: ErrorContext[];
+    // File System Access API handle for save operations
+    fileHandle?: FileSystemFileHandle;
 }
 
 /** Document state for Monaco Editor */
@@ -214,6 +216,8 @@ export interface SettingsAudio {
     reverbLevel: number;
     loopCount: number;
     fadeOutDuration: number;
+    playbackRate: number;
+    loop: boolean;
 }
 
 /** Audio settings (alias) */
@@ -319,6 +323,36 @@ export interface MidiSettings {
     velocityCurve: 'linear' | 'logarithmic' | 'exponential';
 }
 
+/** WebHID report decoding format */
+export type HIDReportFormat = 'usb-midi-class' | 'raw-scan';
+
+/** WebHID MIDI controller settings (experimental) */
+export interface HIDSettings {
+  /** Enable HID MIDI input */
+  enabled: boolean;
+  /** How to interpret raw HID input reports */
+  reportFormat: HIDReportFormat;
+  /** Report ID to listen to (null = accept all) */
+  reportId: number | null;
+  /** Byte offset into the report where MIDI data starts */
+  byteOffset: number;
+  /** Attempt to reconnect previously granted devices on startup */
+  autoReconnect: boolean;
+}
+
+/** WebSerial protocol variant */
+export type SerialProtocol = 'gimic' | 'scci-raw' | 'generic';
+
+/** WebSerial hardware-access settings (experimental) */
+export interface SerialSettings {
+    /** Baud rate for the serial connection */
+    baudRate: number;
+    /** Protocol adapter to use when encoding register writes */
+    protocol: SerialProtocol;
+    /** Whether to auto-reconnect to the last granted port on startup */
+    autoReconnect: boolean;
+}
+
 /** Key binding */
 export interface KeyBinding {
     command: string;
@@ -349,7 +383,13 @@ export interface IDESettings {
     // MIDI
     midiMode: string;
     midiChannel: number;
-    
+
+    // HID MIDI controllers (experimental)
+    hid: HIDSettings;
+
+    // Serial / Hardware (experimental)
+    serial: SerialSettings;
+
     // UI
     panelVisibility: Record<PanelType, boolean>;
     panelPositions: Record<PanelType, PanelPosition>;
