@@ -1,0 +1,36 @@
+'{
+
+    TitleName   = Tempo Changes
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Demonstrates mid-track tempo changes using the t (or T) command inline.
+; The tempo command can appear anywhere in a part and takes effect immediately.
+; Here a single melody starts slow, accelerates, then decelerates back.
+
+'B1 T80
+
+; Section 1 — slow (T80)
+'B1 v100 l4 o4 c d e f g a b >c
+
+; Accelerate — add t commands between notes to ramp up tempo
+'B1 t100 l4 g f e d
+'B1 t120 l4 c e g >c
+'B1 t140 l4 <b >c d e
+'B1 t160 l4 f g a b
+
+; Peak speed — 16th-note run at T160
+'B1 l16 o5 c d e f g a b >c
+
+; Decelerate back down
+'B1 t140 l8 <b >c d e
+'B1 t120 l4 f e d c
+'B1 t100 l2 e g
+'B1 t80 l1 c

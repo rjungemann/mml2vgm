@@ -1,0 +1,54 @@
+'{
+
+    TitleName   = FM and PSG Combo
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; Combining FM (YM2612) and PSG (SN76489) for a full game-music texture.
+; A1 = FM lead melody, A2 = FM pad harmony, B1 = PSG bass, B2 = PSG hi-hat
+
+; FM lead patch — algorithm 4, moderate attack, clean pluck
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,002,001,000,000
+'@ 031,012,000,007,002,000,000,004,000,000,000
+'@ 004,005
+
+; FM pad patch — algorithm 7, slow attack, detuned for width
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 015,003,000,005,003,008,000,001,002,000,000
+'@ 015,003,000,005,003,008,000,001,006,000,000
+'@ 015,003,000,005,003,008,000,002,002,000,000
+'@ 015,003,000,005,003,000,000,002,006,000,000
+'@ 007,000
+
+'A1 T112
+'A2 T112
+'B1 T112
+'B2 T112
+
+; A1 — FM lead melody, octave 5
+'A1 @0 v100 l8 o5 q6 e r e r g a g e | d r d r f g f d | c r e g >c< b a g | e2. r4
+'A1 @0 l8 o5 q6 e r e r g a b >c< | d r d r f e d c | b4 a4 g4 f4 | e1
+
+; A2 — FM pad harmony, octave 4 (chords)
+'A2 @1 v70 l1 o4 q8 e | d | c | c
+'A2 @1 l1 o4 q8 d | d | g | e
+
+; B1 — PSG bass, walking quarter notes, octave 2
+'B1 v90 l4 o2 e e f+ g | d d e f+ | c c d e | c2 r2
+'B1 l4 o2 d d e f+ | d d e g | g f+ e d | e1
+
+; B2 — PSG hi-hat, eighth-note pulse on high note, octave 6
+'B2 v50 l8 o6 (c r)16 (c r)16

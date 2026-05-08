@@ -1,0 +1,17 @@
+'{
+    TitleName   = Shanghai Alice of Meiji 17
+    Composer    = UI-70
+    Arranger    = Cyris
+    SystemName  = Generic SSG
+    Format      = VGM
+    ClockCount  = 192
+
+    PartAY8910  = A
+}
+
+; Converted from Sitaraba / 3MLE MML format by scripts/convert_sitaraba.mjs
+; Note: l<N>. (dotted default length) is expanded to per-note dots.
+
+'A1 t140l16ababl2r.<l16f+a>c+f+a>c+<<df+a>df+a<eg+b>eg+b<c+eg+>c+eg+<df+a>df+a<c-df+b>df+<c+fg+>c+fg+n61g+fc+<g+ff+a>c+f+a>c+<<df+a>df+a<eg+b>eg+b<c+eg+>c+eg+<df+a>df+a<c-df+b>df+<aa+>cc+dd+ff+g+ab>cc+<af+c+f+n61af+d<a>dabg+ec-ebg+ec+n44c+g+af+d<a>daf+d<al8f+.l16a>cd+f+a>cc+<g+f+l8f.l16n61af+c+f+n61af+d<a>dabg+ec-ebg+ec+n44c+g+af+d<l8a>l16ab+f+c<l8f+.l16c+fg+>c+fg+>l4c+.<<f+.l16f+g+ab>c+f+l8e.f+.c+.<a.l16n49bn49l8f+.l16n49bn49l8f+.l16f+c+c+g+g+al8g+.l16bag+l4f+.l16f+g+ab>c+f+l8e.f+.c+.<a.l16n49bn49l8f+.l16n49bn49l8f+.l16f+c+c+g+g+al8g+.l16bag+l4d+.l16d+ff+g+a+>d+l8c+.d+.<a+.f+.l16n51g+a+l8d+.>l16f<g+a+l8d+.l16d+<a+a+>fff+l8f.l16g+f+fl4d+.l16d+ff+g+a+>d+l8c+.d+.<a+.f+.l16n51g+a+l8d+.>l16f<g+a+l8d+.l16d+<a+a+>fff+df+a>da>cc+<af+c+f+n61af+d<a>dabg+ec-ebg+ec+n44c+g+af+d<a>daf+d<al8f+.l16a>cd+f+a>cc+<g+f+l8f.l16n61af+c+f+n61af+d<a>dabg+ec-ebg+ec+n44c+g+af+d<l8a>l16ab+f+c<l8f+.l16c+fg+>c+fg+>l4c+.
+'A2 t140l1rl4o2f+.d.e.c+.d.c-.c+.f.f+.d.e.c+.d.c-.l8c+.c+.l16c+c+c+c+c+c+l8f+l16f+l8f+.dl16dl8d.el16el8e.c+l16c+l8c+.dl16dl8d.<bl16bl8b.>c+l16c+l8c+.c+l16c+l8c+.f+l16f+l8f+.dl16dl8d.el16el8e.c+l16c+l8c+.dl16dl8d.<bl16bl8b.>c+l16c+l8c+.c+l16c+l8c+.l1r.r.r.r.l8d+l16d+l8d+.d+l16d+l8d+.c+.c+.<a+.a+.>g+.g+.a+.a+.l16<bbbbbbl8>c+.c+.d+d+d+d+.d+.c+.c+.<a+.a+.>g+.g+.a+.a+.<b.b.>d.f.f+l16f+l8f+.dl16dl8d.el16el8e.c+l16c+l8c+.dl16dl8d.<bl16bl8b.>c+l16c+l8c+.c+l16c+l8c+.f+l16f+l8f+.dl16dl8d.el16el8e.c+l16c+l8c+.dl16dl8d.<bl16bl8b.>c+.c+.c+.c+.l1f+
+'A3 t140l1rv6l4o2c+.<a.b.g+.a.f+.f.g+.f+.a.b.g+.a.f+.f.l8f.g+.l4f+.a.b.g+.a.f+.f.g+.n25.a.b.g+.a.f+.f.g+.v8l8>f+l16f+l8f+.f+l16f+l8f+.e.e.c+.c+.<b.b.>c+.c+.l16ddddddl8e.e.f+.f+l16f+l8f+.f+.e.e.c+.c+.<b.b.>c+.c+.l16ddddddl8e.e.l1r.r.r.r.v6l4c+.<a.b.g+.a.f+.f.g+.f+.a.b.g+.a.f+.l2f.l1f+

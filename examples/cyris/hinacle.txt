@@ -1,0 +1,12 @@
+[Title] Hinacle8Miracle (Solo Strings)
+[Source] IOSYS
+[Compose Rank] 9 (565/332/183)
+[Editor] Cyris
+
+MML@
+t160l8o2a+a+a+a+a+>fdcrccccgced+rd+d+d+<agfrfffb+rf4a+a+a+a+a+>fdcrccccgced+rd+d+d+<agf2.r4.a+a+a+a+a+>fd<araaaa>fc<agrgg>d<ga+frfffa+ra+r>d+rd+d+d+n34cdrddddn34cdcrccc<g+a+frb+fb+rab+a>drdddd+fcr<a+ggn39ga+b+brbbbn42ba+r>dcn34fn34d<a+araaa>cf<gr>d<gg>g<g>dn34crcrcrcrfrfr2rd+rd+d+fcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>a+fdd+rd+r<frfr>drdr<g>d<ga+>crcrfcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>a+fdd+rd+r<frfr>drdr<g>d<ga+>crcrfcd+c<a+ra+a+a+4f4a+a+a+a+a+>fdcrccccgced+rd+d+d+<agfrfffb+rf4a+a+a+a+a+>fdcrccccgced+rd+d+d+<agl2.fr4.a+
+,
+l1.rrrrrrrrrrl8rfa+ar2a4r4aa+b+a+r2.frf+r4.f+g+f+fl2.ra+4ar8gl8rfrd+2r4grar4.gagafr4a+b+r16a+r16>cdr2.r<fr4a+ar16a+r16>cdr2rdfc4r2<a+aa+agfgrga+f4r4.dfa+2r2rfr4a+b+r16a+r16>cdr2.r<fr4a+ar16a+r16>cdr2rdfc4r2<a+aa+agfgrga+f4r4.dfa+2r2rfffa+b+r16a+r16frffa+>crdr4.>fdd+dn70drd+dn70drcr<<fffa+b+r16a+r16frffa+>crdr4.>fdd+dn70l2.cr4.<<a+
+,
+l8fffa+b+r16a+r16frffa+>crdr4.>fdd+dn70drd+dn70drcr<<fffa+b+r16a+r16frffa+>crdr4.>fdd+dn70cr1<<a+a+raa+a+raraa+rar16gr16fa+a+raa+a+rfrfa+b+a+r4.a+a+raa+a+raraa+rar16gr16fa+a+raa+a+rfr
+; 

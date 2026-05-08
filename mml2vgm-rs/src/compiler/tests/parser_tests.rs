@@ -326,3 +326,85 @@ fn parse_stress_all_note_variants() {
     let _ast = Parser::new(tokens).parse().expect("parse failed");
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "parse_stress_all_note_variants exceeded timeout");
 }
+
+// ── MIDI note number command ─────────────────────────────────────────────────
+
+#[test]
+fn parse_note_number_middle_c() {
+    // n60 = MIDI 60 = C4 (middle C)
+    let ast = timed_parse("'A1 n60");
+    let part = ast.parts.get("A1").unwrap();
+    let note = part.commands.iter().find_map(|n| {
+        if let MmlNode::Note(note) = n { Some(note) } else { None }
+    }).expect("expected a Note node");
+    assert_eq!(note.letter, 'C');
+    assert_eq!(note.accidental, 0);
+    assert_eq!(note.octave, 4);
+}
+
+#[test]
+fn parse_note_number_csharp2() {
+    // n37 = MIDI 37 = C#2 (as used in Sitaraba/3MLE files)
+    let ast = timed_parse("'A1 n37");
+    let part = ast.parts.get("A1").unwrap();
+    let note = part.commands.iter().find_map(|n| {
+        if let MmlNode::Note(note) = n { Some(note) } else { None }
+    }).expect("expected a Note node");
+    assert_eq!(note.letter, 'C');
+    assert_eq!(note.accidental, 1);  // sharp
+    assert_eq!(note.octave, 2);
+}
+
+#[test]
+fn parse_note_number_b_natural() {
+    // n47 = MIDI 47 = B2
+    let ast = timed_parse("'A1 n47");
+    let part = ast.parts.get("A1").unwrap();
+    let note = part.commands.iter().find_map(|n| {
+        if let MmlNode::Note(note) = n { Some(note) } else { None }
+    }).expect("expected a Note node");
+    assert_eq!(note.letter, 'B');
+    assert_eq!(note.accidental, 0);
+    assert_eq!(note.octave, 2);
+}
+
+#[test]
+fn parse_note_number_does_not_change_octave() {
+    // n37 is C#2; the A that follows should still be at octave 3 (set by o3)
+    let ast = timed_parse("'A1 o3 n37 a");
+    let part = ast.parts.get("A1").unwrap();
+    let notes: Vec<_> = part.commands.iter().filter_map(|n| {
+        if let MmlNode::Note(note) = n { Some(note) } else { None }
+    }).collect();
+    // First note is from n37 (octave 2), second note 'a' should be at octave 3
+    assert_eq!(notes.len(), 2);
+    assert_eq!(notes[0].octave, 2);  // from n37
+    assert_eq!(notes[1].letter, 'A');
+    assert_eq!(notes[1].octave, 3);  // current_octave still 3
+}
+
+#[test]
+fn parse_note_number_dotted() {
+    let ast = timed_parse("'A1 l8 n60.");
+    let part = ast.parts.get("A1").unwrap();
+    let note = part.commands.iter().find_map(|n| {
+        if let MmlNode::Note(note) = n { Some(note) } else { None }
+    }).expect("expected a Note node");
+    assert!(note.dotted, "expected dotted note");
+    assert_eq!(note.letter, 'C');
+}
+
+#[test]
+fn parse_note_number_roundtrip() {
+    // Verify n<N> midi_note() equals the original N for all naturals
+    let naturals = [
+        (0u32, 'C', 0i8), (2, 'D', 0), (4, 'E', 0), (5, 'F', 0),
+        (7, 'G', 0), (9, 'A', 0), (11, 'B', 0),
+    ];
+    for (offset, letter, acc) in &naturals {
+        let midi = 48 + offset; // octave 3
+        let octave = (midi / 12).saturating_sub(1) as u8;
+        let note = crate::compiler::ast::Note::new(*letter, *acc, octave);
+        assert_eq!(note.midi_note(), midi as u8, "roundtrip failed for {}", letter);
+    }
+}

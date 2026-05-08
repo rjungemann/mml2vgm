@@ -1,0 +1,158 @@
+'{
+
+    TitleName   = INVOKE -インヴォーク-
+    Composer    = hertzdevil (adapted for mml2vgm-rs)
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = S
+
+}
+
+; Converted from examples/hertzdevil/invoke.mml
+; Original by hertzdevil (https://www.hertzdevil.info/music.html)
+;
+; === CHANNEL MAPPING ===
+;   PU1 (!1)  -> S1  (PSG tone 1 — lower lead / arpeggio)
+;   PU2 (!2)  -> S2  (PSG tone 2 — upper lead / melody)
+;   WAV (!3)  -> S3  (PSG tone 3 — bass / inner voice)
+;   NOI (!4)  -> S4  (PSG noise, stub)
+;   PCMA (!5) -> dropped  (string ADPCM samples @67-69)
+;   PCMB (!6) -> dropped  (guitar/piano ADPCM @40/@57/@44)
+;
+; === DIFFERENCES / ISSUES ===
+;
+; 1. KEY SIGNATURES — two sections:
+;    Intro: k-beadg (Bb minor: all of b, e, a, d, g are flat)
+;    Loop:  k=beadg k+fcgd (C# minor: f+, c+, g+, d+)
+;    Accidentals manually baked in.  Some = (natural overrides) shown inline.
+;
+; 2. TEMPO CHANGE mid-intro
+;    The intro ends with T158 (slightly slower) for the held note.
+;    Preserved.
+;
+; 3. LEAD SECTION — most affected by stripping.
+;    The $$lead1 / $$lead2 section uses B (pitch bend by cents/semitones),
+;    P (portamento), and _V-3 accent pops on virtually every single note.
+;    Without these the melody sounds mechanical.  Notes are preserved;
+;    the expressive contour is entirely lost.
+;
+; 4. PCMA STRING LAYERS ($$str03/04/05)
+;    These are ADPCM samples playing sustained string pads on top of the
+;    lead.  They are dropped; the conversion sounds noticeably sparse in
+;    those passages.
+;
+; 5. (n) FADE PARENS: "(note)" = note with a fade-out / key-off early.
+;    Stripped to plain notes.
+;
+; 6. STRIPPED COMMANDS: @@, E, P, EP/EPX, _V, B, W, D,
+;    @A/@B/@~, @~X, YL./YLR, @n x, (fade parens).
+
+; =======================================================================
+; Section 1: Intro  (k-beadg = Bb minor: b-,e-,a-,d-,g-)
+;
+; PULSE plays a dotted-8th run across PU1/PU2 at T102, then a sustained
+; f1~f1 at T158.
+; WAV plays a bass arpeggiated figure.
+; =======================================================================
+
+'S2 T102 o4 v59 l8
+'S2 f. e-. f a-4 b-4 e-4 a-4 f4. f
+'S2 g-4. f16 e-16 f4 d-4 e-. <b-. >e-
+'S2 T158 f1 ~f1
+
+'S1 T102 o3 v51 l8
+'S1 f. e-. f a-4 b-4 e-4 a-4 f4. f
+'S1 g-4. f16 e-16 f4 d-4 e-. <b-. >e-
+'S1 T158 f1 ~f1
+
+; WAV bass: inner voice (Bb minor, with g= natural override in bar 3)
+'S3 T102 o1 v17 l8
+'S3 b- >f b- f <g- >d- g- g-
+'S3 <a- >e- a- e- d- a- >d-4
+'S3 <e- b- >e-4 <<b- >f b- f <g- e- g4
+'S3 T158 <<f1 ~f1
+
+'S4 T102 r1 r1 r1 r2 T158 r1 r1
+
+; =======================================================================
+; L = loop point  (k=beadg k+fcgd = C# minor: f+, c+, g+, d+)
+; =======================================================================
+
+'S1 L
+
+; =======================================================================
+; Section 2: C# minor arpeggio  (loop section start)
+;
+; PU1: arpeggio runs on beat-pairs + long sustain notes
+; PU2: lighter harmonic arpeggio + sustained d+
+; Keys: f+,c+,g+,d+; c= = C natural; d= = D natural
+; =======================================================================
+
+'S1 T102 o2 v42
+'S1 l4  b a l16 e g+ b >e g+ e <b g+
+'S1 l4  a g+ l16 c+ f+ a >c+ f+ c+ <a f+
+'S1 l4  >c c+ d+ c< l16
+'S1 v76 l4
+'S1 c+. <f+. b. e. a. >d.
+
+'S2 T102 o3 v68
+'S2 l4 b a g+2 a g+ f+2 >c c+ d+ c
+'S2 l8 d+ ~d+2.
+
+; WAV inner voice (C# minor: f+,c+,g+,d+)
+'S3 T102 o0 v17 l16
+'S3 b  a  g+  g+  a  g+  f+  f+
+'S3 g+ a+ >c  <g+
+'S3 l4
+'S3 >c+ f+ <b >e+ <a >d+<
+
+; =======================================================================
+; Section 3: Lead melody  (C# minor, k+fcgd)
+;
+; $$PULSE plays both PU1 and PU2 simultaneously with different harmonies.
+; PU2 = upper voice (c+, b, c+, b...),  PU1 = lower voice (e+, g+...).
+; B / P / _V accent commands stripped; raw notes only.
+; =======================================================================
+
+'S2 v68 l8 o4
+'S2 >c+ <b >c+. <b. >c4 <b >c <b >c ~c b
+'S2 >c. <b >c+ ~c c16 c+ <b16 >e c4 <b16 b16
+'S2 >c16 c <b >c32 ~c ~c <b. >c. <b. >c d r16 g+4
+'S2 e+32 ~f16. ~f e16 d32 ~d8. d32 ~e. ~e32 e c4. r8
+'S2 e16 e8. d16 e8. d16 ~d4 d ~e e d4 e16 e r
+'S2 f. e16 d. c16 d. c. c <b4. ~b r4.
+'S2 b >f. e f4 g a4 g. f16 f.
+'S2 c4 e. f16 e d4 d ~c4. c r4.
+
+'S1 v42 l8 o3
+'S1 >c+ <b >c+. <b. >c4 <b >c <b >c ~c b
+'S1 >c. <b >c+ ~c c16 c+ <b16 >e c4 <b16 b16
+'S1 g16 g8. f16 g8. x16 f4 g f4 g16 g
+'S1 a g16 f. e16 f. e. e d4. r4.
+'S1 d c. <b >c4 e f4 e. c16 c.
+'S1 e4 g. a16 g f4 f e4. r4.
+
+; final flourish (PULSE unison)
+'S2 l16 c d c d d e- f16 e16. e16_
+'S1 l16 c d c d d e- f16 e16. e16_
+
+; =======================================================================
+; Section 4: Sustain / return (C# minor → Bb minor echo)
+;
+; Original: V9 D0 long _V-3 x32~x24 sustain notes.
+; Here: simple long note sequence.
+; =======================================================================
+
+'S1 v76 l4 o3
+'S1 c+. <f+. b. e. a. >d.
+
+'S2 v51 l4 o3
+'S2 c+. <f+. b. e. a. >d.
+
+'S3 v17 l1 o0
+'S3 c+ <f+ b >e <a >d
+
+'S4 r1 r1 r1 r1 r1 r1

@@ -1,0 +1,26 @@
+'{
+
+    TitleName   = PSG Demo
+    Composer    = Tutorial
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Three SN76489 PSG voices: melody, counter-melody, and bass
+
+; Melody: ascending then descending arpeggio
+'B1 T140
+'B1 v100 l8 o4 c e g >c < b g e c r4
+
+; Counter-melody: offset by one beat
+'B2 T140
+'B2 v80 l8 o3 r4 e g b >e d b g e
+
+; Bass: root notes on each beat
+'B3 T140
+'B3 v70 l4 o2 c r c r

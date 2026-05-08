@@ -1,0 +1,263 @@
+'{
+
+    TitleName   = The Wings of a Boy that Killed Adolescence
+    Composer    = hertzdevil (adapted for mml2vgm-rs)
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = S
+
+}
+
+; Converted from examples/hertzdevil/heero.mml
+; Original by hertzdevil (https://www.hertzdevil.info/music.html)
+; Japanese title: 思春期を殺した少年の翼
+;
+; === CHANNEL MAPPING ===
+;   PU1 (!1)  -> S1  (PSG tone 1 — lower lead voice)
+;   PU2 (!2)  -> S2  (PSG tone 2 — upper lead voice)
+;   WAV (!3)  -> S3  (PSG tone 3 — inner bass voice)
+;   NOI (!4)  -> S4  (PSG noise, stub)
+;   PCMA (!5) -> dropped  (ADPCM hi-hat / snare samples)
+;   PCMB (!6) -> dropped  (PCM bass / guitar samples)
+;
+; === DIFFERENCES / ISSUES ===
+;
+; 1. KEY SIGNATURE CHANGES — this is the hardest track to convert.
+;    heero.mml goes through five distinct key areas:
+;      a) _0       A minor  (no accidentals)
+;      b) k-bea    C minor  (b-, e-, a-)
+;      c) k=bea k+f  E minor  (f+ only)
+;      d) k=f k-bea  C minor  (b-, e-, a-)
+;      e) k-d      F minor  (b-, e-, a-, d-)
+;      f) k=bead k+f  E minor  (f+ only)
+;    The original mml2vgm k command adjusts ALL subsequent notes until
+;    changed; there is no equivalent in mml2vgm-rs.  Accidentals have
+;    been manually applied per section below.  A few chromatic overrides
+;    using = (natural) — e.g. a= in k-bea meaning A natural — are noted
+;    inline.
+;
+; 2. THE WAV CHANNEL uses the (x24) notation: wave-channel silence
+;    interrupts inserted between notes to simulate staccato.  These are
+;    stripped; the WAV voice here just plays the note pitch as-is.
+;    The "bass1" macro (@A3 @B0 @~4) sets the wave shape to a custom
+;    sawtooth — not representable on SN76489.
+;
+; 3. $$PULSE notation: in the original, $$PULSE writes the same MML to
+;    both PU1 and PU2 simultaneously (they share the data but have
+;    different instrument/envelope settings).  Here S1 and S2 are given
+;    the same note sequence with slightly different volumes.
+;
+; 4. _V-N ACCENT POPS: in the original, _V-7x6r_V7 creates a
+;    short volume dip then recovery after each note — giving a percussive
+;    accent.  These are stripped entirely.
+;
+; 5. PCMB bass (slides from e1f1f+1...) uses pitch-bent sustain with
+;    @11 (bass sample).  Approximated in S3 as whole-note pitches.
+;
+; 6. STRIPPED COMMANDS: @@, E, P, EP/EPX, _V, B, W, D,
+;    @A/@B/@~, YL./YLR, @n x, (fade parens).
+
+; =======================================================================
+; Section 1: Intro  (_0 = A minor)
+;
+; $$PULSE plays the intro arpeggio hook in 12th/6th-note triplets.
+; Pattern: A C A G# C G# G C G G# C G# | A B C D D(1/6) E(1/3) G#(1/6) A fade
+; =======================================================================
+
+'S2 T165 o2 v85 l12
+'S2 a >c <a g+ >c <g+ g >c <g g+ >c <g+
+'S2 a b >c d d6 e3 g+6 a ~a ~a ~a r2.
+
+'S1 T165 o2 v68 l12
+'S1 a >c <a g+ >c <g+ g >c <g g+ >c <g+
+'S1 a b >c d d6 e3 g+6 a ~a ~a ~a r2.
+
+; PCMB bass approximation (whole-note bass notes)
+'S3 T165 o0 v17 l1
+'S3 a a a a r2.
+
+'S4 T165 r1 r1 r1 r2.
+
+; =======================================================================
+; L = loop point
+; =======================================================================
+
+'S1 L
+
+; =======================================================================
+; Section 2: Main melody  (_0 = A minor)
+;
+; PU2 upper voice (melody), PU1 lower voice (harmony a 3rd below).
+; _V accent pops stripped; note durations preserved.
+; The `x` tokens (silence pops) after each note are stripped.
+; =======================================================================
+
+'S2 o3 v85 l12
+'S2 a4 c d d+ e4 >c <b >c <a1
+'S2 >d c <b >c4 ~c6 d c <b >c <b a b6 >c <a4
+
+'S2 c d d+ e4 >c <b >c <b6 a3 ~a4
+'S2 >d c <b >c <b a b6 >c <b3 a6 g+2
+
+'S2 a4 c d d+ e4 >c <b >c <a1
+'S2 >d c <b >c4 ~c6 d c <b >c <b a b6 >c <a4
+
+'S2 e g g+ a4 >c <b >c d4 e6 <a2
+'S2 >c <b a b a g a g e d e g g+6 >c <a2
+
+'S1 o3 v68 l12
+'S1 e4 <a a+ b >c4 a g+ a f1
+'S1 a a g+ a4 ~a6 a a g a g f g6 a e4
+
+'S1 <a a+ b >c4 a g+ a g6 f+3 ~f+4
+'S1 b a g a g f g6 a g3 f6 e2
+
+'S1 e4 <a a+ b >c4 a g+ a f1
+'S1 a a g+ a4 ~a6 a a g a g f g6 a e4
+
+'S1 c d d+ e4 a g+ a f+4 g6 f+2
+'S1 a g f g f e e d c <b >c d <g+6 >c <a2
+
+; PCMB bass (ascending whole-note bass under first 4 bars, approximated)
+'S3 o0 v17 l1
+'S3 e f f+ f2 g4 ~g6 e12 ~e1 f+1 f2. ~f6 g2 e12 ~e2
+'S3 e f f+ f2 g4 ~g6 e12 ~e1 f+1 f2 g2
+'S3 g+6 >c4 <a2 r
+
+; =======================================================================
+; Section 3: C minor  (k-bea: b->b-, e->e-, a->a-)
+;
+; PULSE unison lead in C minor.
+; a= means A natural (overrides k-bea for that note).
+; g- means G-flat (explicit, not from key sig).
+; =======================================================================
+
+'S2 o3 v85 l4
+'S2 e-2 c d e- f6 e-1
+'S2 g a- a b- a a- g3 ~g
+'S2 g- a- a b- a a- g-3 ~g-
+'S2 e-2 c d e- f6 g-1
+'S2 g a- a b- a a- g3 ~g
+'S2 b b- >c d- c <b b3 ~b
+
+'S1 o2 v68 l4
+'S1 e-2 c d e- f6 e-1
+'S1 g a- a b- a a- g3 ~g
+'S1 g- a- a b- a a- g-3 ~g-
+'S1 e-2 c d e- f6 g-1
+'S1 g a- a b- a a- g3 ~g
+'S1 b b- >c d- c <b b3 ~b
+
+'S3 o1 v17 l1
+'S3 c c- <b- a-
+'S3 c c- <b- a-
+
+; =======================================================================
+; Section 4: E minor  (k=bea k+f: only f->f+)
+;
+; b, e, a revert to natural; only F becomes F#.
+; b- and d remain unless written explicitly.
+; =======================================================================
+
+'S2 o3 v85 l6
+'S2 b2 g e r2
+'S2 d d+ e g a g b-2 g a r3 b-3 g a r6
+'S2 b2 g e r2
+'S2 d d+ e g a g b-6 a6 g6 b-6 a6 g6
+
+'S1 o3 v68 l6
+'S1 g2 e <b r2
+'S1 a a+ b b >c <b >d2 <b- >c r3 g3 e f+ r6
+'S1 g2 e <b r2
+'S1 a a+ b b >c <b >d6 c6 <b-6 >d6 c6 <b-6
+
+'S3 o1 v17 l1
+'S3 e e e e
+'S3 e e e g
+
+; =======================================================================
+; Section 5: C minor reprise  (k=f k-bea: b-, e-, a-)
+;
+; Two sub-sections:
+;   a) Staccato march figure (g e f g / g d f g / etc.)
+;   b) Rising scale climax (b=2 g a= b= >c d e1...)
+;      b= and a= are B/A naturals overriding k-bea.
+; =======================================================================
+
+; Sub-section a: march
+'S2 o3 v85 l12
+'S2 g e- f g6 e- r6 g d f g6 d r6
+'S2 g e- f g6 e- r6 a- f g a-6 f r6
+'S2 g e- f g6 e- r6 g d f g6 d r6
+'S2 g e- f g6 e- r6 a- g f g6 >c r6
+
+'S1 o2 v68 l12
+'S1 g e- f g6 e- r6 g d f g6 d r6
+'S1 g e- f g6 e- r6 a- f g a-6 f r6
+'S1 g e- f g6 e- r6 g d f g6 d r6
+'S1 g e- f g6 e- r6 a- g f g6 >c r6
+
+; Sub-section b: climax
+'S2 v85 l4
+'S2 <<b2 g a b >c d e1 r4
+'S2 e a g a3 ~a f >c <b >c2 ~c6
+'S2 <b2 g a b >c d e2 ~e3
+
+'S1 v68 l4
+'S1 <<b2 g a b >c d e1 r4
+'S1 e a g a3 ~a f >c <b >c2 ~c6
+'S1 <b2 g a b >c d e2 ~e3
+
+; Final C minor riff: ascending broken chords
+'S2 v85 l8 o2
+'S2 b g b >c+ d e- e+6 <  b g b >c c+ d e-6 <
+'S2 b g b >c+ d e- e+6    g g- f e-4.
+
+'S1 v68 l8 o2
+'S1 b g b >c+ d e- e+6 <  b g b >c c+ d e-6 <
+'S1 b g b >c+ d e- e+6    g g- f e-4.
+
+'S3 o0 v17 l1
+'S3 g g g g
+'S3 g g g g
+
+; =======================================================================
+; Section 6: F minor  (k-d: adds d- to k-bea already in force,
+;             giving b-, e-, a-, d-)
+; =======================================================================
+
+'S2 o3 v85 l16
+'S2 r4 a a a b b b f f f g g g r4 g g g r4
+'S2 r4 a a a b b b f f f g g g r4 g g g r4
+'S2 l12 <b a g a6 f3 b a g a b >c3 ~c
+'S2      <b a g a6 f4 a b >d-2 ~d-
+
+'S1 o2 v68 l16
+'S1 r4 f f f e- e- e- <b b b >d- d- d- r4 d- d- d- r4
+'S1 r4 f f f e- e- e- <b b b >d- d- d- r4 d- d- d- r4
+'S1 l12 <f1 ~f2 g6 a6 b6 d-1 ~d-1
+
+'S3 o0 v17 l1
+'S3 f f f f
+'S3 f f f f
+
+; =======================================================================
+; Section 7: E minor  (k=bead k+f: only f->f+)
+;
+; Oscillating accompaniment figure under a sustained bass melody.
+; =======================================================================
+
+'S1 v42 l8 o3
+'S1 [a g a a+ b >d e- d g e- <b a  a g a a+ b >d e- g8]4
+
+'S2 v25 l8 o3
+'S2 [a g a a+ b >d e- d g e- <b a  a g a a+ b >d e- g8]2
+
+'S3 o1 v17 l1
+'S3 e f g a
+'S3 e f g a
+
+'S4 r1 r1 r1 r1 r1 r1 r1 r1

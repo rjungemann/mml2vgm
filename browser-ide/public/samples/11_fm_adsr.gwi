@@ -1,0 +1,74 @@
+'{
+
+    TitleName   = FM Envelope Design
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+
+}
+
+; FM Envelope (ADSR) Showcase — four patches demonstrating how AR/DR/SL/RR
+; shape the amplitude envelope of a note.
+;
+; AR (Attack Rate)  — how fast the note reaches peak level (31=instant, 0=slow)
+; DR (Decay Rate)   — how fast it falls from peak to sustain (0=no decay)
+; SL (Sustain Level)— the level at which decay stops (0=full, 15=silent)
+; RR (Release Rate) — how fast it fades after key-off  (15=instant, 0=slow)
+
+; @0 — Fast Pluck: instant attack, fast decay, no sustain
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 007,000
+
+; @1 — Sustained Organ: instant attack, no decay, held sustain, fast release
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 007,000
+
+; @2 — Slow Pad: slow attack, no decay, sustained, slow release
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 008,000,000,003,000,000,000,001,000,000,000
+'@ 008,000,000,003,000,000,000,001,000,000,000
+'@ 008,000,000,003,000,000,000,001,000,000,000
+'@ 008,000,000,003,000,000,000,001,000,000,000
+'@ 007,000
+
+; @3 — Percussive Decay: fast attack, fast decay to silence, no sustain
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,010,015,000,000,001,000,000,000
+'@ 031,015,000,010,015,000,000,001,000,000,000
+'@ 031,015,000,010,015,000,000,001,000,000,000
+'@ 031,015,000,010,015,000,000,001,000,000,000
+'@ 007,000
+
+'A1 T80
+'A2 T80
+'A3 T80
+'A4 T80
+
+; A1 — Pluck: note terminates almost immediately (SL=0 means instant decay)
+'A1 @0 v100 l2 o4 c r c r | c r c r | c r c r | c r c1
+
+; A2 — Organ: note rings clearly for its full duration then stops cleanly
+'A2 @1 v100 l2 o4 c r c r | c r c r | c r c r | c r c1
+
+; A3 — Pad: each note blooms slowly; short notes barely sound, long notes shine
+'A3 @2 v80 l4 o4 c4 e4 g4 >c4< | g4 e4 c2 | c4 e4 g2. | c1
+
+; A4 — Percussive: hit and gone, works as a drum tone layer
+'A4 @3 v100 l16 o3 c r r r c r r r c r r r c r r r
+'A4 l16 o3 c r r r c r r r c r r r c r r r r r r r r r r r r r r r c1

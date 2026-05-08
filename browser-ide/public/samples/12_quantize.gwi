@@ -1,0 +1,46 @@
+'{
+
+    TitleName   = Quantize and Gate Time
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; Quantize (gate time) changes how much of each note's duration is "on".
+; q1 = note plays 1/8 of its duration (very staccato)
+; q4 = note plays 4/8 = half (normal separation)
+; q8 = note plays 8/8 = full duration (legato, tied into next note)
+;
+; Lowercase q uses fixed fractions. All three channels play the same melody.
+
+; Simple sustained patch for clear comparison
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 007,000
+
+'A1 T120
+'A2 T120
+'A3 T120
+'B1 T120
+
+; A1 — q1: very staccato — notes are 1/8 of their notated duration
+'A1 @0 v100 l4 o5 q1 c d e f g a b >c< b a g f e d c2. r4
+
+; A2 — q4: moderate separation — notes are half their notated duration
+'A2 @0 v80 l4 o4 q4 c d e f g a b >c< b a g f e d c2. r4
+
+; A3 — q8: legato — notes play their full duration with no gap
+'A3 @0 v60 l4 o3 q8 c d e f g a b >c< b a g f e d c2. r4
+
+; B1 — PSG bass root notes for harmonic context
+'B1 v70 l1 o2 c c c c

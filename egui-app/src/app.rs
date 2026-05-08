@@ -1,6 +1,7 @@
 use crate::audio::{AudioBuffer, AudioEngine};
 use crate::compiler;
 use crate::document::{CompileError, CompileStatus, DocumentStore};
+use crate::live_audio::LiveAudioEngine;
 use crate::midi::{MidiEvent, MidiManager};
 use crate::panels::compile_options::{self, CompileOptions};
 use crate::settings::{Settings, Theme};
@@ -38,6 +39,10 @@ pub struct MmlApp {
 
     bottom_tab: BottomTab,
     settings_open: bool,
+    fm_editor: crate::panels::fm_tone_editor::FmToneEditorState,
+    envelope_editor: crate::panels::envelope_editor::EnvelopeEditorState,
+    arpeggio_editor: crate::panels::arpeggio_editor::ArpeggioEditorState,
+    sample_editor: crate::panels::sample_editor::SampleEditorState,
 
     pending_open: PendingSlot<Option<(PathBuf, String)>>,
     pending_save_as: PendingSlot<Option<PathBuf>>,
@@ -50,6 +55,9 @@ pub struct MmlApp {
     /// Receives (note, pcm) pairs from background preview-compile threads.
     preview_rx: Receiver<(u8, Vec<f32>)>,
     preview_tx: Sender<(u8, Vec<f32>)>,
+
+    /// Real-time chip-register audio engine for the on-screen keyboard.
+    live_audio: Option<LiveAudioEngine>,
 }
 
 type PendingSlot<T> = Option<std::sync::Arc<std::sync::Mutex<Option<T>>>>;
@@ -89,6 +97,8 @@ impl MmlApp {
         let mut docs = DocumentStore::new();
         docs.open_untitled();
 
+        let live_audio = LiveAudioEngine::new();
+
         Self {
             docs,
             settings,
@@ -101,12 +111,17 @@ impl MmlApp {
             keyboard_held: None,
             bottom_tab: BottomTab::Errors,
             settings_open: false,
+            fm_editor: Default::default(),
+            envelope_editor: Default::default(),
+            arpeggio_editor: Default::default(),
+            sample_editor: Default::default(),
             pending_open: None,
             pending_save_as: None,
             socket_rx,
             keyboard_preview_channel: String::new(),
             preview_rx,
             preview_tx,
+            live_audio,
         }
     }
 
@@ -138,9 +153,19 @@ impl MmlApp {
         while let Ok(msg) = self.worker_rx.try_recv() {
             match msg {
                 WorkerMsg::CompileOk { doc_id, bytes, pcm, warnings } => {
+                    // Grab content before mutably borrowing doc
+                    let content = self.docs.get(doc_id)
+                        .map(|d| d.content.clone())
+                        .unwrap_or_default();
                     if let Some(doc) = self.docs.get_mut(doc_id) {
                         doc.compile_status = CompileStatus::Ok { warnings };
                         doc.compiled_bytes = Some(bytes);
+                    }
+                    // Update the live player with the freshly compiled source
+                    if !content.is_empty() {
+                        if let Some(la) = &self.live_audio {
+                            la.load_source(&content);
+                        }
                     }
                     if !pcm.is_empty() {
                         if let Some(engine) = &mut self.audio {
@@ -436,6 +461,12 @@ impl eframe::App for MmlApp {
         // Apply MIDI port changes (reconnect when preferred port changed).
         reconnect_midi_if_needed(&mut self.midi, &self.settings);
 
+        // ── instrument editors ────────────────────────────────────────────────
+        crate::panels::fm_tone_editor::show(ctx, &mut self.fm_editor, &mut self.docs);
+        crate::panels::envelope_editor::show(ctx, &mut self.envelope_editor, &mut self.docs);
+        crate::panels::arpeggio_editor::show(ctx, &mut self.arpeggio_editor, &mut self.docs);
+        crate::panels::sample_editor::show(ctx, &mut self.sample_editor, &mut self.docs);
+
         // ── menu bar ──────────────────────────────────────────────────────────
         TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -481,6 +512,13 @@ impl eframe::App for MmlApp {
 
                 ui.menu_button("Edit", |ui| {
                     if ui.button("Settings…   Ctrl+,").clicked() { self.settings_open = true; ui.close_menu(); }
+                });
+
+                ui.menu_button("Instruments", |ui| {
+                    if ui.button("FM Tone Editor").clicked() { self.fm_editor.open = true; ui.close_menu(); }
+                    if ui.button("Envelope Editor").clicked() { self.envelope_editor.open = true; ui.close_menu(); }
+                    if ui.button("Arpeggio Editor").clicked() { self.arpeggio_editor.open = true; ui.close_menu(); }
+                    if ui.button("Sample/PCM Editor").clicked() { self.sample_editor.open = true; ui.close_menu(); }
                 });
 
                 ui.menu_button("Build", |ui| {
@@ -753,27 +791,18 @@ impl MmlApp {
         if let Some(note) = note_on {
             self.midi.send_note_on(0, note, 100);
             if (note as usize) < 128 { self.active_notes[note as usize] = true; }
-            // Trigger a synthesized preview note on the selected MML channel.
-            if self.audio.is_some() && !self.keyboard_preview_channel.is_empty() {
-                let content = self.docs.active().map(|d| d.content.clone()).unwrap_or_default();
-                let channel = self.keyboard_preview_channel.clone();
-                let tx = self.preview_tx.clone();
-                let format = self.compile_opts.format.clone();
-                std::thread::spawn(move || {
-                    if let Some(snippet) = compiler::build_note_preview(&content, note, &channel) {
-                        if let Ok(out) = compiler::compile_content(&snippet, &format) {
-                            let pcm = render_pcm_pub(&out.bytes);
-                            let _ = tx.send((note, pcm));
-                        }
-                    }
-                });
+            // Direct chip-register note-on via LiveAudioEngine (zero compile latency)
+            if !self.keyboard_preview_channel.is_empty() {
+                if let Some(la) = &self.live_audio {
+                    la.note_on(&self.keyboard_preview_channel, note, 100);
+                }
             }
         }
         if let Some(note) = note_off {
             self.midi.send_note_off(0, note);
             if (note as usize) < 128 { self.active_notes[note as usize] = false; }
-            if let Some(engine) = &mut self.audio {
-                engine.stop_preview();
+            if let Some(la) = &self.live_audio {
+                la.note_off(&self.keyboard_preview_channel);
             }
         }
     }

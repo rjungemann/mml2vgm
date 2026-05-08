@@ -77,6 +77,9 @@ const defaultPanelVisibility: Record<PanelType, boolean> = {
     runtime: true,
     compilation: true,
     waveform: true,
+    fmToneEditor: false,
+    envelopeEditor: false,
+    arpeggioEditor: false,
 };
 
 const defaultPanelPositions: Record<PanelType, PanelPosition> = {
@@ -96,6 +99,9 @@ const defaultPanelPositions: Record<PanelType, PanelPosition> = {
     runtime: 'bottom',
     compilation: 'bottom',
     waveform: 'bottom',
+    fmToneEditor: 'right',
+    envelopeEditor: 'right',
+    arpeggioEditor: 'right',
 };
 
 export const defaultSettings: IDESettings = {

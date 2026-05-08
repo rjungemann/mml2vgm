@@ -1,0 +1,76 @@
+'{
+
+    TitleName   = YM2608 OPNA
+    SystemName  = NEC PC-98
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2608  = A
+    PartSN76489 = B
+
+}
+
+; YM2608 (OPNA) — 6 FM channels, same register layout as YM2612.
+; Used in NEC PC-98 computers. Also has ADPCM rhythm/melody channels,
+; but this example focuses on the 6 FM voices.
+;
+; Part letter A → YM2608. FM patches work identically to YM2612.
+
+; Lead patch — bright two-carrier FM (algorithm 4)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,008,002,000,000,001,001,000,000
+'@ 031,014,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,008,002,000,000,002,007,000,000
+'@ 031,014,000,007,002,000,000,004,000,000,000
+'@ 004,005
+
+; String pad — detuned all-carrier (algorithm 7)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 018,004,000,006,003,008,000,001,002,000,000
+'@ 018,004,000,006,003,008,000,001,006,000,000
+'@ 018,004,000,006,003,008,000,002,001,000,000
+'@ 018,004,000,006,003,000,000,002,007,000,000
+'@ 007,000
+
+; Bass patch — stacked operators (algorithm 1)
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,008,002,030,000,001,000,000,000
+'@ 031,010,000,007,003,025,000,002,000,000,000
+'@ 031,008,000,007,003,020,000,001,000,000,000
+'@ 031,007,000,006,004,000,000,002,000,000,000
+'@ 001,004
+
+'A1 T108
+'A2 T108
+'A3 T108
+'A4 T108
+'B1 T108
+
+; A1 — OPNA lead melody
+'A1 @0 v100 l4 o5 q6 c r e r g r b r | >c r< b r a r g r
+'A1 l4 o5 q6 f r a r c r e r | d r c r b r a r
+'A1 l4 o5 q6 g r b r >d r f r | e r d r c r e r
+'A1 l2 o5 c1
+
+; A2 — OPNA second lead, octave above, delayed entry
+'A2 @0 v85 l8 o5 r r r r r r r r
+'A2 l4 o5 q6 e r g r b r >d r | e r d r c r b r<
+'A2 l4 o5 q6 a r >c r e r g r< | f r e r d r c r
+'A2 l4 o5 q6 b r >d r f r a r | g r f r e r g r
+'A2 l2 o5 e1
+
+; A3 — OPNA rhythm guitar stabs (staccato chords implied by octave doubles)
+'A3 @0 v75 l8 o4 q2 (c r r e r r g r)4
+
+; A4 — OPNA string pad for harmonic width
+'A4 @1 v65 l1 q8 o4 c | f | g | c
+'A4 l1 q8 o4 c | f | g | c
+
+; B1 — SN76489 bass with OPNA bass patch
+'B1 v90 l4 o2 c g c g | f c f c | g d g d | c2 r2
+'B1 l4 o2 c g c g | f c f c | g d g d | c1

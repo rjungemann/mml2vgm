@@ -1,0 +1,55 @@
+'{
+
+    TitleName   = YMF262 OPL3
+    SystemName  = IBM PC
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYMF262  = A
+    PartSN76489 = B
+
+}
+
+; YMF262 (OPL3) — 18-channel FM chip extending OPL2 with stereo panning
+; and a 4-operator mode. Used in Sound Blaster Pro 2.0 and later cards.
+; The compiler initialises each channel with a minimal 2-operator sine patch.
+;
+; 18 channels available across two ports (A1-A9, A10-A18 if needed).
+; Here we use 6 channels for a rich ensemble texture.
+
+'A1 T96
+'A2 T96
+'A3 T96
+'A4 T96
+'A5 T96
+'A6 T96
+'B1 T96
+
+; A1 — OPL3 melody, octave 5
+'A1 v100 l4 o5 q6 c r d r e r g r | a r g r f r e r
+'A1 l4 o5 q6 d r e r f r a r | g r f r e r d r
+'A1 l2 o5 c2 e2 | c1
+
+; A2 — OPL3 second melody line, overlapping with A1
+'A2 v85 l8 o5 q5 e g c e | g e c g | d f a d | f a c f
+'A2 l8 o5 q5 e g c e | g e c g | d f a d | c1
+
+; A3 — OPL3 harmony, a sixth above, octave 5
+'A3 v80 l4 o5 q6 a r b r >c r e r | f r e r d r c r
+'A3 l4 o5 q6 b r >c r d r f r | e r d r c r b r<
+'A3 l2 o5 a2 >c2 | a1
+
+; A4 — OPL3 counter-bass, octave 3
+'A4 v90 l4 o3 q7 c g e g | f c a c | g d b d | c g e c
+'A4 l4 o3 q7 c g e g | f c a c | g d b d | c1
+
+; A5 — OPL3 mid-range sustain pad
+'A5 v70 l1 q8 o4 c | f | g | c | c | f | g | c
+
+; A6 — OPL3 rhythmic stab
+'A6 v75 l8 o4 q2 (c r r r c r r r)8
+
+; B1 — SN76489 sub-bass
+'B1 v80 l1 o1 c | f | g | c | c | f | g | c

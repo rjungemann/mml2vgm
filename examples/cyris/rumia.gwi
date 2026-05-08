@@ -1,0 +1,17 @@
+'{
+    TitleName   = Apparitions Stalk The Night (Solo Strings)
+    Composer    = ZUN
+    Arranger    = Cyris
+    SystemName  = Generic SSG
+    Format      = VGM
+    ClockCount  = 192
+
+    PartAY8910  = A
+}
+
+; Converted from Sitaraba / 3MLE MML format by scripts/convert_sitaraba.mjs
+; Note: l<N>. (dotted default length) is expanded to per-note dots.
+
+'A1 t145>l8el16rl8d<l16abl8r.l16arl8g>e.<l16gf+>de<gf+>de<f+gabl8r.bl16rl8al16rl8grf+l16cel8bl16rcef+aegdf+cec-dagf+>l8el16rl8d<l16abl8r.l16arl8g>e.<l16gf+>de<gf+>de<f+gabl8r.bl16rl8al16rl8grf+l16cel8bl16rcef+aegdf+cec-l4dl2bl8el16rl8gl16rl8b>l2el16r<gf+>de<gf+>dl2el8gl16rl8f+l16rl8d<l2bl16bl32r>l16gl32rl16f+<al32r>l16f+l32rl16el2c-l8dl16rl8dl16rl8e<l2bl16el32rl16f+l32rl16gal32rl16bl32r>l16gl2el16r<gf+>de<gf+>dl8d+l4rl8d+l4r<l8egab+l16bagrl8aregab+l16bagrl8arl16dergl2al4r>l8dl16c<bal32rl16el32rl16cgl32rl16dl32rl16c-el32rl16cl32r<l16a>dl32r<l16bl32rl16gl8ab+l16bagrl8aregab+l16bagrl8arl16dl8el16gl2al8re>dl16c<bal32rl16el32rl16cl4gl16al32rl16el32rl16c>dl32rl16c-l32rl16cl8ab+l16bagrl8aregab+l16bagrl8arl16dergl2al4r>l8dl16c<bal32rl16el32rl16cgl32rl16dl32rl16c-el32rl16cl32r<l16a>dl32r<l16bl32rl16gl8ab+l16bagrl8aregab+l16bagrl8arl16dl8el16gl2al4r>l8dl16c-cl1a
+'A2 t145l1r.r.r.r.r.r.r.r.r.r.rl8o2fb+fb+frfl16b+fl8g>d<g>d<gl16rl8bl16r>d<gl8a>e<a>e<al16r>l8cl16re<al8a>e<a>e<al16r>l8cl16recl8<fb+fb+frfl16b+fl8g>d<g>d<gl16rl8bl16r>d<gl8a>e<a>e<al16r>l8cl16re<al8a>e<a>e<al16r>l8cl16recl8<fb+fb+frfl16b+fl8g>d<g>d<gl16rl8bl16r>d<gl8a>e<a>e<al16r>l8cl16re<al8a>e<a>e<al16r>l8cl16recl8<fb+fb+frfl16b+fl8g>d<g>d<gl16rl8bl16r>d<gl8a>e<a>e<ara>e<a>e<a>e<al16rl8al16rl8a
+'A3 t145l8<<eereeereeereeereccrcccrcccrcccrceereeereeereeereccrcccrcccrcccrcccrcddrdeereeereeeref+f+rf+ggrgggrgccrcddrdeereeereccrcddrde-rre-rre-r

@@ -1,0 +1,34 @@
+'{
+
+    TitleName   = PSG Extended
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Advanced PSG techniques: all three tone channels plus the noise channel,
+; chromatic playing, volume automation, and polyrhythmic patterns.
+;
+; SN76489 channels: B1, B2, B3 = square wave tones, B4 = noise
+
+'B1 T140
+'B2 T140
+'B3 T140
+
+; B1 — fast arpeggiated melody in E minor, octave 5
+; Uses chromatic sharps (e+, f+, g+) for modal color
+'B1 v100 l16 o5 (e f+ g a b >c d e<)2 (e d c b a g f+ e)2
+'B1 l16 o5 (e g b >e< b g e d)2 (c e g >c e g <e d)2
+'B1 l8 o5 e f+ g b | >c< b a g | f+ e d c | b1
+
+; B2 — harmonic support a fifth above, driving 8th-note pulse
+'B2 v80 l8 o5 (b r)8 (b r)8 (b r)8 (b r)8
+'B2 l8 o5 (b r)8 (b r)8 (b r)8 (>e r)8
+
+; B3 — walking bass, octave 3, quarter notes
+'B3 v90 l4 o3 e d c b | a g f+ e | d e f+ g | a b >c d | e d c b | a g f+ e | d e f+ g | e1

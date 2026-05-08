@@ -1,0 +1,32 @@
+'{
+
+    TitleName   = Sequencing Demo
+    Composer    = Tutorial
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; FM instrument 0: simple sustaining tone
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,000,001,000,000,000
+'@ 031,000,000,007,000,000,042,000,001,000,000
+   AL  FB
+'@ 004,000
+
+; Melody: dotted notes, ties, octave steps, and quantization
+'A1 T120
+'A1 @0 v100 l8 Q6 o4
+'A1 c4. d8 | e4. f8 | g4 a8 b8 | >c1 |
+
+; PSG: simple looping bass using parenthesis loop syntax
+'B1 T120
+'B1 v100 l2 o2 (c g)4

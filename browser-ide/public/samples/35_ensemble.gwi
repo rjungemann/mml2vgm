@@ -1,0 +1,96 @@
+'{
+
+    TitleName   = Full Ensemble
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; Full chip ensemble — all 6 YM2612 FM channels plus 3 SN76489 PSG channels.
+; Demonstrates the maximum polyphony of the Sega Genesis / Mega Drive hardware:
+; A1-A6 = six FM voices, B1-B3 = three PSG voices.
+
+; Lead patch — single-carrier bright (algorithm 4)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,007,002,000,000,001,001,000,000
+'@ 031,014,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,002,007,000,000
+'@ 031,014,000,007,002,000,000,004,000,000,000
+'@ 004,005
+
+; Brass patch — algorithm 3, forward bite
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,003,040,000,001,000,000,000
+'@ 031,008,000,007,003,040,000,001,000,000,000
+'@ 031,006,000,006,004,020,000,002,001,000,000
+'@ 031,005,000,005,005,000,000,001,000,000,000
+'@ 003,004
+
+; String pad — detuned all-carrier (algorithm 7)
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 018,004,000,006,003,008,000,001,002,000,000
+'@ 018,004,000,006,003,008,000,001,006,000,000
+'@ 018,004,000,006,003,008,000,002,001,000,000
+'@ 018,004,000,006,003,000,000,002,007,000,000
+'@ 007,000
+
+; Bass patch — stacked (algorithm 0)
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,009,002,030,000,001,000,000,000
+'@ 031,008,000,007,003,025,000,002,000,000,000
+'@ 031,007,000,006,004,020,000,001,000,000,000
+'@ 031,005,000,005,005,000,000,002,000,000,000
+'@ 000,005
+
+'A1 T108
+'A2 T108
+'A3 T108
+'A4 T108
+'A5 T108
+'A6 T108
+'B1 T108
+'B2 T108
+'B3 T108
+
+; A1 — FM lead melody
+'A1 @0 v100 l4 o5 q6 g r a r b r >d r | e r d r c r b r<
+'A1 l4 o5 q6 a r b r >c r e r | d r c r b r a r
+'A1 l4 o5 q6 g r a r b r >c r | d2 b2 | g1
+
+; A2 — FM lead harmony (a third above)
+'A2 @0 v85 l4 o5 q6 b r >c r d r f r | g r f r e r d r<
+'A2 l4 o5 q6 >c r d r e r g r | f r e r d r c r<
+'A2 l4 o5 q6 b r >c r d r e r | f2 d2 | b1
+
+; A3 — FM brass chords (staccato hits on off-beats)
+'A3 @1 v80 l8 o4 q2 (r g r g r g r g)4 (r d r d r d r d)4 (r g r g r g r g)8
+
+; A4 — FM counter-melody
+'A4 @0 v75 l8 o4 q5 g a b >c d e f+ g | f+ e d c b a g f+
+'A4 l8 o4 q5 e f+ g a b >c d e | d c b a g2. r4
+
+; A5 — FM string pad, wide stereo (detuned)
+'A5 @2 v65 l1 q8 o4 g | d | g | g
+
+; A6 — FM bass guitar
+'A6 @3 v100 l4 o2 q7 g r r g | d r r d | g r r g | g2 r2
+'A6 l4 o2 q7 g r r g | d r r d | g r r g | g1
+
+; B1 — PSG melody doubling lead an octave down
+'B1 v70 l4 o4 g a b >d | e d c b< | a b >c e | d2 b2 | g1
+
+; B2 — PSG arpeggiated inner voice
+'B2 v60 l16 o4 (g b >d< b)4 (d f+ a f+)4 (g b >d< b)4 (g b >d< b g b >d b<)1
+
+; B3 — PSG bass root pedal
+'B3 v90 l2 o1 g g | d d | g g | g1

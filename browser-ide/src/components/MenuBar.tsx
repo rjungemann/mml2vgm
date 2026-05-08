@@ -78,17 +78,40 @@ interface MenuBarProps {
 }
 
 // Menu definitions for keyboard navigation
-const MENUS = ['file', 'edit', 'view', 'compile', 'play', 'tools', 'examples', 'help'] as const;
+const MENUS = ['file', 'edit', 'view', 'compile', 'play', 'tools', 'instruments', 'examples', 'help'] as const;
 type MenuName = typeof MENUS[number];
 
 // List of example files in public/samples/
 const EXAMPLE_FILES = [
+  // ── Beginner ───────────────────────────────────────────────────────────────
   { filename: 'hello_world.gwi', label: 'Hello World' },
+  { filename: '01_fm_basics.gwi', label: 'FM Basics' },
+  { filename: '02_psg_basics.gwi', label: 'PSG Basics' },
+  { filename: '03_notes_and_lengths.gwi', label: 'Notes and Lengths' },
+  { filename: '04_octaves_and_volumes.gwi', label: 'Octaves and Volumes' },
+  { filename: '05_loops.gwi', label: 'Loops' },
+  // ── Intermediate ───────────────────────────────────────────────────────────
   { filename: 'arpeggio.gwi', label: 'Arpeggio' },
   { filename: 'chord_progression.gwi', label: 'Chord Progression' },
   { filename: 'drum_pattern.gwi', label: 'Drum Pattern' },
-  { filename: 'c140_test.gwi', label: 'C140 Test' },
   { filename: 'ay8910_test.gwi', label: 'AY-3-8910 Test' },
+  { filename: '10_fm_algorithms.gwi', label: 'FM Algorithms (0-7)' },
+  { filename: '11_fm_adsr.gwi', label: 'FM Envelope (ADSR)' },
+  { filename: '12_quantize.gwi', label: 'Quantize / Gate Time' },
+  { filename: '13_fm_feedback.gwi', label: 'FM Feedback' },
+  { filename: '14_fm_psg_combo.gwi', label: 'FM + PSG Combo' },
+  { filename: '15_tempo_changes.gwi', label: 'Tempo Changes' },
+  { filename: '16_song_structure.gwi', label: 'Song Structure' },
+  { filename: '17_ym2203_opn.gwi', label: 'YM2203 (OPN)' },
+  { filename: '18_ym2151_opm.gwi', label: 'YM2151 (OPM)' },
+  { filename: '19_ym3812_opl2.gwi', label: 'YM3812 (OPL2)' },
+  { filename: '20_psg_extended.gwi', label: 'PSG Extended' },
+  // ── Advanced ───────────────────────────────────────────────────────────────
+  { filename: '30_ym2608_opna.gwi', label: 'YM2608 (OPNA)' },
+  { filename: '31_ymf262_opl3.gwi', label: 'YMF262 (OPL3)' },
+  { filename: '35_ensemble.gwi', label: 'Full Ensemble' },
+  // ── Test / Reference ───────────────────────────────────────────────────────
+  { filename: 'c140_test.gwi', label: 'C140 Test' },
   { filename: 'general_test.gwi', label: 'General Test' },
   { filename: 'pcm_test.gwi', label: 'PCM Test' },
   { filename: 'pcm_test_2.gwi', label: 'PCM Test 2' },
@@ -461,6 +484,23 @@ const MenuBar: React.FC<MenuBarProps> = ({
           disabled: !onOpenPreferences,
         });
         break;
+      case 'instruments':
+        items.push({
+          label: 'FM Tone Editor',
+          onClick: onShowPanel ? () => onShowPanel('fmToneEditor') : undefined,
+          disabled: !onShowPanel,
+        });
+        items.push({
+          label: 'Envelope Editor',
+          onClick: onShowPanel ? () => onShowPanel('envelopeEditor') : undefined,
+          disabled: !onShowPanel,
+        });
+        items.push({
+          label: 'Arpeggio Editor',
+          onClick: onShowPanel ? () => onShowPanel('arpeggioEditor') : undefined,
+          disabled: !onShowPanel,
+        });
+        break;
       case 'examples':
         EXAMPLE_FILES.forEach((example) => {
           items.push({ label: example.label, onClick: () => onLoadExample(example.filename), disabled: false });
@@ -612,6 +652,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
       {renderMenu('compile', 'Compile')}
       {renderMenu('play', 'Play')}
       {renderMenu('tools', 'Tools')}
+      {renderMenu('instruments', 'Instruments')}
       {renderMenu('examples', 'Examples')}
       {renderMenu('help', 'Help')}
 

@@ -1,0 +1,39 @@
+'{
+
+    TitleName   = Envelope and Arpeggio Demo
+    Composer    = Tutorial
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; --- Envelope definitions ---
+
+; Envelope 1: fast decay pluck (15 steps from full to silent)
+'@ E 001, 15,13,11,9,7,5,3,1,0
+
+; Envelope 2: slow decay pad
+'@ E 002, 15,15,14,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0
+
+; --- Arpeggio definitions ---
+
+; Arpeggio 1: C major triad (c / e / g)
+'@ A 001, c4,e4,g4
+
+; --- Parts ---
+
+; Melody with pluck envelope
+'B1 T120
+'B1 EN1 l8 o4 c d e f g a b >c
+
+; Chord arpeggio bass with slow pad envelope
+'B2 T120
+'B2 EN2 AR1 l2 o3 c f
+
+; Counter-melody (plain volume, no envelope)
+'B3 T120
+'B3 v10 l4 o4 r2 e g

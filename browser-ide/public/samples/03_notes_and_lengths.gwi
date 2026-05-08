@@ -1,0 +1,42 @@
+'{
+
+    TitleName   = Notes and Lengths
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; MML note length reference — each line demonstrates one duration type.
+; Listen along to hear how each length sounds at T80.
+
+'B1 T80
+
+; Whole note (l1) — holds for 4 beats
+'B1 v100 l1 o4 c
+
+; Half notes (l2) — two per measure
+'B1 l2 o4 c c
+
+; Quarter notes (l4) — four per measure (the most common default)
+'B1 l4 o4 c c c c
+
+; Eighth notes (l8) — eight per measure
+'B1 l8 o4 c c c c c c c c
+
+; Sixteenth notes (l16) — sixteen per measure
+'B1 l16 o4 c c c c c c c c c c c c c c c c
+
+; Dotted notes — a dot adds half the note's duration
+; Dotted half (c2.) = 3 beats, dotted quarter (c4.) = 1.5 beats
+'B1 l4 o4 c2. c4 | c4. c8 c4 r4
+
+; Tied notes — c4^8 plays C as one note lasting a quarter + eighth
+'B1 l4 o4 c4^8 r8 c4^2 r2
+
+; Mix of lengths on one line — duration suffix overrides the default
+'B1 l8 o4 c4 d e8 f4 g e d c2

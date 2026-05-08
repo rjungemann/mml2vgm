@@ -1,0 +1,13 @@
+[Title] Apparitions Stalk The Night (Solo Strings)
+[Source] ZUN
+[Compose Rank] 9 (579/334/138)
+[Editor] Cyris
+
+MML@
+t145>e8l16rd8<abr8.arg8>e8.<gf+>de<gf+>de<f+gabr8.b8ra8rg8r8f+8ceb8rcef+aegdf+cec-dagf+>e8rd8<abr8.arg8>e8.<gf+>de<gf+>de<f+gabr8.b8ra8rg8r8f+8ceb8rcef+aegdf+cec-d4b2e8rg8rb8>e2r<gf+>de<gf+>de2g8rf+8rd8<b2br32>gr32f+<ar32>f+r32ec-2d8rd8re8<b2er32f+r32gar32br32>ge2r<gf+>de<gf+>dl8d+r4d+r4<egab+l16bagrl8aregab+l16bagra8r8derga2r4>d8c<bar32er32cgr32dr32c-er32cr32<a>dr32<br32ga8b+8bagrl8aregab+l16bagra8r8de8ga2r8e8>d8c<bar32er32cg4ar32er32c>dr32c-r32ca8b+8bagrl8aregab+l16bagra8r8derga2r4>d8c<bar32er32cgr32dr32c-er32cr32<a>dr32<br32ga8b+8bagrl8aregab+l16bagra8r8de8ga2r4>d8c-ca1
+,
+l1.rrrrrrrrrrr1l8o2fb+fb+frfb+16f16g>d<g>d<gl16rb8r>d<gl8a>e<a>e<al16r>c8re<al8a>e<a>e<al16r>c8recl8<fb+fb+frfb+16f16g>d<g>d<gl16rb8r>d<gl8a>e<a>e<al16r>c8re<al8a>e<a>e<al16r>c8recl8<fb+fb+frfb+16f16g>d<g>d<gl16rb8r>d<gl8a>e<a>e<al16r>c8re<al8a>e<a>e<al16r>c8recl8<fb+fb+frfb+16f16g>d<g>d<gl16rb8r>d<gl8a>e<a>e<ara>e<a>e<a>e<ar16ar16a
+,
+l8<<eereeereeereeereccrcccrcccrcccrceereeereeereeereccrcccrcccrcccrcccrcddrdeereeereeeref+f+rf+ggrgggrgccrcddrdeereeereccrcddrde-rre-rre-r
+;
+ 

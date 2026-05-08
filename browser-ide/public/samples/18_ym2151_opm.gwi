@@ -1,0 +1,44 @@
+'{
+
+    TitleName   = YM2151 OPM
+    SystemName  = Arcade
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2151  = A
+    PartSN76489 = B
+
+}
+
+; YM2151 (OPM) — 8-channel FM chip used in arcade boards (Taito F2, Capcom CPS1)
+; and early synths (Yamaha DX series). The compiler uses a hardcoded algorithm-7
+; (all-carrier sine) init for each OPM channel. FM patches are not currently
+; applied to OPM channels, so the timbre is uniform — variation comes from
+; how the channels are arranged melodically.
+
+'A1 T128
+'A2 T128
+'A3 T128
+'A4 T128
+'B1 T128
+
+; A1 — OPM lead melody, octave 5
+'A1 v100 l4 o5 q6 e r f+ r g r a r | b r a r g r e r
+'A1 l4 o5 q6 f+ r g r a r b r | >c r< b r a r f+ r
+'A1 l4 o5 q6 e r f+ r g r b r | >c2< a2 | g1
+
+; A2 — OPM harmony, a third above, octave 5
+'A2 v80 l4 o5 q6 g r a r b r >c r | d r c r b r g r
+'A2 l4 o5 q6 a r b r >c r d r | e r d r c r a r
+'A2 l4 o5 q6 g r a r b r >d r | e2 c2 | b1
+
+; A3 — OPM bass voice, octave 3
+'A3 v90 l2 o3 q7 e b | f+ >c< | g d | e b | f+ >c< | g d | e b | e1
+
+; A4 — OPM rhythmic pulse, octave 4 (staccato hits on the beat)
+'A4 v70 l8 o4 q1 (e r r r e r r r)8
+
+; B1 — SN76489 bass for low-end grounding
+'B1 v80 l2 o2 e b | f+ >c< | g d | e b | f+ >c< | g d | e b | e1

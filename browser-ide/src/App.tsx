@@ -31,6 +31,9 @@ import RuntimePanel from '@/components/panels/RuntimePanel';
 import CompilationPanel from '@/components/panels/CompilationPanel';
 import WaveformPanel from '@/components/panels/WaveformPanel';
 import SamplesPanel from '@/components/panels/SamplesPanel';
+import FmToneEditorPanel from '@/components/panels/FmToneEditorPanel';
+import EnvelopeEditorPanel from '@/components/panels/EnvelopeEditorPanel';
+import ArpeggioEditorPanel from '@/components/panels/ArpeggioEditorPanel';
 import { TabBar } from '@/components/TabBar';
 import BottomTabs, { type BottomTab } from '@/components/BottomTabs';
 import { useSessionStorageState } from '@/utils/useSessionStorageState';
@@ -1026,6 +1029,12 @@ export const App: React.FC = () => {
             documentLanguage={activeDoc?.language || 'gwi'}
           />
         );
+      case 'fmToneEditor':
+        return <FmToneEditorPanel />;
+      case 'envelopeEditor':
+        return <EnvelopeEditorPanel />;
+      case 'arpeggioEditor':
+        return <ArpeggioEditorPanel />;
       default:
         return null;
     }
@@ -1033,9 +1042,10 @@ export const App: React.FC = () => {
 
   // Get panels for right sidebar (positioned right)
   const allPanelTypes: PanelType[] = [
-    'folder', 'folderTree', 'partCounter', 'errorList', 'log', 'lyrics', 
+    'folder', 'folderTree', 'partCounter', 'errorList', 'log', 'lyrics',
     'mixer', 'midiKeyboard', 'debug', 'playback', 'compileOptions', 'info', 'script',
-    'runtime', 'compilation', 'waveform'
+    'runtime', 'compilation', 'waveform',
+    'fmToneEditor', 'envelopeEditor', 'arpeggioEditor',
   ];
   
   const rightSidebarPanelTypes: PanelType[] = allPanelTypes.filter(

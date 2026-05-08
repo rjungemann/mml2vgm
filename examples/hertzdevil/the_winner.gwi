@@ -1,0 +1,198 @@
+'{
+
+    TitleName   = THE WINNER
+    Composer    = hertzdevil (adapted for mml2vgm-rs)
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = S
+
+}
+
+; Converted from examples/hertzdevil/the_winner.mml
+; Original by hertzdevil (https://www.hertzdevil.info/music.html)
+;
+; === CHANNEL MAPPING ===
+;   PU1 (!2)  -> S1  (PSG tone 1 — main arpeggio / lead)
+;   PU2 (!1)  -> S2  (PSG tone 2 — bass / counter-lead)
+;   WAV (!3)  -> S3  (PSG tone 3 — inner voice, simplified)
+;   NOI (!4)  -> S4  (PSG noise, stub rests)
+;   PCMA (!5) -> dropped  (ADPCM rhythm samples, no equivalent)
+;   PCMB (!6) -> dropped  (ADPCM rhythm samples, no equivalent)
+;
+; === DIFFERENCES / ISSUES ===
+;
+; 1. TARGET CHIP
+;    Original: DMG (Game Boy APU) — 2 pulse, 1 wave, 1 noise.
+;    Our system has no DMG MML compiler support.  SN76489 is the closest
+;    chip we can actually compile to; it lacks duty-cycle control, so all
+;    voices are plain square waves instead of the original 12.5 %/25 %/50 %
+;    pulse shapes.
+;
+; 2. KEY SIGNATURE  (k-be _0 = G minor: b->b-, e->e-)
+;    The original uses the mml2vgm key-signature command "k-be" which
+;    automatically flattens every B and E note.  Our system has no such
+;    command; the accidentals have been baked in manually below.
+;
+; 3. STRIPPED COMMANDS (no equivalent in mml2vgm-rs):
+;    @@n,n,n   — GB pulse duty + hardware envelope preset
+;    E ...     — GB hardware volume envelope (ADSR)
+;    P ...     — Portamento speed/target
+;    EP.../EPX — Pitch envelope (rising/falling pitch slides per note)
+;    _V-n/_Vn  — Inline relative volume decay (accent effect)
+;    B n       — Pitch bend
+;    W ...     — Echo width / stereo pan
+;    D n       — Fine detune (cents)
+;    YL./YLR   — PCM sample key-on / key-off
+;    @n x      — PCM sample trigger
+;
+;    The loss of EP is the most audible: the original lead melody has a
+;    prominent downward pitch-slide attack on every note (achieved by
+;    EP-7,-7,0,8,4 / EPX).  Without it the melody sounds "flat" (no pun).
+;    Similarly, the _V accent chops give the arpeggio its characteristic
+;    rhythmic bounce; those are gone here.
+;
+; 4. PCMA / PCMB CHANNELS
+;    Both PCM channels carry kick/snare/hat patterns via ADPCM samples
+;    (@25, @21, @8, etc.).  They have been dropped entirely because
+;    mml2vgm-rs does not support a PCM chip in this context, and there are
+;    no .wav sample files to supply.
+;
+; 5. VOLUME SCALING
+;    GB V command: 0-15 (15 = loudest).
+;    SN76489 v command: 0-127 (127 = loudest).
+;    Mapping used: V_gb * 8.5 ≈ v_sn  (V9->v76, V7->v59, V5->v42, V4->v34)
+;
+; 6. TEMPO
+;    Preserved exactly: T165.
+
+; =======================================================================
+; Section 1: Intro  (4 whole notes, repeated twice in original)
+; Pattern is two bars of descending-then-ascending arpeggio in G minor.
+; PU1 uses triplet-eighth / triplet-sixteenth pairs  (note12 + note24).
+; =======================================================================
+
+'S1 T165 o3 v76
+'S1 [c12 c24 d12 d24 g12 g24 c12 c24
+     d12 d24 b-12 b-24 >c12 c24 d12 d24
+     c12 c24 d12 d24 b-12 b-24 >c12 c24
+     <g12 g24 >c12 c24 b-12 b-24 >d12 d24]2
+
+'S2 T165 o2 v59 l8
+'S2 [c d g c d <b-> c d   c d <b-> c <g> c <b-> d]2
+
+'S3 T165 o2 v25 l16
+'S3 [c r d r g r c r d r <b-> r c r d r
+     c r d r <b-> r c r <g> r c r <b-> r d r]2
+
+'S4 T165 r1 r1 r1 r1
+
+; =======================================================================
+; Section 2: Lead 1
+; Original: pitched slides (EP-7,-7,0,8,4) give each note a falling
+; attack.  Stripped here to bare note values.  PU2 enters one 16th late
+; (r16 offset).
+; =======================================================================
+
+'S1 v76 l8
+'S1 d4. c1 c c4 d4
+'S1 c4. <b-1.>
+'S1 d4. c1 c d4 f.
+'S1 g1 ~g1
+
+'S2 v42 l8 r16
+'S2 g16 ~g4. d4 f4 g1
+'S2 r1 <b-4 r4.
+'S2 g16 ~g4. d4 f4 g1
+
+'S3 v25 l8
+'S3 [f]9 b- a f b- a f d
+'S3 [f]9 b- a f c c <b-> c
+
+'S4 r1 r1 r1 r1 r1 r1 r1 r1
+
+; =======================================================================
+; Section 3: Arpeggio return (2 whole notes)
+; PU2 descends one octave from original and plays a slightly truncated
+; bass line + transition notes before the loop point.
+; =======================================================================
+
+'S1 o3 v76
+'S1 [c12 c24 d12 d24 g12 g24 c12 c24
+     d12 d24 b-12 b-24 >c12 c24 d12 d24
+     c12 c24 d12 d24 b-12 b-24 >c12 c24
+     <g12 g24 >c12 c24 b-12 b-24 >d12 d16]
+
+'S2 v59 l8 <
+'S2 c d g c d <b-> c d   c d <b-> c <g> c <b-> d v42 c d
+
+'S3 v25 l16
+'S3 d r <b-> r c r d r   <g> r c r <b-> r d r
+
+'S4 r1 r1
+
+; =======================================================================
+; L = loop point  (playback will jump here on repeat)
+; =======================================================================
+
+'S1 L
+
+; =======================================================================
+; Section 4: Lead 2
+; Original: heavy portamento (P20,8,3) and per-note pitch bends (B).
+; Each note in the original glides up to pitch.  Stripped to raw notes.
+; =======================================================================
+
+'S1 v76 l8 o3
+'S1 b-4 g ~f ~g4. <a4 b- b-4>
+'S1 d f g ~b- b- g f f4 g d4 f4
+'S1 f g ~b- b- g f f4 g d4 f4 f r4.
+'S1 ~g. g16 g16 g4 ~a g f+4. f+ r4 d16 f g
+'S1 ~g. g16 g16 g4 ~a g f+4. f+.
+
+'S2 v34 l8 o3 r32
+'S2 b-4 g ~f ~g4. ~g16. <c4 d d4>
+'S2 d f g ~b- b- g f f4 g d4 f4
+'S2 f g ~b- b- g f f4 g d4 f4 f r4.
+'S2 ~g. g16 g16 g4 ~a g f+4. f+ r4 d16 f g
+'S2 ~g. g16 g16 g4 ~a g f+4. f+.
+
+'S3 v25 l8
+'S3 g g g g d f g <b-> r4 g
+'S3 d f g <b-> g f g r4
+
+'S4 r1 r1 r1 r1 r1
+
+; =======================================================================
+; Section 5: Ostinato lead (16th-note pairs with accent pops)
+; Original: _V-6 / _V6 accent pops on every dotted 16th + 32nd pair.
+; Those are stripped; the rhythm is preserved as plain notes.
+; =======================================================================
+
+'S1 v68 l16 o3
+'S1 d d. d d d. d c c. c c c. c   c4 f4
+'S1 d4. d d c4. ~c c c   c4 ~d4 c <b-4 b- r4>
+'S1 d d. d d d. d c c. c c c. c   c4 d4 f4 d r4.
+'S1 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S1 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S1 d d. d d d. d c c. c c c. c   c4 d4 f4 d r4.
+'S1 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S1 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+
+'S2 v34 l16 o3 r32
+'S2 d d. d d d. d c c. c c c. c   c4 f4
+'S2 d4. d d c4. ~c c c   c4 ~d4 c <b-4 b- r4>
+'S2 d d. d d d. d c c. c c c. c   c4 d4 f4 d r4.
+'S2 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S2 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S2 d d. d d d. d c c. c c c. c   c4 d4 f4 d r4.
+'S2 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+'S2 d d. d d d. d c c. c c c. c   c4 ~d4 c <b-4 b->
+
+'S3 v25 l8
+'S3 [f]9 b- a f b- a f d
+'S3 [f]9 b- a f d c c d
+
+'S4 r1 r1 r1 r1 r1 r1 r1 r1

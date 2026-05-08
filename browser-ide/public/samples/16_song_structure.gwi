@@ -1,0 +1,109 @@
+'{
+
+    TitleName   = Song Structure
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; Multi-section song structure: Intro → Verse → Chorus → Bridge → Outro
+; MML parts are independent time streams — write each section sequentially
+; in each part's track, padding with rests to align to the right position.
+
+; FM melody patch (bright lead)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,007,002,000,000,001,001,000,000
+'@ 031,012,000,007,002,000,000,001,007,000,000
+'@ 031,012,000,007,002,000,000,002,001,000,000
+'@ 031,012,000,007,002,000,000,002,007,000,000
+'@ 004,004
+
+; FM pad patch (warm sustained)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 012,004,000,005,003,005,000,001,002,000,000
+'@ 012,004,000,005,003,005,000,001,006,000,000
+'@ 012,004,000,005,003,005,000,002,002,000,000
+'@ 012,004,000,005,003,000,000,002,006,000,000
+'@ 007,000
+
+'A1 T120
+'A2 T120
+'B1 T120
+'B2 T120
+
+; ── INTRO (4 bars) ────────────────────────────────────────────────────────────
+; A1 — intro: rising arpeggio figure
+'A1 @0 v90 l8 o4 q6 c e g >c e g <c e | g >c e g <c e g >c<
+
+; A2 — intro: slow pad swell
+'A2 @1 v60 l1 q8 o4 c | g
+
+; B1 — intro: bass holds root
+'B1 v80 l1 o2 c | g
+
+; B2 — intro: no hi-hat yet
+'B2 l1 r | r
+
+; ── VERSE (8 bars) ────────────────────────────────────────────────────────────
+; A1 — verse melody
+'A1 @0 v100 l4 o5 q6 e r e r g e | d r d r f d | c r e g >c b | a g f e d2
+'A1 l4 o5 q6 e r e r g e | d r d r f d | c e g >c e c | <b1
+
+; A2 — verse pad chords
+'A2 @1 v65 l1 q8 o4 e | d | c | g
+'A2 @1 l1 q8 o4 e | d | c | g
+
+; B1 — verse bass: half notes
+'B1 v90 l2 o2 c g | d a | e b | g d
+'B1 l2 o2 c g | d a | e b | g1
+
+; B2 — verse hi-hat: eighth notes
+'B2 v50 l8 o6 (c r)8 (c r)8 (c r)8 (c r)8
+'B2 l8 o6 (c r)8 (c r)8 (c r)8 (c r)8
+
+; ── CHORUS (4 bars) ───────────────────────────────────────────────────────────
+; A1 — chorus: higher, bigger melody
+'A1 @0 v110 l4 o5 q6 >c r c r e c | b r b r >d b< | a r a >c e a< | g1
+
+; A2 — chorus: brighter pad, higher octave
+'A2 @1 v80 l1 q8 o5 c | b | a | g
+
+; B1 — chorus: driving bass
+'B1 v100 l4 o2 c c g g | b b >d d< | a a e e | g1
+
+; B2 — chorus: hi-hat every beat
+'B2 v60 l4 o6 (c r r r)4
+
+; ── BRIDGE (4 bars) ───────────────────────────────────────────────────────────
+; A1 — bridge: quieter, half-time feel
+'A1 @0 v80 l2 o4 q6 e g | f a | e g | c1
+
+; A2 — bridge: minimal pad
+'A2 @1 v50 l1 q8 o4 e | f | e | c
+
+; B1 — bridge: sparse bass
+'B1 v70 l2 o2 c r | d r | e r | c1
+
+; B2 — bridge: no hi-hat
+'B2 l1 r r r r
+
+; ── OUTRO (2 bars) ────────────────────────────────────────────────────────────
+; A1 — outro: descending resolution
+'A1 @0 v90 l4 o5 q6 c b a g | f e d c
+
+; A2 — outro: fade out pad
+'A2 @1 v40 l1 q8 o4 c | c
+
+; B1 — outro: root hold
+'B1 v70 l1 o2 c | c
+
+; B2 — outro: silence
+'B2 l1 r | r

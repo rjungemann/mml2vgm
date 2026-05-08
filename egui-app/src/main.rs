@@ -4,6 +4,7 @@ mod compiler;
 mod document;
 mod editor;
 mod highlight;
+mod live_audio;
 mod midi;
 mod panels;
 mod settings;

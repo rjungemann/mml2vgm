@@ -1,0 +1,29 @@
+'{
+
+    TitleName   = Octaves and Volumes
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Demonstrates octave commands and volume control on SN76489.
+; B1 = octave range sweep, B2 = same melody with volume swell.
+
+'B1 T100
+'B2 T100
+
+; B1 — chromatic ascent from octave 2 through octave 6 using > (octave up)
+; Each note moves one semitone up across 5 octaves
+'B1 v100 l4 o2 c > c > c > c > c > c
+
+; Return down using < (octave down) and oN (absolute octave)
+'B1 v100 l4 >c < c < c < c < c o2 c
+
+; B2 — volume swell from v10 (quiet) to v100 (full) and back using the same melody
+; SN76489 volume: v0 = mute, v100 = full volume
+'B2 l4 o4 v10 c v25 d v50 e v75 f v100 g v75 a v50 b v25 >c v10 c1

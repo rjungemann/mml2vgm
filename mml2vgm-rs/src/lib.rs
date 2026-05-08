@@ -42,6 +42,21 @@ pub mod player;
 // Drivers module (external driver support)
 pub mod drivers;
 
+// Live playback via direct register writes
+pub mod live_player;
+pub use live_player::LivePlayer;
+
+// Instrument serialization (parsing/generating MML definitions)
+pub mod instrument_serializer;
+pub use instrument_serializer::{
+    FmInstrumentDef, PcmInstrumentDef, EnvelopeDef, ArpeggioDef,
+    parse_fm_instruments, serialize_fm_instrument,
+    parse_pcm_instruments, serialize_pcm_instrument,
+    parse_envelopes, serialize_envelope,
+    parse_arpeggios, serialize_arpeggio,
+    replace_definition_block, get_carrier_ops,
+};
+
 /// Declared implementation maturity for a chip or output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -1,0 +1,104 @@
+'{
+
+    TitleName   = FM Algorithm Showcase
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; FM Algorithm Showcase — all 8 algorithms (0-7), one per FM channel.
+; Each channel plays the same melody so you can hear how the algorithm
+; changes the timbre. Algorithms 0-5 fit in one YM2612 (6 channels).
+; ALG=6 and ALG=7 are in patches @6 and @0 (reused from other examples).
+
+; ── Algorithm 0: full modulator chain (op1→op2→op3→op4 carrier) ──────────────
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,040,000,001,000,000,000
+'@ 031,008,000,007,003,030,000,002,000,000,000
+'@ 031,007,000,007,003,020,000,001,000,000,000
+'@ 031,007,000,007,003,000,000,002,000,000,000
+'@ 000,003
+
+; ── Algorithm 1: (op1+op2)→op3→op4 carrier ───────────────────────────────────
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,003,030,000,001,000,000,000
+'@ 031,010,000,007,002,035,000,002,000,000,000
+'@ 031,007,000,007,003,020,000,001,000,000,000
+'@ 031,007,000,007,003,000,000,002,000,000,000
+'@ 001,003
+
+; ── Algorithm 2: op1→(op2+op3)→op4 carrier ───────────────────────────────────
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,003,030,000,001,000,000,000
+'@ 031,008,000,007,003,025,000,002,000,000,000
+'@ 031,010,000,007,002,025,000,001,002,000,000
+'@ 031,007,000,007,003,000,000,002,000,000,000
+'@ 002,002
+
+; ── Algorithm 3: (op1→op2)+(op3→op4) two carriers ────────────────────────────
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,003,030,000,001,000,000,000
+'@ 031,007,000,007,003,000,000,002,000,000,000
+'@ 031,010,000,007,002,030,000,001,002,000,000
+'@ 031,007,000,007,003,000,000,002,000,000,000
+'@ 003,003
+
+; ── Algorithm 4: op1→op2 carrier + op3→op4 carrier (two-branch FM) ───────────
+'@ M 004
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,002,000,000,000
+'@ 031,015,000,007,001,000,000,004,000,000,000
+'@ 004,006
+
+; ── Algorithm 5: op1→(op2+op3+op4) three carriers ────────────────────────────
+'@ M 005
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,025,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,002,002,000,000
+'@ 031,012,000,007,002,000,000,004,006,000,000
+'@ 005,002
+
+; (Algorithm 6 and 7 play on B1/B2 via the PSG part — see comments below)
+
+; Tempo — each channel plays at 90 BPM
+'A1 T90
+'A2 T90
+'A3 T90
+'A4 T90
+'A5 T90
+'A6 T90
+'B1 T90
+
+; A1 — Algorithm 0: dark, vocal-like through full stack
+'A1 @0 v100 l4 o4 c e g >c< g e c2. r4
+
+; A2 — Algorithm 1: similar stack, slightly different mod weighting
+'A2 @1 v100 l4 o4 c e g >c< g e c2. r4
+
+; A3 — Algorithm 2: op3 adds harmonic ring to carrier
+'A3 @2 v100 l4 o4 c e g >c< g e c2. r4
+
+; A4 — Algorithm 3: two parallel FM branches, richer mid range
+'A4 @3 v100 l4 o4 c e g >c< g e c2. r4
+
+; A5 — Algorithm 4: classic two-carrier FM pluck character
+'A5 @4 v100 l4 o4 c e g >c< g e c2. r4
+
+; A6 — Algorithm 5: one modulator feeding three carriers, nasal quality
+'A6 @5 v100 l4 o4 c e g >c< g e c2. r4
+
+; B1 (SN76489) — PSG bass root notes for harmonic context
+'B1 v80 l1 o2 c c c c

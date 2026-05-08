@@ -1,0 +1,188 @@
+'{
+
+    TitleName   = Moon Knights (Ver. OGMD)
+    Composer    = hertzdevil (adapted for mml2vgm-rs)
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = S
+
+}
+
+; Converted from examples/hertzdevil/moon_knights.mml
+; Original by hertzdevil (https://www.hertzdevil.info/music.html)
+;
+; === CHANNEL MAPPING ===
+;   PU1 (!1)  -> S1  (PSG tone 1 — lead / accent)
+;   PU2 (!2)  -> S2  (PSG tone 2 — piano / counter)
+;   WAV (!3)  -> S3  (PSG tone 3 — bass)
+;   NOI (!4)  -> S4  (PSG noise, stub)
+;   PCMA (!5) -> dropped  (ADPCM rhythm samples)
+;   PCMB (!6) -> dropped  (PCM guitar / choir / piano samples)
+;
+; === DIFFERENCES / ISSUES ===
+;
+; 1. TARGET CHIP — same as the_winner.gwi: DMG -> SN76489.
+;    The organ-like "accent bounce" (note._V-3n8_V3 pattern) was done with
+;    the GB's hardware volume envelope; replaced with simple repeated notes.
+;
+; 2. KEY SIGNATURES — two zones:
+;    Intro:   _0  (A minor — no accidentals)
+;    Main:    k+fcgda (G# minor — f,c,g,d,a all sharpened)
+;    Manually baked in; k= (natural override) translated per note.
+;
+; 3. GUITAR SECTION OMITTED
+;    The "$$PULSE $$guitar2" section uses B (pitch bend by semitone) and
+;    16th-note tremolo/vibrato (_V-3/_V3).  Without portamento and pitch-
+;    bend the transcription would be unrecognisable, so that section is
+;    replaced with a comment stub.
+;
+; 4. PCMB GUITAR / CHOIR / STRING SAMPLES — all dropped.
+;    The original uses @62 (guitar sample), @58 (choir), @40 / @38 / @61
+;    (string layers), @44 (piano).  No sample files are available.
+;
+; 5. YL. / Y.R / YLR / YRR (C140 PCM key-on/loop) — stripped.
+;
+; 6. PCMB ARPEGGIO (the sustained 16th-note chord pattern after the
+;    guitar section) is the harmonically richest part.  It has been
+;    sketched into S3 as a simple arpeggiated inner voice — nowhere near
+;    the original 3-layer shimmer.
+;
+; 7. STRIPPED COMMANDS: @@, E, P, EP/EPX, _V, B, W, D, @A/@B/@~,
+;    YL./Y.R/YLR, @n x, $$str0N macros.
+;
+; 8. TEMPO: preserved at T170.
+
+; =======================================================================
+; Section 1: Intro  (_0 = A minor — no key signature)
+;
+; PU1: accent organ figure — dotted-quarter + eighth pairs climbing
+;      from A to D#.  Original used _V bounce; here each note is plain.
+; PU2: piano ostinato — sixteenth-note scalar runs.
+; WAV: slow descending bass (whole notes).
+; =======================================================================
+
+'S1 T170 r8.
+'S1 o3 v51 l4
+'S1 [[a. a8 b. b8 >c. c8 d+. d+8 <]2 v59]2
+
+'S2 T170 v34 o3 l8
+'S2 a b a >d+ <a b a >d+ f <a >e <a >d+ <a >e <a
+'S2 a b a >d+ <a b a >d+ f <a >e <a >d+ <a >d+ <a
+
+'S3 T170 r8. v17 l1
+'S3 a g f >c2 <b2
+'S3 l8 [a4]4 [g4]4 [f]8 >[c]4 [d+]4
+
+'S4 T170 r1 r1 r1 r1 r1 r1 r1 r1
+
+; =======================================================================
+; Section 2: Guitar-arpeggio bridge  (k+fcgda — G# minor: f+c+g+d+a+)
+;
+; PU1/PU2: interleaved 16th-note arpeggio of G# minor triad
+;          Original voice split (PU1 = lower strand, PU2 = higher strand).
+; WAV: whole-note rest (bridge is very short in original)
+; =======================================================================
+
+'S1 v59 l16 o1
+'S1 f+  a+ >d+ <a+ >d+  f+  a+  f+  a+ >d+ <a+ >d+  f+  a+ >d+
+
+'S2 v42 o1 l16
+'S2 >d+ <a+ f+ a+ f+ >d+ <a+ d+  f+  a+ >d+ <a+ f+ a+ >d+ <a+
+
+'S3 v17 r1
+
+'S4 v17 l1 >a >a
+
+; =======================================================================
+; Section 3: Big ensemble — 16th-note chord hammer (still k+fcgda)
+;
+; The original has a complex interlocking piano arpeggio across PU1, PU2,
+; and PCMB.  PU1/PU2 here approximate the outer voices.
+; =======================================================================
+
+'S1 v59 l16 o2
+'S1 d+ <b+ >e  <b+ >e  d+ <b+ e    d+ <a+ >e  <a+ >e  d+ <a+ e
+'S1 <a+ f+ >c+ <f+ >c+ <a+ f+ c+   >d+ <b+ >e  <b+ >e  d+ <b+ e
+'S1 g+ e  <b+ >e  <b+ g+ e  b+     a+  f+  c+  f+  c+  a+  f+  c+
+
+'S2 v34 l16 o2
+'S2 b+ g+ d+ g+ d+ b+ g+ d+   >c+  <a+ e  a+ e  >c+ <a+ e
+'S2 a+ f+ c+ f+ c+ a+ f+ c+   b+ g+ d+ g+ d+ b+ g+ d+
+'S2 b+ f+ d+ f+ d+ b+ f+ d+   g+ d+ <b+ >d+ <b+ g+ d+ b+
+
+'S3 v17 l16
+'S3 [g+]56 [f+]8 [e]8 [f]8 [<b]8 [>c+]8 [c#+]8 [d+]8 [c+]8 [<b]8 [a+]8 >
+
+'S4 r1 r1 r1 r1 r1 r1 r1 r1
+
+; =======================================================================
+; Section 4: Lead melody  (k+fcgda — G# minor)
+;
+; PU1 and PU2 play the same melody in near-unison (original: different
+; duty cycles and a +1 semitone detune on PU2 for a chorus effect).
+; Detune is impossible on SN76489; both channels are identical here.
+;
+; NOTE: the lead is the most characteristic part of this track.  The
+; original uses @0/_V accent pops on every note — stripped to bare pitches.
+; =======================================================================
+
+; run-up pickup before beat 1
+'S1 v76 l16 o4
+'S1 g+ a+ b >c+
+
+'S1 l4
+'S1 d+. <g+8. g+16 g+16 >d+16 d+16 e. e16 r16 f+. e
+'S1 d+. c+. <b16 b16 >c+2. c+16 r16
+'S1 <g+16 a+16 b16 >c+16
+
+'S1 L
+
+'S1 l4
+'S1 d+. <g+8. g+16 g+16 >d+16 d+16 e. e16 r16 f+. e
+'S1 d+. g+. b a+2 f+. g+16 f+16 g+1. v17 g+2
+
+'S2 v51 l16 o4
+'S2 g+ a+ b >c+
+
+'S2 l4
+'S2 d+. <g+8. g+16 g+16 >d+16 d+16 e. e16 r16 f+. e
+'S2 d+. c+. <b16 b16 >c+2. c+16 r16
+'S2 <g+16 a+16 b16 >c+16
+
+'S2 l4
+'S2 d+. <g+8. g+16 g+16 >d+16 d+16 e. e16 r16 f+. e
+'S2 d+. g+. b a+2 f+. g+16 f+16 g+1. v17 g+2
+
+; WAV bass — chromatic descent over lead
+'S3 v17 l4 o3
+'S3 [g+]14 f+ e e+ f <b >c+ c#+ d+ c+ <b a+
+
+'S4 r1 r1 r1 r1 r1 r1 r1 r1
+
+; =======================================================================
+; (Guitar section omitted — see notes above)
+; The original has an extended passage with @guitar2 portamento bends,
+; B14/B3/B8 pitch-slide commands, and 16th tremolo that cannot be
+; faithfully reproduced without pitch-bend / portamento support.
+; =======================================================================
+
+; =======================================================================
+; Section 5: String arpeggios  (k+fcgda, A minor relative, chords)
+;
+; Original: slow dotted-quarter + two 8th runs spread across PU1/PU2/PCMB.
+; Here: simplified to the outer-voice line in S1 and a chord sketch in S2.
+; Note: original uses explicit accidentals like b= (B natural) in k+fcgda.
+; =======================================================================
+
+'S1 v68 l4 o3
+'S1 e.  g.  b >d.  c.  f
+'S1 d.  c.  <b  a.  b.  f
+'S1 g.  a.  b  a.  f. f16 ~f16 b8~
+
+'S2 v42 l4 o2
+'S2 >e  g  b >d  c  f
+'S2  d  c  b  a  b  f
+'S2  g  a  b  a  f  b8~

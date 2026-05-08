@@ -1,0 +1,33 @@
+'{
+
+    TitleName   = Loops
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Demonstrates MML loop syntax.
+; (body)N — repeat the body N times (finite loop)
+; Loops can be nested: (outer (inner)M)N
+
+'B1 T120
+
+; Simple 4-bar riff repeated 4 times using (...)4
+'B1 v100 l8 o4 (c d e f g f e d)4
+
+; Nested loops — inner pattern (c e g)2 repeats twice inside outer loop (...)3
+'B1 v100 l8 o4 ((c e g)2 a)3 c1
+
+; Varied repeat — different rhythm each time, written manually (no loop shorthand)
+'B1 v100 l4 o4 c g e g | c g e g | c2 g2 | c1
+
+; Quarter-note pulse loop — 8 repetitions of a two-note figure
+'B1 v80 l8 o3 (c >c<)8
+
+; Short staccato burst — (16th-note chord figure) × 4, then a held note
+'B1 v100 l16 o5 (c e g)4 l2 r c1

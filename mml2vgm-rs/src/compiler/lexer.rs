@@ -39,6 +39,8 @@ pub enum Token {
     // Notes
     /// Note: C, D, E, F, G, A, B
     Note(char),
+    /// MIDI note number command: n or N (followed by a number 0-127)
+    NoteNumberCommand,
     /// Sharp: #
     Sharp,
     /// Flat: b
@@ -343,6 +345,12 @@ impl<'a> Lexer<'a> {
                 Ok(Token::LengthCommand)
             }
             
+            // MIDI note number command
+            'n' | 'N' => {
+                self.advance();
+                Ok(Token::NoteNumberCommand)
+            }
+
             // Instrument/At sign
             '@' => {
                 self.advance();

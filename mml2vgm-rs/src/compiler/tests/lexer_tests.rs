@@ -288,3 +288,33 @@ fn lex_deeply_nested_loops() {
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "lex_deeply_nested_loops exceeded timeout");
     assert!(!tokens.is_empty());
 }
+
+// ── MIDI note number command ─────────────────────────────────────────────────
+
+#[test]
+fn lex_note_number_command_lowercase() {
+    let tokens = timed_tokenize("n37");
+    assert_eq!(tokens[0], Token::NoteNumberCommand);
+    assert_eq!(tokens[1], Token::Number(37));
+}
+
+#[test]
+fn lex_note_number_command_uppercase() {
+    let tokens = timed_tokenize("N60");
+    assert_eq!(tokens[0], Token::NoteNumberCommand);
+    assert_eq!(tokens[1], Token::Number(60));
+}
+
+#[test]
+fn lex_note_number_in_sequence() {
+    // n37 sandwiched between regular notes: a n37 a
+    let tokens = timed_tokenize("a n37 a");
+    let kinds: Vec<_> = tokens.iter().map(|t| std::mem::discriminant(t)).collect();
+    // Note, NoteNumberCommand, Number, Note
+    assert!(tokens.iter().any(|t| *t == Token::NoteNumberCommand));
+    assert_eq!(tokens[0], Token::Note('A'));
+    assert_eq!(tokens[1], Token::NoteNumberCommand);
+    assert_eq!(tokens[2], Token::Number(37));
+    assert_eq!(tokens[3], Token::Note('A'));
+    let _ = kinds;
+}

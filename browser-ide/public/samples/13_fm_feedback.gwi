@@ -1,0 +1,81 @@
+'{
+
+    TitleName   = FM Feedback Showcase
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; FM operator feedback controls how much op1 feeds back into itself.
+; Feedback values: 0 = clean sine, 7 = maximum noise/distortion
+;
+; Each FM channel uses a different feedback value so you can hear
+; the progression from clean to distorted on the same melody.
+
+; @0 — Feedback 0: pure sine, clean and smooth
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 007,000
+
+; @1 — Feedback 2: slight warmth, barely noticeable
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 007,002
+
+; @2 — Feedback 4: clear odd harmonic presence, buzzy character
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 007,004
+
+; @3 — Feedback 6: strong buzzing, approximates a sawtooth wave
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 007,006
+
+; @4 — Feedback 7: maximum, rough noise-like texture
+'@ M 004
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 031,010,000,007,002,000,000,001,000,000,000
+'@ 007,007
+
+'A1 T100
+'A2 T100
+'A3 T100
+'A4 T100
+'A5 T100
+'B1 T100
+
+; All five channels play the same C major arpeggio
+'A1 @0 v100 l4 o4 q6 c e g >c< g e c2 r2
+'A2 @1 v100 l4 o4 q6 c e g >c< g e c2 r2
+'A3 @2 v100 l4 o4 q6 c e g >c< g e c2 r2
+'A4 @3 v100 l4 o4 q6 c e g >c< g e c2 r2
+'A5 @4 v100 l4 o4 q6 c e g >c< g e c2 r2
+
+; PSG bass for grounding
+'B1 v70 l1 o2 c c c c

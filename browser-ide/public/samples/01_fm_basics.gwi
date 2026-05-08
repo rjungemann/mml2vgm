@@ -1,0 +1,31 @@
+'{
+
+    TitleName   = FM Basics
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+
+}
+
+; FM instrument 0 — simple sine lead (algorithm 7: all 4 operators are carriers)
+; Format: AR DR SR RR SL TL KS ML DT AM SSG-EG  (one row per operator, then ALG FB)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 007,000
+
+; Part A (YM2612), channel 1 — single FM melody voice
+'A1 T100
+
+; @0 = FM instrument 0, v100 = full volume, l4 = default quarter note, o4 = octave 4
+; Simple C major melody ascending and descending
+'A1 @0 v100 l4 o4 c d e f g a b >c
+'A1 l4 o5 c b a g f e d c
+'A1 l2 o4 c1

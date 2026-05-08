@@ -1,0 +1,17 @@
+'{
+    TitleName   = Hinacle8Miracle (Solo Strings)
+    Composer    = IOSYS
+    Arranger    = Cyris
+    SystemName  = Generic SSG
+    Format      = VGM
+    ClockCount  = 192
+
+    PartAY8910  = A
+}
+
+; Converted from Sitaraba / 3MLE MML format by scripts/convert_sitaraba.mjs
+; Note: l<N>. (dotted default length) is expanded to per-note dots.
+
+'A1 t160l8o2a+a+a+a+a+>fdcrccccgced+rd+d+d+<agfrfffb+rl4fl8a+a+a+a+a+>fdcrccccgced+rd+d+d+<agl2f.l4r.l8a+a+a+a+a+>fd<araaaa>fc<agrgg>d<ga+frfffa+ra+r>d+rd+d+d+n34cdrddddn34cdcrccc<g+a+frb+fb+rab+a>drdddd+fcr<a+ggn39ga+b+brbbbn42ba+r>dcn34fn34d<a+araaa>cf<gr>d<gg>g<g>dn34crcrcrcrfrfl2rl8rd+rd+d+fcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>a+fdd+rd+r<frfr>drdr<g>d<ga+>crcrfcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>fa+fd+rd+d+fcd+c<a+ra+a+a+>a+fdd+rd+r<frfr>drdr<g>d<ga+>crcrfcd+c<a+ra+a+l4a+fl8a+a+a+a+a+>fdcrccccgced+rd+d+d+<agfrfffb+rl4fl8a+a+a+a+a+>fdcrccccgced+rd+d+d+<agl2f.l4r.l2a+.
+'A2 t160l1r.r.r.r.r.r.r.r.r.r.l8rfa+al2rl4arl8aa+b+a+l2r.l8frf+l4r.l8f+g+f+fl2r.l4a+l2a.l8rl2g.l8rfrl2d+l4rl8gral4r.l8gagafl4rl8a+b+l16rl8a+l16r>l8cdl2r.l8r<fl4rl8a+al16rl8a+l16r>l8cdl2rl8rdfl4cl2r<l8a+aa+agfgrga+l4fr.l8dfl2a+rl8rfl4rl8a+b+l16rl8a+l16r>l8cdl2r.l8r<fl4rl8a+al16rl8a+l16r>l8cdl2rl8rdfl4cl2r<l8a+aa+agfgrga+l4fr.l8dfl2a+rl8rfffa+b+l16rl8a+l16rl8frffa+>crdl4r.>l8fdd+dn70drd+dn70drcr<<fffa+b+l16rl8a+l16rl8frffa+>crdl4r.>l8fdd+dn70l2c.l4r.<<l2a+.
+'A3 t160l8fffa+b+l16rl8a+l16rl8frffa+>crdl4r.>l8fdd+dn70drd+dn70drcr<<fffa+b+l16rl8a+l16rl8frffa+>crdl4r.>l8fdd+dn70cl1r<<l8a+a+raa+a+raraa+ral16rl8gl16rl8fa+a+raa+a+rfrfa+b+a+l4r.l8a+a+raa+a+raraa+ral16rl8gl16rl8fa+a+raa+a+rfr

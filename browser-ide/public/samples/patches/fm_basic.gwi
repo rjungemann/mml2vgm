@@ -1,0 +1,103 @@
+; FM Basic Patch Library — YM2612 / YM2608 / YM2203
+;
+; Include this file in your own songs to get access to a set of general-purpose
+; FM instrument patches. Each patch is documented with its algorithm and character.
+;
+; Patch format:
+;   '@ M NNN
+;      AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+;   '@ op1_values
+;   '@ op2_values
+;   '@ op3_values
+;   '@ op4_values
+;   '@ ALG,FB
+
+; ── @0 — Sine Lead ───────────────────────────────────────────────────────────
+; Algorithm 7: all 4 operators are carriers → pure sine organ
+; Fast attack, medium decay, bright and clean
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 031,012,000,007,002,000,000,001,000,000,000
+'@ 007,000
+
+; ── @1 — FM Pluck ────────────────────────────────────────────────────────────
+; Algorithm 4: two modulator+carrier pairs
+; Fast attack, fast decay — sharp pluck with FM overtones
+; Feedback 6 on op1 adds slight crunch
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,002,000,000,000
+'@ 031,015,000,007,001,000,000,004,000,000,000
+'@ 004,006
+
+; ── @2 — Warm Pad ────────────────────────────────────────────────────────────
+; Algorithm 7: all carriers, slow attack
+; Use for sustained background pads — note takes time to bloom in
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 012,003,000,005,003,000,000,001,000,000,000
+'@ 012,003,000,005,003,000,000,001,000,000,000
+'@ 012,003,000,005,003,000,000,001,000,000,000
+'@ 012,003,000,005,003,000,000,001,000,000,000
+'@ 007,000
+
+; ── @3 — Deep Bass ───────────────────────────────────────────────────────────
+; Algorithm 0: all 4 operators stacked in series — op4 is the only carrier
+; Full modulation chain gives a rich, dark bass tone
+; Use in octave 2-3 for best effect
+'@ M 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,009,002,030,000,001,000,000,000
+'@ 031,008,000,007,003,025,000,002,000,000,000
+'@ 031,007,000,006,004,020,000,001,000,000,000
+'@ 031,005,000,005,005,000,000,002,000,000,000
+'@ 000,005
+
+; ── @4 — Metallic Bell ───────────────────────────────────────────────────────
+; Algorithm 7: all carriers with heavy feedback and detuning
+; Bright, inharmonic bell-like timbre — best at fast decay
+'@ M 004
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,007,005,000,000,003,002,000,000
+'@ 031,015,000,007,005,000,000,003,006,000,000
+'@ 031,015,000,007,005,000,000,007,002,000,000
+'@ 031,015,000,007,005,000,000,007,006,000,000
+'@ 007,007
+
+; ── @5 — Detuned Strings ─────────────────────────────────────────────────────
+; Algorithm 7: all carriers with slight detuning between pairs (DT=2 vs DT=6)
+; Chorus-like string ensemble — slow attack, sustained
+'@ M 005
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 020,005,000,007,003,005,000,001,002,000,000
+'@ 020,005,000,007,003,005,000,001,006,000,000
+'@ 020,005,000,007,003,005,000,002,002,000,000
+'@ 020,005,000,007,003,000,000,002,006,000,000
+'@ 007,000
+
+; ── @6 — Electric Piano ──────────────────────────────────────────────────────
+; Algorithm 4: modulator pairs with slight detune on op3
+; Classic FM electric piano character — medium attack, medium decay
+'@ M 006
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,009,002,050,000,001,000,000,000
+'@ 031,010,000,007,003,000,000,001,000,000,000
+'@ 031,008,000,009,002,050,000,002,001,000,000
+'@ 031,010,000,007,003,000,000,002,000,000,000
+'@ 004,003
+
+; ── @7 — Brass ───────────────────────────────────────────────────────────────
+; Algorithm 3: two-branch modulator structure with sharp carrier
+; Bright brass bite — fast attack, moderate sustain
+'@ M 007
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,003,040,000,001,000,000,000
+'@ 031,008,000,007,003,040,000,001,000,000,000
+'@ 031,006,000,006,004,020,000,002,001,000,000
+'@ 031,005,000,005,005,000,000,001,000,000,000
+'@ 003,004

@@ -1,0 +1,36 @@
+'{
+
+    TitleName   = FM Synthesis Demo
+    Composer    = Tutorial
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+
+}
+
+; Pad/string-like tone: algorithm 7 (additive — all four operators are carriers)
+; Long attack and slow release for a sustained pad character.
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,020,000,001,000,000,000
+'@ 031,010,004,008,002,000,000,001,000,000,000
+   AL  FB
+'@ 007,000
+
+; Three channels forming a chord progression
+; Root voice
+'A1 T90
+'A1 @1 v100 l2 o4 c f g c
+
+; Third above root
+'A2 T90
+'A2 @1 v90  l2 o4 e a b e
+
+; Fifth above root
+'A3 T90
+'A3 @1 v80  l2 o4 g >c d g

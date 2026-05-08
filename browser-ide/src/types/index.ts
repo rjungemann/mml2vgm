@@ -237,7 +237,7 @@ export interface MixerChipSettings {
 // ============================================================================
 
 /** Panel types */
-export type PanelType = 
+export type PanelType =
     | 'folder'
     | 'partCounter'
     | 'errorList'
@@ -253,7 +253,10 @@ export type PanelType =
     | 'script'
     | 'runtime'
     | 'compilation'
-    | 'waveform';
+    | 'waveform'
+    | 'fmToneEditor'
+    | 'envelopeEditor'
+    | 'arpeggioEditor';
 
 /** Panel position */
 export type PanelPosition = 

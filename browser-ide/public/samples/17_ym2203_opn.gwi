@@ -1,0 +1,61 @@
+'{
+
+    TitleName   = YM2203 OPN
+    SystemName  = NEC PC-88
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2203  = A
+    PartSN76489 = B
+
+}
+
+; YM2203 (OPN) — 3 FM channels, same register layout as YM2612.
+; The YM2203 was used in NEC PC-88 and PC-98 computers.
+; It also has 3 SSG (AY-style PSG) channels, but those are handled
+; separately as SN76489 parts in this compiler.
+;
+; Part letter A is mapped to YM2203, B to SN76489 for bass texture.
+
+; FM patch — clean organ (algorithm 7, all carriers)
+'@ M 000
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,008,000,007,002,000,000,001,000,000,000
+'@ 031,008,000,007,002,000,000,001,000,000,000
+'@ 031,008,000,007,002,000,000,001,000,000,000
+'@ 031,008,000,007,002,000,000,001,000,000,000
+'@ 007,000
+
+; FM patch — two-carrier pluck (algorithm 4)
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,001,000,000,000
+'@ 031,015,000,007,001,000,000,002,001,000,000
+'@ 031,015,000,007,001,000,000,004,000,000,000
+'@ 004,004
+
+'A1 T110
+'A2 T110
+'A3 T110
+'B1 T110
+
+; A1 — YM2203 channel 1: melody voice
+'A1 @0 v100 l4 o5 q6 c r d r e r g r | a r g r e r c r
+'A1 l4 o5 q6 d r e r f+ r a r | g r f+ r e r d r
+'A1 l4 o5 q6 e r f+ r g r b r | >c r< b r a r g r
+'A1 l4 o5 q6 c2 d2 | e2. r4
+
+; A2 — YM2203 channel 2: countermelody
+'A2 @1 v80 l8 o4 q5 e g c e | g e c g | d f a d | f a d f
+'A2 l8 o4 q5 e g c e | g e c g | d f a d | c1
+
+; A3 — YM2203 channel 3: sustained pad / harmony
+'A3 @0 v60 l1 q8 o4 c | c | d | e
+'A3 l1 q8 o4 c | c | d | e
+
+; B1 — SN76489 bass (PSG)
+'B1 v85 l2 o2 c g | c g | d a | c g
+'B1 l2 o2 c g | c g | d a | c1

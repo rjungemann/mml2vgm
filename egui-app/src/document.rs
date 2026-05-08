@@ -128,6 +128,10 @@ impl DocumentStore {
         self.active.and_then(|id| self.docs.iter_mut().find(|d| d.id == id))
     }
 
+    pub fn get(&self, id: usize) -> Option<&Document> {
+        self.docs.iter().find(|d| d.id == id)
+    }
+
     pub fn get_mut(&mut self, id: usize) -> Option<&mut Document> {
         self.docs.iter_mut().find(|d| d.id == id)
     }

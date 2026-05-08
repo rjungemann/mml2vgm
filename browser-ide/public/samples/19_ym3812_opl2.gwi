@@ -1,0 +1,49 @@
+'{
+
+    TitleName   = YM3812 OPL2
+    SystemName  = IBM PC
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM3812  = A
+    PartSN76489 = B
+
+}
+
+; YM3812 (OPL2) — 9-channel 2-operator FM chip used in the AdLib and Sound Blaster
+; cards. Each channel uses a modulator and a carrier (2 operators total, unlike the
+; YM2612's 4). The compiler initialises each OPL2 channel with a simple sine patch.
+;
+; 9 channels available: A1-A9. Use them freely for melody, harmony, and bass.
+
+'A1 T100
+'A2 T100
+'A3 T100
+'A4 T100
+'B1 T100
+
+; A1 — OPL2 melody, octave 5
+'A1 v100 l4 o5 q6 c r e r g r b r | >c r< b r a r g r
+'A1 l4 o5 q6 f r a r c r e r | f r e r d r c r
+'A1 l4 o5 q6 e r g r b r >d r | e r d r c r e r
+'A1 l2 o5 c1
+
+; A2 — OPL2 harmony (third below), octave 4
+'A2 v80 l4 o4 q6 e r g r b r >d r | e r d r c r b r<
+'A2 l4 o4 q6 a r >c r e r g r< | a r g r f r e r
+'A2 l4 o4 q6 g r b r >d r f r | g r f r e r g r
+'A2 l2 o4 e1
+
+; A3 — OPL2 counter-melody, octave 4
+'A3 v70 l8 o4 q5 g e c g | f d b f | e c a e | d b g d
+'A3 l8 o4 q5 g e c g | f d b f | e c a e | c1
+
+; A4 — OPL2 bass voice, octave 2
+'A4 v90 l2 o2 c g | f c | g d | c1
+'A4 l2 o2 c g | f c | g d | c1
+
+; B1 — SN76489 sub-bass (one octave below A4)
+'B1 v80 l1 o1 c | f | g | c
+'B1 l1 o1 c | f | g | c

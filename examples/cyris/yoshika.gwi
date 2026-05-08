@@ -1,0 +1,17 @@
+'{
+    TitleName   = Rigid Paradise (Solo Strings)
+    Composer    = ZUN
+    Arranger    = Cyris and Kuro
+    SystemName  = Generic SSG
+    Format      = VGM
+    ClockCount  = 192
+
+    PartAY8910  = A
+}
+
+; Converted from Sitaraba / 3MLE MML format by scripts/convert_sitaraba.mjs
+; Note: l<N>. (dotted default length) is expanded to per-note dots.
+
+'A1 l8ro2aa._l32a>c+l4dc+<l8a+l4agael8aa._l32a>c+l4dc+l8<a+l1al8aa>d<l4al8an37al4agael8aa>d<l4al8an37aan37a>c+d<a>e<a>dadadadadadadadan34fn34fn34fn34fn34fn34fcgcgdadadadadadadadan34fn34fn34fn34fl4n34fffl8cc._l32cel4fel8c+l4cn34c<g>l8cc._l32cel4fel8c+l1cl8cc._l32cel4fel8c+l4cn34c<g>l8cc._l32cel4fel8c+cecefcgcfb+fb+fb+fb+fb+fb+fb+fb+c+g+c+g+c+g+c+g+c+g+c+g+d+a+d+a+fb+fb+fb+fb+fb+fb+fb+fb+c+g+c+g+c+g+c+g+c+g+c+g+d+a+d+a+c+g+c+g+c+g+c+g+d+a+d+a+d+a+d+a+fb+fb+fb+fb+fb+fb+fb+fb+c+g+c+g+c+g+c+g+d+a+d+a+d+a+d+a+fb+fb+fb+fb+fb+fb+fb+fb+c+g+c+g+c+g+c+g+d+a+d+a+d+a+d+a+fb+fb+fb+fb+fb+fb+fb+fb+c+g+c+g+c+g+c+g+d+a+d+a+d+a+d+a+fb+fb+fb+fb+fb+fb+fb+f
+'A2 l8raa._l32a>c+l4dc+<l8a+l4agael8aa._l32a>c+l4dc+<l8a+l1al8aa._l32a>c+l4dc+<l8a+l4agael8aa._l32a>c+l4dc+<l8a+l4a>c+del8fdecd<f>cdd<a>ecfcegfdecd<f>cdd<a>ecfcegfdecd<f>cdd<a>ecfcegfdecd<f>cdl1dl8cc._l32cel4fel8c+l4cn58c<g>l8cc._l32cel4fel8c+l1cl8cc._l32cel4fel8c+l4cn58c<g>l8cc._l32cel4fel8c+l4cefgl8g+fgn58fn56c<g>fcgn58g+d+ga+g+fgn58fn56c<g>fcgn58g+d+ga+g+fgn58fn56c<g>fcgn58g+d+ga+g+fgn58fn56c<g>fcgn58g+d+gl1a+.r.r.r.r.r.r.l2rl1>l8d+<l1fl8fl4l8f._l32fbl4b+a+l8g+l4gd+n58d+l1f.
+'A3 l1r.r.r.r.r.r.r.r.r.r.r.r.r.r.r.r.l2rl8r>l1fl4a+l2b+.l1fl4d+cl2fa+b+l4a+n75l1a+_l2a+l4g+gl8ff._l32fbl4b+a+l8g+l4gd+n58d+l8ff._l32fbl4b+a+>l8d+<l1fl8ff._l32fbl4b+a+l8g+l4gd+n58d+l8fl1f_l4f.l8fgd+gff._l32fbl4b+a+l8g+l4gd+n58d+l8ff._l32fbl4b+a+

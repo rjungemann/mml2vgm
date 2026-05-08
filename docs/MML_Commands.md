@@ -417,3 +417,37 @@ The full MML command set is extensive. For detailed command reference, please se
 - For .m/.m2/.mz (PMD): See the official PMD page
 
 This document provides the structural overview. For specific MML commands (notes, rests, volume, effects, etc.), consult the relevant command reference for your target format.
+
+### Sequencer Note Commands (mml2vgm-rs)
+
+| Command | Description |
+|---------|-------------|
+| `c`–`b` / `C`–`B` | Play a note (A–G). Followed optionally by `+` or `-` for sharp/flat, then an octave number, then another number for duration. |
+| `r` / `R` | Rest. Followed optionally by a duration number and `.` for dotted. |
+| `n<N>` | Play the note at MIDI note number `N` (0–127). The pitch and octave are derived from the MIDI number; the current default length (`l`) sets the duration. Supports `.` (dotted) and `_` (tied). Does **not** change the current octave for subsequent letter-notes. Useful when importing MML from Sitaraba / 3MLE format, where `n` commands are used for chromatic notes that would otherwise need octave switches. |
+| `l<N>` | Set default note length (1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth, …). |
+| `o<N>` | Set current octave (0–8). |
+| `>` / `<` | Octave up / down. |
+| `t<N>` | Set tempo in BPM. |
+| `v<N>` | Set volume (0–127). |
+| `@<N>` | Select instrument number N. |
+
+#### MIDI Note Number Reference (`n<N>`)
+
+| MIDI | Note | MIDI | Note | MIDI | Note |
+|------|------|------|------|------|------|
+| 0    | C-1  | 48   | C3   | 96   | C7   |
+| 12   | C0   | 60   | C4 (middle C) | 108 | C8 |
+| 24   | C1   | 72   | C5   | —    | —    |
+| 36   | C2   | 84   | C6   | —    | —    |
+
+Sharp notes: add 1 to the preceding C (e.g. MIDI 61 = C#4, 63 = D#4).
+
+Example — using `n` to access a note that would otherwise require an octave switch:
+```
+; Without n: need to shift octave, play note, shift back
+'B1 l8 o3 a >c+< a
+
+; With n: stays at o3 for surrounding notes, n picks exact pitch
+'B1 l8 o3 a n37 a
+```

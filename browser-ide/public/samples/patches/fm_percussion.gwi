@@ -1,0 +1,71 @@
+; FM Percussion Patch Library — YM2612
+;
+; Patches @10-@15: drum kit sounds synthesized with FM.
+; These use very fast decays and no sustain to simulate percussion hits.
+;
+; To use: add 'A1 @10 v100 o2 c' style commands in your song.
+; FM drums work best in octave 1-3 and with short notes (l16 or l8).
+
+; ── @10 — FM Kick ────────────────────────────────────────────────────────────
+; Algorithm 7, very fast decay — low thud with quick tail
+; Best in octave 1-2 for a deep kick sound
+'@ M 010
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 031,020,000,015,000,000,000,001,000,000,000
+'@ 007,004
+
+; ── @11 — FM Snare ───────────────────────────────────────────────────────────
+; Algorithm 7, feedback 6 for noise-like character, fast decay
+; Best in octave 3-4 for snare register
+'@ M 011
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,018,000,012,001,000,000,002,002,000,000
+'@ 031,018,000,012,001,000,000,002,006,000,000
+'@ 031,018,000,012,001,000,000,003,002,000,000
+'@ 031,018,000,012,001,000,000,003,006,000,000
+'@ 007,006
+
+; ── @12 — FM Hi-Hat Closed ───────────────────────────────────────────────────
+; Algorithm 7, very high multipliers, very fast decay
+; Bright metallic click — use in octave 5-6
+'@ M 012
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,031,000,015,000,000,000,015,002,000,000
+'@ 031,031,000,015,000,000,000,015,006,000,000
+'@ 031,031,000,015,000,000,000,015,002,000,000
+'@ 031,031,000,015,000,000,000,015,006,000,000
+'@ 007,007
+
+; ── @13 — FM Hi-Hat Open ─────────────────────────────────────────────────────
+; Same as closed but with slower release — lingering metallic shimmer
+'@ M 013
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,005,002,000,000,015,002,000,000
+'@ 031,015,000,005,002,000,000,015,006,000,000
+'@ 031,015,000,005,002,000,000,015,002,000,000
+'@ 031,015,000,005,002,000,000,015,006,000,000
+'@ 007,007
+
+; ── @14 — FM Cymbal ──────────────────────────────────────────────────────────
+; High feedback, inharmonic — crash cymbal character, medium decay
+'@ M 014
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,010,000,007,003,000,000,015,003,000,000
+'@ 031,010,000,007,003,000,000,013,005,000,000
+'@ 031,010,000,007,003,000,000,015,001,000,000
+'@ 031,010,000,007,003,000,000,013,007,000,000
+'@ 007,007
+
+; ── @15 — FM Tom ─────────────────────────────────────────────────────────────
+; Algorithm 0, medium pitch, medium decay — classic drum machine tom
+; Pitch is set by octave (o1=low tom, o3=high tom)
+'@ M 015
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,015,000,010,002,020,000,001,000,000,000
+'@ 031,012,000,008,003,015,000,002,000,000,000
+'@ 031,010,000,007,004,010,000,001,000,000,000
+'@ 031,008,000,006,005,000,000,002,000,000,000
+'@ 000,003

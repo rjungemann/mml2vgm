@@ -1,6 +1,10 @@
+pub mod arpeggio_editor;
 pub mod compile_options;
+pub mod envelope_editor;
 pub mod error_list;
+pub mod fm_tone_editor;
 pub mod midi_keyboard;
 pub mod playback;
+pub mod sample_editor;
 pub mod settings_panel;
 pub mod waveform;

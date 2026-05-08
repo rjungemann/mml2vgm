@@ -1,0 +1,28 @@
+'{
+
+    TitleName   = PSG Basics
+    SystemName  = Sega Genesis
+    Composer    = mml2vgm
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartSN76489 = B
+
+}
+
+; Three-voice SN76489 texture: melody, harmony, bass
+; B1 = melody (high), B2 = harmony (third above), B3 = bass (low)
+
+'B1 T120
+'B2 T120
+'B3 T120
+
+; Melody — G major tune in octave 5
+'B1 v100 l4 o5 g a b >d< b a g2 | e f+ g a g f+ e2 | d e f+ g a b >d2< | g1
+
+; Harmony — a third below the melody in octave 4
+'B2 v80 l4 o4 e f+ g a g f+ e2 | c d e f+ e d c2 | b >c d e f+ g b2< | e1
+
+; Bass — root notes in octave 2
+'B3 v90 l2 o2 g. r4 c. r4 | g. r4 c. r4 | g. r4 d. r4 | g1

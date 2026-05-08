@@ -896,6 +896,46 @@ impl Parser {
                     Ok(Some(MmlNode::Note(note)))
                 }
                 
+                // MIDI note number: n<0-127>
+                // Converts a MIDI note number directly to a note, bypassing current octave.
+                // The octave is derived from the MIDI number: octave = (midi / 12) - 1.
+                // Does NOT update current_octave; subsequent letter-notes continue at their
+                // current octave (same as 3MLE / Sitaraba behaviour).
+                Token::NoteNumberCommand => {
+                    self.advance();
+                    if let Some(Token::Number(midi)) = self.current_token() {
+                        let midi = midi.min(127);
+                        self.advance();
+                        let octave = (midi / 12).saturating_sub(1) as u8;
+                        let pos = midi % 12;
+                        let (letter, accidental): (char, i8) = match pos {
+                            0  => ('C', 0),
+                            1  => ('C', 1),
+                            2  => ('D', 0),
+                            3  => ('D', 1),
+                            4  => ('E', 0),
+                            5  => ('F', 0),
+                            6  => ('F', 1),
+                            7  => ('G', 0),
+                            8  => ('G', 1),
+                            9  => ('A', 0),
+                            10 => ('A', 1),
+                            _  => ('B', 0),  // 11 = B
+                        };
+                        let mut note = Note::new(letter, accidental, octave);
+                        note.duration = Some(self.current_length);
+                        if self.consume(Token::Dot) {
+                            note.dotted = true;
+                        }
+                        if self.consume(Token::Underscore) {
+                            note.tied = true;
+                        }
+                        Ok(Some(MmlNode::Note(note)))
+                    } else {
+                        Ok(None)
+                    }
+                }
+
                 Token::Rest => {
                     self.advance();
                     let mut rest = Rest {
