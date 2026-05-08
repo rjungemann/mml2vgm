@@ -1,0 +1,19 @@
+#title "FM Operator Commands Test"
+#description "Tests FM operator commands: AR, DR, SR, RR, SL, TL"
+
+$Part1=YM2612@1
+$Part2=YM2151
+
+* Part1 YM2612 FM Test
+@Part1
+@AR10 @DR20 @SR5 @RR8 @SL6 @TL42
+@AL1 @FB3
+t120 l8
+o5 c2 d2 e2 f2 | g2 a2 b2 >c2
+
+* Part2 OPM Test (YM2151)
+@Part2
+@AR12 @DR18 @SR4 @RR6 @SL8 @TL40
+@AL2 @FB2
+t120 l8 
+o4 c2 d2 e2 f2 | g2 a2 b2 >c2

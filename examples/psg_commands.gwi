@@ -1,0 +1,13 @@
+#title "PSG Commands Test"
+#description "Tests PSG (AY8910) commands: EN, MIX, NOISE"
+
+$PSG=AY8910
+
+* PSG Envelope and Mixer Test
+@PSG
+@EN1 @MIX0 @NOISE12
+t120 l8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
+r8
+@EN0 @MIX1 @NOISE8
+o5 c4 d4 e4 f4 | g4 a4 b4 >c4
