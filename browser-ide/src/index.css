@@ -201,6 +201,27 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Editor drag-over highlight when .wav files are being dragged */
+.editor-wav-drag-over {
+  outline: 2px dashed var(--accent-primary, #007acc);
+  outline-offset: -2px;
+}
+
+.editor-wav-drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent-primary, #007acc) 18%, transparent 82%);
+  color: var(--text-primary, #d4d4d4);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 25;
+}
+
 /* Monaco Editor overrides */
 .monaco-editor {
   height: 100% !important;
@@ -1401,6 +1422,19 @@ body {
 
 .active-note-glyph {
   background-color: rgba(147, 112, 219, 0.4) !important;
+}
+
+/* Status bar note badge */
+.active-note-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: rgba(147, 112, 219, 0.2);
+  border-radius: 4px;
+  color: rgba(147, 112, 219, 0.9);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* ============================================================================

@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useDocumentStore } from '@/stores/documentStore';
 import { sampleService } from '@/services/sampleService';
 import type { StoredSample } from '@/services/sampleService';
+import { zipSync } from 'fflate';
 
 // ============================================================================
 // Constants
@@ -46,6 +47,47 @@ function formatDate(d: Date): string {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Encode a Float32Array (interleaved if stereo) back to a 16-bit PCM WAV Uint8Array.
+ * This mirrors the interleaving done in sampleService.audioBufferToFloat32.
+ */
+function encodeWav(pcm: Float32Array, sampleRate: number, channels: number): Uint8Array {
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const byteRate = sampleRate * channels * bytesPerSample;
+    const blockAlign = channels * bytesPerSample;
+    const dataBytes = pcm.length * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataBytes);
+    const view = new DataView(buffer);
+
+    const writeStr = (offset: number, str: string) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + dataBytes, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);           // chunk size
+    view.setUint16(20, 1, true);            // PCM format
+    view.setUint16(22, channels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeStr(36, 'data');
+    view.setUint32(40, dataBytes, true);
+
+    let offset = 44;
+    for (let i = 0; i < pcm.length; i++) {
+        const s = Math.max(-1, Math.min(1, pcm[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        offset += 2;
+    }
+
+    return new Uint8Array(buffer);
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -59,7 +101,12 @@ interface PendingDuplicate {
 // Component
 // ============================================================================
 
-const SamplesPanel: React.FC = () => {
+interface SamplesPanelProps {
+    /** Increment this counter to programmatically open the file-upload dialog */
+    uploadTrigger?: number;
+}
+
+const SamplesPanel: React.FC<SamplesPanelProps> = ({ uploadTrigger = 0 }) => {
     const { activeDocumentId, activeDocument } = useDocumentStore(
         useShallow((state) => ({
             activeDocumentId: state.activeDocumentId,
@@ -104,6 +151,15 @@ const SamplesPanel: React.FC = () => {
 
     useEffect(() => { refresh(); }, [refresh]);
 
+    // Open the hidden file input when triggered externally (e.g. from menu bar)
+    const uploadTriggerRef = useRef(0);
+    useEffect(() => {
+        if (uploadTrigger > 0 && uploadTrigger !== uploadTriggerRef.current) {
+            uploadTriggerRef.current = uploadTrigger;
+            fileInputRef.current?.click();
+        }
+    }, [uploadTrigger]);
+
     // Dequeue one duplicate for resolution whenever the current one is cleared
     useEffect(() => {
         if (duplicateQueue.length > 0 && !currentDuplicate) {
@@ -114,6 +170,36 @@ const SamplesPanel: React.FC = () => {
             setDuplicateRenameValue(next.name);
         }
     }, [duplicateQueue, currentDuplicate]);
+
+    // -------------------------------------------------------------------------
+    // Download as ZIP
+    // -------------------------------------------------------------------------
+
+    const handleDownloadZip = useCallback(async () => {
+        if (!projectId || samples.length === 0) return;
+        setError(null);
+        try {
+            const files: Record<string, Uint8Array> = {};
+            for (const meta of samples) {
+                const full = await sampleService.get(projectId, meta.name);
+                if (!full) continue;
+                const wavName = meta.name.toLowerCase().endsWith('.wav') ? meta.name : `${meta.name}.wav`;
+                files[wavName] = encodeWav(full.pcm, full.sampleRate, full.channels);
+            }
+            const zipped = zipSync(files, { level: 0 }); // store-only; WAV is already uncompressed
+            const blob = new Blob([zipped], { type: 'application/zip' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `samples-${projectId.slice(0, 8)}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            setError(`Download failed: ${(e as Error).message}`);
+        }
+    }, [projectId, samples]);
 
     // -------------------------------------------------------------------------
     // Upload
@@ -316,6 +402,14 @@ const SamplesPanel: React.FC = () => {
             <div style={styles.toolbar}>
                 <button style={styles.uploadBtn} onClick={handleUploadClick}>
                     Upload WAV…
+                </button>
+                <button
+                    style={{ ...styles.uploadBtn, background: 'var(--bg-secondary, #252526)', border: '1px solid var(--border, #3c3c3c)', color: 'var(--text-primary, #d4d4d4)' }}
+                    onClick={handleDownloadZip}
+                    disabled={samples.length === 0}
+                    title={samples.length === 0 ? 'No samples to download' : `Download ${samples.length} sample${samples.length !== 1 ? 's' : ''} as ZIP`}
+                >
+                    Download ZIP
                 </button>
                 <span style={styles.hint}>or drag &amp; drop .wav files here</span>
             </div>

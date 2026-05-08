@@ -6,6 +6,7 @@ import { traceService } from '@/services/traceService';
 import { partService } from '@/services/partService';
 import { formatService } from '@/services/formatService';
 import { storageService, registerServiceWorker, setUpdateNotificationCallback } from '@/services/storageService';
+import { sampleService } from '@/services/sampleService';
 import { serialService } from '@/services/serialService';
 import { hidService } from '@/services/hidService';
 import { i18nService } from '@/services/i18nService';
@@ -121,6 +122,19 @@ export const App: React.FC = () => {
     }))
   );
 
+  // Compile store (moved before useEffect that uses getResult)
+  const { compile, cancel, status, getResult, progress, progressMessage, lastCompileTimingSummary } = useCompileStore(
+    useShallow((state) => ({
+      compile: state.compile,
+      cancel: state.cancel,
+      status: state.status,
+      getResult: state.getResult,
+      progress: state.progress,
+      progressMessage: state.progressMessage,
+      lastCompileTimingSummary: state.lastCompileTimingSummary,
+    }))
+  );
+
   // Get active document
   const activeDocument = activeDocumentId ? documents.get(activeDocumentId) || null : null;
 
@@ -231,19 +245,6 @@ export const App: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
-
-  // Compile store
-  const { compile, cancel, status, getResult, progress, progressMessage, lastCompileTimingSummary } = useCompileStore(
-    useShallow((state) => ({
-      compile: state.compile,
-      cancel: state.cancel,
-      status: state.status,
-      getResult: state.getResult,
-      progress: state.progress,
-      progressMessage: state.progressMessage,
-      lastCompileTimingSummary: state.lastCompileTimingSummary,
-    }))
-  );
 
   // Get compiled data for active document
   const activeCompileResult = activeDocumentId ? getResult(activeDocumentId) : undefined;
@@ -801,6 +802,68 @@ export const App: React.FC = () => {
   const handleOpenHelp = useCallback(() => setOpenDialog('help'), []);
   const handleOpenMmlReference = useCallback(() => setOpenDialog('mmlReference'), []);
 
+  // Upload Samples via menu bar — switch to the Samples tab and open file picker
+  const [sampleUploadTrigger, setSampleUploadTrigger] = useState(0);
+  const handleUploadSamples = useCallback(() => {
+    setActiveBottomTab('samples');
+    if (bottomPaneMinimized) setBottomPaneMinimized(false);
+    setSampleUploadTrigger((prev) => prev + 1);
+  }, [setActiveBottomTab, bottomPaneMinimized, setBottomPaneMinimized]);
+
+  // Drag .wav files directly onto the editor area
+  const [isEditorDragOver, setIsEditorDragOver] = useState(false);
+  const editorDragCounterRef = useRef(0);
+
+  const handleEditorDragOver = useCallback((e: React.DragEvent) => {
+    const hasWav = Array.from(e.dataTransfer.items).some(
+      (item) => item.kind === 'file' && (item.type === 'audio/wav' || item.type === 'audio/wave')
+    );
+    if (!hasWav) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleEditorDragEnter = useCallback((e: React.DragEvent) => {
+    const hasWav = Array.from(e.dataTransfer.items).some(
+      (item) => item.kind === 'file' && (item.type === 'audio/wav' || item.type === 'audio/wave')
+    );
+    if (!hasWav) return;
+    e.preventDefault();
+    editorDragCounterRef.current += 1;
+    setIsEditorDragOver(true);
+  }, []);
+
+  const handleEditorDragLeave = useCallback(() => {
+    editorDragCounterRef.current -= 1;
+    if (editorDragCounterRef.current <= 0) {
+      editorDragCounterRef.current = 0;
+      setIsEditorDragOver(false);
+    }
+  }, []);
+
+  const handleEditorDrop = useCallback(async (e: React.DragEvent) => {
+    editorDragCounterRef.current = 0;
+    setIsEditorDragOver(false);
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      f.name.toLowerCase().endsWith('.wav')
+    );
+    if (files.length === 0) return;
+    e.preventDefault();
+    if (!activeDocumentId) return;
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer();
+        await sampleService.put(activeDocumentId, file.name, buf);
+      } catch (err) {
+        console.error('[App] Failed to upload dropped sample:', err);
+      }
+    }
+    // Switch to Samples tab so user can see the result
+    setActiveBottomTab('samples');
+    if (bottomPaneMinimized) setBottomPaneMinimized(false);
+    setSampleUploadTrigger((prev) => prev); // nudge without opening picker
+  }, [activeDocumentId, setActiveBottomTab, bottomPaneMinimized, setBottomPaneMinimized]);
+
   // Phase 3.1: Zoom controls (adjust Monaco font size via settings store)
   const handleZoomIn = useCallback(() => {
     const current = settings.editor.fontSize ?? 14;
@@ -1118,7 +1181,7 @@ export const App: React.FC = () => {
     {
       id: 'samples',
       label: 'Samples',
-      content: <SamplesPanel />,
+      content: <SamplesPanel uploadTrigger={sampleUploadTrigger} />,
     },
   ];
 
@@ -1198,6 +1261,7 @@ export const App: React.FC = () => {
         onOpenPreferences={handleOpenPreferences}
         onOpenHelp={handleOpenHelp}
         onOpenMmlReference={handleOpenMmlReference}
+        onUploadSamples={handleUploadSamples}
       />
 
       {/* Tab Bar */}
@@ -1270,7 +1334,16 @@ export const App: React.FC = () => {
       <div className="main-layout">
         <div className="editor-column">
           {/* Editor Area */}
-          <div className="editor-container" id="editor-container" role="main" aria-label="MML Editor">
+          <div
+            className={`editor-container${isEditorDragOver ? ' editor-wav-drag-over' : ''}`}
+            id="editor-container"
+            role="main"
+            aria-label="MML Editor"
+            onDragOver={handleEditorDragOver}
+            onDragEnter={handleEditorDragEnter}
+            onDragLeave={handleEditorDragLeave}
+            onDrop={handleEditorDrop}
+          >
             {activeDocument && (
               <MonacoEditor
                 ref={editorRef}
@@ -1303,6 +1376,12 @@ export const App: React.FC = () => {
                 >
                   Cancel
                 </button>
+              </div>
+            )}
+
+            {isEditorDragOver && (
+              <div className="editor-wav-drop-overlay" aria-hidden="true">
+                Drop .wav files to add to sample library
               </div>
             )}
           </div>
@@ -1366,6 +1445,7 @@ export const App: React.FC = () => {
         progressMessage={progressMessage}
         lastCompileTimingSummary={lastCompileTimingSummary}
         isAudioPlaying={audioRuntimeDebug.isPlaying}
+        activeNoteEvents={activeNoteEvents}
       />
 
       {/* Dialogs */}

@@ -330,8 +330,8 @@ impl DriverRegistry {
   
 - [x] Format-specific editor features
   - [x] Syntax highlighting per format via `tokenize()` → `getTokenPatterns()`
-  - ~~[ ] Autocomplete per format~~ — deferred; no per-format autocomplete; out of scope for v1
-  - ~~[ ] Format-specific panels (PMD rhythm editor)~~ — deferred; out of scope for v1
+  - [ ] Autocomplete per format — deferred; no per-format autocomplete; out of scope for v1
+  - [ ] Format-specific panels (PMD rhythm editor) — deferred; out of scope for v1
   
 - ~~[ ] Performance optimization (WASM size, compilation speed, memory)~~ — deferred; current
   performance is acceptable; profile-driven optimization deferred until regression observed

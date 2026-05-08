@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Document, CompileStatus, MMLLanguage } from '@/types';
+import type { Document, CompileStatus, MMLLanguage, SourceMapEvent } from '@/types';
 
 interface StatusBarProps {
   document: Document | null;
@@ -10,11 +10,13 @@ interface StatusBarProps {
   isAudioPlaying?: boolean;
   onToggleRuntimeDebug?: () => void;
   runtimeDebugVisible?: boolean;
+  activeNoteEvents?: SourceMapEvent[];
 }
 
 const StatusBar: React.FC<StatusBarProps> = ({
   document,
   compileStatus,
+  activeNoteEvents,
 }) => {
   // Format file size
   const formatFileSize = (content: string): string => {
@@ -34,6 +36,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
       mus: 'MUS',
     };
     return names[lang] || lang;
+  };
+
+  // Convert MIDI note number to note name (e.g., 60 -> "C4")
+  const getMidiNoteName = (noteNumber: number): string => {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const octave = Math.floor(noteNumber / 12) - 1;
+    const noteIndex = noteNumber % 12;
+    return `${noteNames[noteIndex]}${octave}`;
   };
 
   // Get status text
@@ -100,6 +110,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <span>{formatLineColumnCount(document.content)}</span>
             </div>
           </>
+        )}
+
+        {/* Active note display */}
+        {activeNoteEvents && activeNoteEvents.length > 0 && (
+          <div className="status-bar-item" style={{ marginLeft: '8px' }}>
+            <span className="active-note-badge">
+              ♪ {getMidiNoteName(activeNoteEvents[0].note_midi)}
+              {activeNoteEvents[0].part && ` • ${activeNoteEvents[0].part}`}
+              {activeNoteEvents.length > 1 && ` (+${activeNoteEvents.length - 1})`}
+            </span>
+          </div>
         )}
       </div>
     </div>

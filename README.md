@@ -237,15 +237,15 @@ See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
 
 | Document | Description |
 |----------|-------------|
-| [PLAN.md](docs/PLAN.md) | Overall project plans and progress |
-| [Browser_IDE_Plan.md](docs/Browser_IDE_Plan.md) | Browser IDE development plan |
-| [Browser_IDE_Implementation.md](docs/Browser_IDE_Implementation.md) | Implementation details and status |
+| [PLAN.md](docs/PLAN.md) | Project plans and feature status overview |
+| [Browser_IDE_Implementation.md](docs/Browser_IDE_Implementation.md) | Web IDE feature status and architecture |
 | [Browser_IDE_Limitations.md](docs/Browser_IDE_Limitations.md) | Known limitations and workarounds |
-| [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) | Rust CLI development plan |
-| [Cloudflare_Pages_Deployment.md](docs/Cloudflare_Pages_Deployment.md) | Cloudflare Pages hosting guide |
+| [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) | Rust CLI compiler implementation status |
+| [PLAN_egui_Desktop.md](docs/PLAN_egui_Desktop.md) | Desktop app architecture and features |
+| [External_Driver_Support.md](docs/External_Driver_Support.md) | Multi-format MML driver implementation |
+| [Cloudflare_Pages_Deployment.md](docs/Cloudflare_Pages_Deployment.md) | Deploying to Cloudflare Pages |
 | [MML_Commands.md](docs/MML_Commands.md) | MML command reference |
 | [ZGM_Specification.md](docs/ZGM_Specification.md) | ZGM format specification |
-| [External_Driver_Support.md](docs/External_Driver_Support.md) | External driver support details |
 
 ---
 

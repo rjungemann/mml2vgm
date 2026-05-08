@@ -75,6 +75,8 @@ interface MenuBarProps {
   onOpenMmlReference?: () => void;
   // Phase 7.3: About dialog
   onOpenAbout?: () => void;
+  // Sample library upload
+  onUploadSamples?: () => void;
 }
 
 // Menu definitions for keyboard navigation
@@ -192,6 +194,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
   onOpenHelp,
   onOpenMmlReference,
   onOpenAbout,
+  onUploadSamples,
 }) => {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeMenuItemIndex, setActiveMenuItemIndex] = useState<number>(0);
@@ -319,6 +322,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
         items.push({ label: 'Export as ZGM', onClick: () => onExportBinary('zgm'), disabled: !hasActiveDocument || !hasCompileResult });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Import...', disabled: true });
+        items.push({ label: 'Upload Samples…', onClick: onUploadSamples, disabled: !onUploadSamples });
         items.push({ label: 'Separator', disabled: true });
         items.push({ label: 'Close', onClick: onCloseDocument, disabled: !hasActiveDocument });
         items.push({ label: 'Close All', onClick: onCloseAllDocuments, disabled: !hasMultipleDocuments });

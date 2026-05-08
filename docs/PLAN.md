@@ -1,144 +1,66 @@
 # Project Plans Overview
 
-This directory contains detailed plans for various aspects of the mml2vgm project.
+This directory contains strategic plans and detailed reference documentation for the mml2vgm project. Completed implementation plans have been archived in `docs/archive/` for reference.
 
 ---
 
-## Active Plans
+## Browser IDE (Complete)
 
-### Browser IDE Plan
-**File:** [Browser_IDE_Plan.md](./Browser_IDE_Plan.md)
+The Browser IDE is fully implemented with all 8 phases complete. See [Browser_IDE_Implementation.md](./Browser_IDE_Implementation.md) for current feature status and [Browser_IDE_Limitations.md](./Browser_IDE_Limitations.md) for known limitations.
 
-Browser-based IDE: Monaco Editor, WASM compilation, audio playback, MIDI keyboard,
-i18n, offline caching, accessibility.
-
-**Status:** ✅ **100% COMPLETE** (8/8 phases)
-
-| Phase | Status |
-|-------|--------|
-| 1: WASM Port | ✅ COMPLETED |
-| 2: Core Structure | ✅ COMPLETED |
-| 3: UI Components | ✅ COMPLETED |
-| 4: Core Functionality | ✅ COMPLETED |
-| 5: Advanced Features | ✅ COMPLETED |
-| 6: Feature Parity | ✅ COMPLETED |
-| 7: Polish & Testing | ✅ COMPLETED |
-| 8: Deployment | ✅ COMPLETED |
+**Features:** Monaco Editor, WASM compilation, audio playback, MIDI keyboard, internationalization, offline caching, accessibility, trace playback, real-time highlighting.
 
 ---
 
-### Rust CLI Plan
-**File:** [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md)
+## Rust CLI (Complete)
 
-Cross-platform CLI compiler in Rust: MML parsing, VGM/XGM/ZGM codegen, sound chip
-emulation, audio playback, diagnostic output.
+The Rust CLI compiler is fully implemented with all phases complete. See [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) for detailed feature status.
 
-**Status:** ✅ **100% COMPLETE** (9/9 phases)
-
-| Phase | Status |
-|-------|--------|
-| 1: Foundation | ✅ COMPLETED |
-| 2: MML Parser | ✅ COMPLETED |
-| 3: Code Generation | ✅ COMPLETED |
-| 4: Sound Chip Emulation | ✅ COMPLETED |
-| 5: Audio Playback | ✅ COMPLETED |
-| 6: Compiler Integration | ✅ COMPLETED |
-| 7: CLI Integration | ✅ COMPLETED |
-| 8: Testing | ✅ COMPLETED |
-| 9: Optimization & Polish | ✅ COMPLETED |
+**Features:** Full C#-format MML parser, VGM/XGM/XGM2/ZGM code generation, YM2612/SN76489 emulation, golden-master validated output.
 
 ---
 
-### egui Desktop Plan
-**File:** [PLAN_egui_Desktop.md](./PLAN_egui_Desktop.md)
+## egui Desktop (Complete)
 
-Native Rust desktop IDE: egui/eframe, rodio audio, midir MIDI, TCP socket interface,
-headless mode, smoke test suite.
+The native desktop IDE is fully implemented. See [PLAN_egui_Desktop.md](./PLAN_egui_Desktop.md) for architecture and features.
 
-**Status:** ✅ **100% COMPLETE** (9/9 phases)
-
-| Phase | Status |
-|-------|--------|
-| 1: Skeleton | ✅ COMPLETED |
-| 2: Editor + Documents | ✅ COMPLETED |
-| 3: Compilation | ✅ COMPLETED |
-| 4: Audio Playback | ✅ COMPLETED |
-| 5: MIDI | ✅ COMPLETED |
-| 6: Settings + Polish | ✅ COMPLETED |
-| 7: Tauri Freeze + Removal | ✅ COMPLETED |
-| 8: Socket Interface | ✅ COMPLETED |
-| 9: Smoke Test Suite | ✅ COMPLETED |
+**Features:** Native UI with egui, full MIDI support via midir, audio playback via rodio, TCP socket interface for external control.
 
 ---
 
-### External Driver Support
-**File:** [External_Driver_Support.md](./External_Driver_Support.md)
+## External Driver Support (Complete)
 
-Rust implementations of five external MML format drivers (M98, Mucom, MoonDriver, PMD,
-Muap) with WASM bindings and browser IDE integration.
-
-**Status:** ✅ **100% COMPLETE** (7/7 phases)
-
-| Phase | Status |
-|-------|--------|
-| 1: Infrastructure | ✅ COMPLETED |
-| 2: M98 Driver | ✅ COMPLETED |
-| 3: Mucom Driver | ✅ COMPLETED |
-| 4: MoonDriver | ✅ COMPLETED |
-| 5: PMD Driver | ✅ COMPLETED |
-| 6: Muap Driver | ✅ COMPLETED |
-| 7: Integration | ✅ COMPLETED |
+Five external MML format drivers (M98, Mucom, MoonDriver, PMD, Muap) are fully implemented with WASM bindings. See [External_Driver_Support.md](./External_Driver_Support.md) for details.
 
 ---
 
-### Performance Improvement Plan
-**File:** [Performance_Improvement_Plan.md](./Performance_Improvement_Plan.md)
+## Performance Optimization (Complete)
 
-Fix for O(n²) lexer bottleneck that caused 60+ second WASM compilation times.
-
-**Status:** ✅ **COMPLETE** — avg 0.23 ms/file; goal exceeded by 20,000×
+Lexer O(n²) bottleneck fixed. WASM compilation now averages 0.23 ms/file (20,000× faster). See [Performance_Improvement_Plan.md](./Performance_Improvement_Plan.md) for details.
 
 ---
 
-### PCM Sample Upload Plan
-**File:** [Sample_Upload_Plan.md](./Sample_Upload_Plan.md)
+## PCM Sample Support (In Progress)
 
-Browser IDE sample library: per-project IndexedDB storage, JS-side WAV decoding,
-compiler worker integration, WASM `MemorySampleResolver`.
+**Phase 1-3:** Sample storage (IndexedDB), upload UI, and compiler integration complete.  
+**Phase 4-5:** WASM/Rust-side sample resolution and UX polish pending.
 
-**Status:** 🚧 **IN PROGRESS** — phases 1-3 complete; phases 4-5 pending
-
-| Phase | Status |
-|-------|--------|
-| 1: Sample Store (IndexedDB) | ✅ COMPLETED |
-| 2: Sample Upload UI | ✅ COMPLETED |
-| 3: Compiler Integration | ✅ COMPLETED |
-| 4: WASM / Rust Side | ⬜ TODO |
-| 5: UX Polish | ⬜ TODO |
+See [Sample_Upload_Plan.md](./Sample_Upload_Plan.md) and [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md).
 
 ---
 
-### PCM Sample Format Expansion Plan
-**File:** [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md)
+## Strategic Plans & References
 
-Extend sample library beyond WAV: OGG Vorbis (browser-native), raw PCM (manual decode),
-ADPCM IMA/Yamaha OKI.
-
-**Status:** 📋 **PLANNED** (Phases 2–4; Phase 1 WAV done as part of Sample Upload Plan)
-
----
-
-## Quick Links
-
-| Plan | Focus | Status |
-|------|-------|--------|
-| [Browser_IDE_Plan.md](./Browser_IDE_Plan.md) | Web-based IDE with WASM | ✅ Complete |
-| [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) | Rust CLI compiler | ✅ Complete |
-| [PLAN_egui_Desktop.md](./PLAN_egui_Desktop.md) | Native egui desktop IDE | ✅ Complete |
-| [External_Driver_Support.md](./External_Driver_Support.md) | M98/Mucom/MoonDriver/PMD/Muap drivers | ✅ Complete |
-| [Performance_Improvement_Plan.md](./Performance_Improvement_Plan.md) | WASM compilation speed | ✅ Complete |
-| [Sample_Upload_Plan.md](./Sample_Upload_Plan.md) | PCM sample library for browser IDE | 📋 Planned |
-| [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md) | OGG / raw PCM / ADPCM support | 📋 Planned |
+| Document | Focus |
+|----------|-------|
+| [Browser_IDE_Implementation.md](./Browser_IDE_Implementation.md) | Web IDE feature status and architecture |
+| [Browser_IDE_Limitations.md](./Browser_IDE_Limitations.md) | Known limitations and workarounds |
+| [PLAN_Rust_CLI.md](./PLAN_Rust_CLI.md) | Rust CLI compiler feature status |
+| [PLAN_egui_Desktop.md](./PLAN_egui_Desktop.md) | Desktop app architecture and features |
+| [External_Driver_Support.md](./External_Driver_Support.md) | Multi-format MML driver support |
+| [Performance_Improvement_Plan.md](./Performance_Improvement_Plan.md) | Compilation performance optimization |
+| [Sample_Upload_Plan.md](./Sample_Upload_Plan.md) | PCM sample library implementation |
+| [Sample_Format_Expansion_Plan.md](./Sample_Format_Expansion_Plan.md) | Support for additional sample formats |
 
 ---
 

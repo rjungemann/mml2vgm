@@ -389,20 +389,20 @@ export const useCompileStore = create<CompileStore>()(
                 }
 
                 let resolvedSamples: Map<string, Float32Array> | undefined;
+                const missingSampleNames: string[] = [];
                 if (referencedSampleNames.length > 0) {
                     try {
                         const sampleMap = await sampleService.resolve(request.documentId, referencedSampleNames);
                         resolvedSamples = new Map<string, Float32Array>();
-                        const missingNames: string[] = [];
                         sampleMap.forEach((pcm, name) => {
                             if (pcm !== null) {
                                 resolvedSamples!.set(name, pcm);
                             } else {
-                                missingNames.push(name);
+                                missingSampleNames.push(name);
                             }
                         });
-                        if (missingNames.length > 0) {
-                            console.warn(`[compileStore] Missing samples for document ${request.documentId}: ${missingNames.join(', ')}`);
+                        if (missingSampleNames.length > 0) {
+                            console.warn(`[compileStore] Missing samples for document ${request.documentId}: ${missingSampleNames.join(', ')}`);
                         }
                     } catch (e) {
                         console.warn('[compileStore] Failed to resolve samples:', e);
@@ -472,6 +472,27 @@ export const useCompileStore = create<CompileStore>()(
                         length: 1,
                         severity: 'warning',
                         code: 'EMPTY_METADATA',
+                    });
+                }
+                // Emit a warning for each PCM sample referenced in the MML but not uploaded
+                for (const name of missingSampleNames) {
+                    // Find the first line that references this sample name
+                    const lines = doc.content.split('\n');
+                    let line = 1;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes(`"${name}"`)) {
+                            line = i + 1;
+                            break;
+                        }
+                    }
+                    warnings.push({
+                        type: 'warning',
+                        message: `Missing sample: "${name}" is referenced but has not been uploaded`,
+                        line,
+                        column: 1,
+                        length: 1,
+                        severity: 'warning',
+                        code: 'MISSING_SAMPLE',
                     });
                 }
 
