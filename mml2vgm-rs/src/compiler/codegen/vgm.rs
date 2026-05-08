@@ -973,10 +973,9 @@ impl VgmGenerator {
                 }
             }
             MmlNode::Bar => {}
-            MmlNode::ChipCommand { command, .. } => {
-                if command.to_uppercase() == "EON" && state.chip.as_deref() == Some("YM2612") {
-                    state.eon_mode = true;
-                }
+            MmlNode::ChipCommand { chip: _, command, args } => {
+                // Route to appropriate chip command handler
+                self.handle_chip_command(command, args, state, *time)?;
             }
             _ => {}
         }
@@ -2541,6 +2540,310 @@ impl VgmGenerator {
     /// Write QSound (Capcom CPS) register
     fn qsound_write(&mut self, addr: u8, data: u8, time: u64) {
         self.generic_chip_write(VgmCommandType::QSoundWrite, addr, data, time);
+    }
+
+    // ── Phase 9: Chip-Specific Command Handlers ────────────────────────────
+
+    /// Route chip commands to appropriate handlers
+    fn handle_chip_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        state: &mut PartCodegenState,
+        time: u64,
+    ) -> MmlResult<()> {
+        let cmd_upper = command.to_uppercase();
+        
+        // Determine chip type from state
+        let chip = state.chip.as_deref().unwrap_or("Generic");
+        
+        // Route to chip-specific or command-specific handlers
+        match cmd_upper.as_str() {
+            // FM Operator Commands (works for most FM chips)
+            "AR" | "DR" | "SR" | "RR" | "SL" | "TL" | "KS" | "ML" | "DT" => {
+                self.handle_fm_operator_command(&cmd_upper, args, state, time, chip)?;
+            }
+            // FM Control Commands
+            "AL" | "FB" => {
+                self.handle_fm_control_command(&cmd_upper, args, state, time, chip)?;
+            }
+            // PSG/AY8910 Commands
+            "EN" | "MIX" | "NOISE" => {
+                self.handle_ay8910_command(&cmd_upper, args, state, time)?;
+            }
+            // POKEY Commands
+            "FILTER" | "DIST" => {
+                self.handle_pokey_command(&cmd_upper, args, state, time)?;
+            }
+            // Wavetable Commands
+            "WAVE" | "SW" | "KEYON" | "KEYOFF" => {
+                self.handle_wavetable_command(&cmd_upper, args, state, time)?;
+            }
+            // PCM Commands
+            "BANK" | "LOOP" | "START" | "END" => {
+                self.handle_pcm_command(&cmd_upper, args, state, time)?;
+            }
+            // Special/Meta commands
+            "EON" => {
+                state.ym2612_port = if args.first().map_or(false, |&a| a != 0) { 1 } else { 0 };
+            }
+            _ => {
+                // Unknown command - silently ignore (can log if needed)
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Handle FM operator commands (AR, DR, SR, RR, SL, TL, KS, ML, DT)
+    fn handle_fm_operator_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        state: &PartCodegenState,
+        time: u64,
+        chip: &str,
+    ) -> MmlResult<()> {
+        if args.is_empty() {
+            return Ok(());
+        }
+        
+        let value = (args[0].min(255)) as u8;
+        
+        // Map command to register offset within operator data
+        // Operator register layout (per YM FM chips):
+        // 0x30: AR, 0x31: DR, 0x32: SR, 0x33: RR, 0x34: SL, 0x35: TL, 0x36: KS, 0x37: ML, 0x38: DT
+        let reg_offset = match command {
+            "AR" => 0x30,
+            "DR" => 0x31,
+            "SR" => 0x32,
+            "RR" => 0x33,
+            "SL" => 0x34,
+            "TL" => 0x35,
+            "KS" => 0x36,
+            "ML" => 0x37,
+            "DT" => 0x38,
+            _ => return Ok(()),
+        };
+        
+        // Write to appropriate chip
+        match chip {
+            "YM2608" | "OPNA" => {
+                self.ym2608_write_reg(0, reg_offset, value, time);
+            }
+            "YM2151" | "OPM" => {
+                self.ym2151_write_reg(reg_offset, value, time);
+            }
+            "YM2203" | "OPN" => {
+                self.ym2203_write_reg(reg_offset, value, time);
+            }
+            "YM2413" | "OPLL" => {
+                self.ym2413_write_reg(reg_offset, value, time);
+            }
+            "YM3526" | "OPL" | "YM3812" | "OPL2" | "Y8950" | "YMF262" | "OPL3" => {
+                // OPL chips use similar register structure
+                self.generic_chip_write(VgmCommandType::Ym3812Write, reg_offset, value, time);
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+
+    /// Handle FM control commands (AL, FB)
+    fn handle_fm_control_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        state: &PartCodegenState,
+        time: u64,
+        chip: &str,
+    ) -> MmlResult<()> {
+        if args.is_empty() {
+            return Ok(());
+        }
+        
+        let value = (args[0].min(255)) as u8;
+        
+        match command {
+            "AL" => {
+                // Algorithm selection (0x04 register)
+                match chip {
+                    "YM2608" | "OPNA" => self.ym2608_write_reg(0, 0x04, value, time),
+                    "YM2151" | "OPM" => self.ym2151_write_reg(0x04, value, time),
+                    _ => {}
+                }
+            }
+            "FB" => {
+                // Feedback level (0x05 register, bits 3-5)
+                let feedback = (value & 0x7) << 3;
+                match chip {
+                    "YM2608" | "OPNA" => self.ym2608_write_reg(0, 0x05, feedback, time),
+                    "YM2151" | "OPM" => self.ym2151_write_reg(0x05, feedback, time),
+                    "YM3526" | "OPL" | "YM3812" | "OPL2" => {
+                        // OPL chips use 0xC0 + channel for feedback
+                        let fb_byte = 0xC0 + (state.ym2612_ch & 0x8);
+                        self.generic_chip_write(VgmCommandType::Ym3812Write, fb_byte, feedback, time);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+
+    /// Handle AY8910 PSG commands
+    fn handle_ay8910_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        _state: &PartCodegenState,
+        time: u64,
+    ) -> MmlResult<()> {
+        if args.is_empty() {
+            return Ok(());
+        }
+        
+        let value = (args[0].min(255)) as u8;
+        
+        match command {
+            "EN" => {
+                // Envelope enable (register 0x0D, bit 4)
+                let envelope_enable = if value != 0 { 0x10 } else { 0x00 };
+                self.ay8910_write(0x0D, envelope_enable, time);
+            }
+            "MIX" => {
+                // Mixer control (register 0x07)
+                // Format: TME (bit 7=tone, bit 6=mix_enable, bit 5=envelope)
+                let mixer = value & 0xE0;
+                self.ay8910_write(0x07, mixer, time);
+            }
+            "NOISE" => {
+                // Noise period (register 0x06, bits 0-4)
+                let noise_period = value & 0x1F;
+                self.ay8910_write(0x06, noise_period, time);
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+
+    /// Handle POKEY commands
+    fn handle_pokey_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        _state: &PartCodegenState,
+        time: u64,
+    ) -> MmlResult<()> {
+        if args.is_empty() {
+            return Ok(());
+        }
+        
+        let value = (args[0].min(255)) as u8;
+        
+        match command {
+            "FILTER" => {
+                // Lowpass filter mode (0x2A register, bits 0-1)
+                let filter_mode = value & 0x03;
+                self.pokey_write(0x2A, filter_mode, time);
+            }
+            "DIST" => {
+                // Distortion mode (0x2B register, bits 0-1)
+                let dist_mode = value & 0x03;
+                self.pokey_write(0x2B, dist_mode, time);
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+
+    /// Handle wavetable commands
+    fn handle_wavetable_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        state: &PartCodegenState,
+        time: u64,
+    ) -> MmlResult<()> {
+        match command {
+            "WAVE" => {
+                if args.is_empty() {
+                    return Ok(());
+                }
+                let wave_num = (args[0].min(255)) as u8;
+                
+                // For HuC6280: waveform select via DRR register
+                if state.chip.as_deref() == Some("HuC6280") {
+                    self.huc6280_write(0x04, wave_num, time);
+                }
+                // For K051649: waveform select via register
+                else if state.chip.as_deref().map_or(false, |c| c.contains("K051649") || c.contains("SCC")) {
+                    self.k051649_write(0, 0x06, wave_num, time);
+                }
+            }
+            "KEYON" | "KEYOFF" => {
+                // Manual key control
+                let key_on = command == "KEYON";
+                let key_byte = if key_on { 0xF0 } else { 0x00 };
+                
+                if state.chip.as_deref() == Some("K051649") {
+                    self.k051649_write(0, 0x08, key_byte, time);
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+
+    /// Handle PCM commands
+    fn handle_pcm_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        state: &PartCodegenState,
+        time: u64,
+    ) -> MmlResult<()> {
+        if args.is_empty() {
+            return Ok(());
+        }
+        
+        let value = (args[0].min(255)) as u8;
+        let chip = state.chip.as_deref().unwrap_or("Generic");
+        
+        match command {
+            "BANK" => {
+                // Bank selection (chip-specific)
+                match chip {
+                    "SegaPCM" => {
+                        // Bank select via address high byte
+                        self.segapcm_write(value, 0x00, 0x00, time);
+                    }
+                    "C140" => {
+                        self.c140_write(0x1E, value, time);
+                    }
+                    _ => {}
+                }
+            }
+            "LOOP" => {
+                // Loop enable flag
+                let loop_enable = if value != 0 { 0x10 } else { 0x00 };
+                match chip {
+                    "C140" => self.c140_write(0x1F, loop_enable, time),
+                    "C352" => self.c352_write(0x1F, loop_enable, time),
+                    "K054539" => self.k054539_write_ported(0, 0x1F, loop_enable, time),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        
+        Ok(())
     }
 }
 
