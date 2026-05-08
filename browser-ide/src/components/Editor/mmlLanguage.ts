@@ -31,10 +31,40 @@ export function registerMmlLanguage(
     // Keywords
     keywords: [
       '@',
+      // Full-tier chips
       'OPNA', 'OPNB', 'SSG', 'ADPCM', 'PCM', 'rhythm',
       'o', 'l', 'v', 't', 'n', 'q',
       'r', 'w', 's', 'i', 'm', 'k', 'd', 'y',
       'T', 'V', 'Q', 'Y', 'X', 'W', 'P', 'L', 'M',
+      // Partial chip Part* keywords (Batch 1: Sega & FM Core)
+      'PartYM2608', 'PartYM2608FM', 'PartYM2608SSG', 'PartYM2608ADPCM',
+      'PartYM2151', 'PartYM2151FM', 'PartOPM',
+      'PartYM2203', 'PartYM2203FM', 'PartYM2203SSG', 'PartOPN',
+      'PartRF5C164',
+      'PartSegaPCM',
+      // Partial chip Part* keywords (Batch 2: OPL Family)
+      'PartYM3526', 'PartOPL',
+      'PartY8950',
+      'PartYM3812', 'PartOPL2',
+      'PartYMF262', 'PartOPL3',
+      // Partial chip Part* keywords (Batch 3: Console PSG/FM)
+      'PartYM2413', 'PartOPLL',
+      'PartHuC6280',
+      'PartNES', 'PartNESPulse', 'PartNESTriangle', 'PartNESNoise', 'PartNESDPCM',
+      'PartDMG', 'PartDMGPulse', 'PartDMGWave', 'PartDMGNoise',
+      // Partial chip Part* keywords (Batch 4: Arcade PCM)
+      'PartC140',
+      'PartC352',
+      'PartK053260',
+      'PartK054539',
+      // Partial chip Part* keywords (Batch 5: Miscellaneous)
+      'PartAY8910',
+      'PartK051649', 'PartSCC', 'PartSCC1',
+      'PartPOKEY',
+      'PartVRC6',
+      'PartQSound',
+      // Chip-specific commands
+      'ForcedMonoPartYM2612',
     ],
     
     // Built-in functions/operations
