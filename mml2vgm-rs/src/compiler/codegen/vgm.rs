@@ -2,7 +2,7 @@
 //!
 //! This module generates VGM (Video Game Music) format files from MML AST.
 
-use super::{CodeGenerator, OutputFormat, VgmHeader};
+use super::{CodeGenerator, OutputFormat, VgmHeader, NoteEvent, SourceMap};
 use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift};
 use crate::compiler::sample_resolver::SampleResolver;
 use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
@@ -176,6 +176,10 @@ pub struct VgmGenerator {
     /// Used in the merge phase to split large wait gaps at per-event boundaries,
     /// matching the C# compiler's one-wait-per-note/rest output style.
     time_checkpoints: BTreeSet<u64>,
+    /// Source map: accumulates note events with timing and source positions
+    source_map: SourceMap,
+    /// Current part name being processed
+    current_part_name: String,
 }
 
 impl VgmGenerator {
@@ -196,6 +200,8 @@ impl VgmGenerator {
             next_ymf262_channel: 0,
             suppress_waits: false,
             time_checkpoints: BTreeSet::new(),
+            source_map: SourceMap::default(),
+            current_part_name: String::new(),
         };
 
         generator.header.version = 0x00000171;
@@ -535,6 +541,7 @@ impl VgmGenerator {
         part: &crate::compiler::ast::PartDefinition,
         time: &mut u64,
     ) -> MmlResult<()> {
+        self.current_part_name = part.name.clone();
         let chip = part.chip.clone();
 
         let (ym2612_port, ym2612_ch, opl_ch, opm_ch, has_channel) = match chip.as_deref() {
@@ -619,9 +626,22 @@ impl VgmGenerator {
                 let mut state = PartCodegenState::new(None, 0, 0);
                 state.octave = note.octave;
                 state.tempo = *tempo;
+                let note_start_time = *time;
                 self.process_psg_note(note, &state, time);
                 let dur = note.duration.unwrap_or(*default_length);
                 let samples = self.note_duration_to_samples(dur, note.dotted, *tempo, *default_length);
+                if let Some(span) = &note.span {
+                    self.source_map.events.push(NoteEvent {
+                        sample_start: note_start_time,
+                        sample_end: note_start_time + samples as u64,
+                        part: "(global)".to_string(),
+                        note_midi: note.midi_note(),
+                        instrument: 0,
+                        line: span.start.line,
+                        col_start: span.start.column,
+                        col_end: span.end.column,
+                    });
+                }
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -780,9 +800,11 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
                 self.ym2612_write_freq(state.ym2612_port, state.ym2612_ch, block, f_num, *time);
+                let note_start_time = *time;
                 self.ym2612_key_on(state, time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -809,9 +831,11 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
                 self.ym2608_write_freq(state.ym2612_port, state.ym2612_ch, block, f_num, *time);
+                let note_start_time = *time;
                 self.ym2608_key_on(state, time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -838,9 +862,11 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
                 self.ym2203_write_freq(state.ym2612_ch, block, f_num, *time);
+                let note_start_time = *time;
                 self.ym2203_key_on(state, time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -863,9 +889,11 @@ impl VgmGenerator {
                 }
                 let (kc, kf) = Self::midi_note_to_opm_kc(midi);
                 self.opm_write_freq(state.opm_ch, kc, kf, *time);
+                let note_start_time = *time;
                 self.opm_key_on(state, time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -887,9 +915,11 @@ impl VgmGenerator {
                     state.keyed_on = false;
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                let note_start_time = *time;
                 self.opl_write_freq(VgmCommandType::Ym3812Write as u8, state.opl_ch, block, f_num, true, *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -911,9 +941,11 @@ impl VgmGenerator {
                     state.keyed_on = false;
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                let note_start_time = *time;
                 self.opl_write_freq(VgmCommandType::Ym3526Write as u8, state.opl_ch, block, f_num, true, *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -935,9 +967,11 @@ impl VgmGenerator {
                     state.keyed_on = false;
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                let note_start_time = *time;
                 self.opl_write_freq(VgmCommandType::Y8950Write as u8, state.opl_ch, block, f_num, true, *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -962,10 +996,12 @@ impl VgmGenerator {
                     state.keyed_on = false;
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
+                let note_start_time = *time;
                 let opcode = if port == 0 { VgmCommandType::Ymf262WritePort0 as u8 } else { VgmCommandType::Ymf262WritePort1 as u8 };
                 self.opl_write_freq(opcode, ch_in_bank, block, f_num, true, *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
@@ -978,7 +1014,9 @@ impl VgmGenerator {
                 }
             }
             Some("SN76489") | None => {
+                let note_start_time = *time;
                 self.process_psg_note(note, state, time);
+                self.emit_note_event(note, state, note_start_time, samples);
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -1668,6 +1706,32 @@ impl VgmGenerator {
         }
         self.header.total_samples = total_samples;
         self.header.data_offset = 0x100;
+    }
+
+    fn emit_note_event(
+        &mut self,
+        note: &crate::compiler::ast::Note,
+        state: &PartCodegenState,
+        sample_start: u64,
+        note_on_samples: u32,
+    ) {
+        if let Some(span) = &note.span {
+            self.source_map.events.push(NoteEvent {
+                sample_start,
+                sample_end: sample_start + note_on_samples as u64,
+                part: self.current_part_name.clone(),
+                note_midi: note.midi_note(),
+                instrument: state.instrument_num.unwrap_or(0),
+                line: span.start.line,
+                col_start: span.start.column,
+                col_end: span.end.column,
+            });
+        }
+    }
+
+    /// Get the source map containing note events with timing information
+    pub fn source_map(&self) -> &SourceMap {
+        &self.source_map
     }
 
     /// Generate the VGM file binary

@@ -49,6 +49,7 @@ pub struct JsCompileResult {
     duration_samples: u64,
     duration_seconds: f64,
     chips_used: String, // JSON array of chip names
+    source_map_json: String, // JSON representation of the source map
 }
 
 // Implement Default for JsCompileResult
@@ -61,6 +62,7 @@ impl Default for JsCompileResult {
             duration_samples: 0,
             duration_seconds: 0.0,
             chips_used: String::new(),
+            source_map_json: String::new(),
         }
     }
 }
@@ -97,6 +99,11 @@ impl JsCompileResult {
     pub fn chips_used(&self) -> String {
         self.chips_used.clone()
     }
+
+    /// Get the source map as a JSON string
+    pub fn source_map_json(&self) -> String {
+        self.source_map_json.clone()
+    }
 }
 
 /// Compile MML source code to a binary format (VGM/XGM/ZGM)
@@ -124,7 +131,8 @@ pub fn compile_mml(mml: &str, options_json: &str) -> Result<JsCompileResult, JsV
         Ok(result) => {
             let info = result.info;
             let chips_json = serde_json::to_string(&info.chips_used).unwrap();
-            
+            let source_map_json = serde_json::to_string(&result.source_map).unwrap_or_default();
+
             Ok(JsCompileResult {
                 data: result.data,
                 part_count: info.part_count,
@@ -132,6 +140,7 @@ pub fn compile_mml(mml: &str, options_json: &str) -> Result<JsCompileResult, JsV
                 duration_samples: info.duration_samples,
                 duration_seconds: info.duration_seconds,
                 chips_used: chips_json,
+                source_map_json,
             })
         }
         Err(e) => Err(JsValue::from_str(&format!("Compilation error: {}", e))),
@@ -173,6 +182,7 @@ pub fn compile_with_samples(
         Ok(result) => {
             let info = result.info;
             let chips_json = serde_json::to_string(&info.chips_used).unwrap();
+            let source_map_json = serde_json::to_string(&result.source_map).unwrap_or_default();
             Ok(JsCompileResult {
                 data: result.data,
                 part_count: info.part_count,
@@ -180,6 +190,7 @@ pub fn compile_with_samples(
                 duration_samples: info.duration_samples,
                 duration_seconds: info.duration_seconds,
                 chips_used: chips_json,
+                source_map_json,
             })
         }
         Err(e) => Err(JsValue::from_str(&format!("Compilation error: {}", e))),

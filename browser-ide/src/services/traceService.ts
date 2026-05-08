@@ -7,7 +7,7 @@
 
 import { audioService } from './audioService';
 import { wasmService } from './wasmService';
-import type { Position, PartInfo, TraceEvent } from '@/types';
+import type { Position, PartInfo, TraceEvent, SourceMap, SourceMapEvent } from '@/types';
 import type { AudioEventListener } from './audioService';
 
 // ============================================================================
@@ -64,11 +64,15 @@ export class TraceService {
     partCount: number;
     duration: number;
     timingMap: Map<number, Position>; // time (ms) -> position
+    sourceMap?: SourceMap; // note events with timing and source positions
   } | null = null;
   
   // Part tracking
   private _activeParts: Set<string> = new Set();
-  
+
+  // Active note events (from source map)
+  private _activeNoteEvents: SourceMapEvent[] = [];
+
   // Event history
   private _recentEvents: TraceEvent[] = [];
   private _maxEvents = 1000;
@@ -106,15 +110,18 @@ export class TraceService {
     partCount: number;
     duration: number;
     timingMap?: Map<number, Position>;
+    sourceMap?: SourceMap;
   }): void {
     this._lastCompileResult = {
       data: compileResult.data,
       partCount: compileResult.partCount,
       duration: compileResult.duration,
       timingMap: compileResult.timingMap || new Map(),
+      sourceMap: compileResult.sourceMap,
     };
-    
-    console.log('[TraceService] Initialized with', compileResult.partCount, 'parts');
+
+    console.log('[TraceService] Initialized with', compileResult.partCount, 'parts and',
+      compileResult.sourceMap?.events.length || 0, 'source map events');
   }
   
   /**
@@ -276,38 +283,60 @@ export class TraceService {
   
   /**
    * Update active parts based on time.
+   * Uses the source map to find notes that are currently playing.
    */
   private updateActiveParts(time: number): void {
-    const partCount = this._lastCompileResult?.partCount || 0;
-    
-    if (partCount === 0) {
-      this._activeParts = new Set();
-      return;
+    const sourceMap = this._lastCompileResult?.sourceMap;
+
+    if (sourceMap && sourceMap.events.length > 0) {
+      // Convert time from milliseconds to samples (44100 Hz sample rate)
+      const currentSample = (time * 44100) / 1000;
+
+      // Find all notes currently playing
+      const activeNotes = sourceMap.events.filter(
+        event => event.sample_start <= currentSample && currentSample < event.sample_end
+      );
+
+      this._activeNoteEvents = activeNotes;
+
+      // Extract unique parts from active notes
+      const activeParts = new Set<string>();
+      activeNotes.forEach(event => {
+        activeParts.add(event.part);
+      });
+
+      this._activeParts = activeParts;
+    } else {
+      // Fallback to simple cycling if no source map
+      const partCount = this._lastCompileResult?.partCount || 0;
+
+      if (partCount === 0) {
+        this._activeParts = new Set();
+        this._activeNoteEvents = [];
+        return;
+      }
+
+      // Simple simulation: cycle through parts
+      const partsPerSecond = 1;
+      const activePartIndex = Math.floor((time / 1000) * partsPerSecond) % partCount;
+
+      const activeParts = new Set<string>();
+      activeParts.add(`part-${activePartIndex}`);
+
+      if (partCount > 1) {
+        const prevIndex = (activePartIndex + partCount - 1) % partCount;
+        const nextIndex = (activePartIndex + 1) % partCount;
+        activeParts.add(`part-${prevIndex}`);
+        activeParts.add(`part-${nextIndex}`);
+      }
+
+      this._activeParts = activeParts;
+      this._activeNoteEvents = [];
     }
-    
-    // Cycle through parts based on time
-    // Each part is active for approximately 1 second (1000ms)
-    // This is a simple simulation until we have real part timing data
-    const partsPerSecond = 1; // How many parts to cycle through per second
-    const activePartIndex = Math.floor((time / 1000) * partsPerSecond) % partCount;
-    
-    // Build set of active part IDs
-    const activeParts = new Set<string>();
-    activeParts.add(`part-${activePartIndex}`);
-    
-    // Also include adjacent parts for more visual interest
-    if (partCount > 1) {
-      const prevIndex = (activePartIndex + partCount - 1) % partCount;
-      const nextIndex = (activePartIndex + 1) % partCount;
-      activeParts.add(`part-${prevIndex}`);
-      activeParts.add(`part-${nextIndex}`);
-    }
-    
-    this._activeParts = activeParts;
-    
+
     // Emit part events for active parts
     this._activeParts.forEach(partId => {
-      const index = parseInt(partId.replace('part-', ''));
+      const index = parseInt(partId.replace('part-', '') || '0');
       this.emitPartEvent(index, 'note-on');
     });
   }
@@ -360,7 +389,14 @@ export class TraceService {
   public isPartActive(partId: string): boolean {
     return this._activeParts.has(partId);
   }
-  
+
+  /**
+   * Get active note events from the source map.
+   */
+  public getActiveNoteEvents(): SourceMapEvent[] {
+    return [...this._activeNoteEvents];
+  }
+
   // ========================================================================
   // Register Tracking
   // ========================================================================

@@ -89,6 +89,7 @@ export interface CompileResult {
     errors: ErrorContext[];
     warnings: ErrorContext[];
     info?: CompileInfo;
+    source_map?: SourceMap;
 }
 
 /** Compilation information */
@@ -99,6 +100,23 @@ export interface CompileInfo {
     duration_seconds: number;
     chips_used: SoundChip[];
     format_version: string;
+}
+
+/** A single note event with timing and source location */
+export interface SourceMapEvent {
+    sample_start: number;
+    sample_end: number;
+    part: string;
+    note_midi: number;
+    instrument: number;
+    line: number;
+    col_start: number;
+    col_end: number;
+}
+
+/** Source map: collection of note events with timing and source positions */
+export interface SourceMap {
+    events: SourceMapEvent[];
 }
 
 /** Error context */

@@ -57,7 +57,7 @@ impl MmlCompiler {
 
         // 6. Code Generation
         let part_count = ast.parts.len();
-        let output_data = self.generate_code(&ast)?;
+        let (output_data, source_map) = self.generate_code_with_sourcemap(&ast)?;
         let info = Self::info_from_vgm(&output_data, part_count);
 
         // 7. Create result
@@ -68,7 +68,7 @@ impl MmlCompiler {
             output_path: Some(output_path.to_string_lossy().to_string()),
             warnings: Vec::new(),
             info,
-            source_map: crate::compiler::codegen::SourceMap::default(),
+            source_map,
         })
     }
 
@@ -229,22 +229,33 @@ impl MmlCompiler {
 
     /// Generate code for the specified output format
     fn generate_code(&self, ast: &MmlAst) -> MmlResult<Vec<u8>> {
+        let (data, _source_map) = self.generate_code_with_sourcemap(ast)?;
+        Ok(data)
+    }
+
+    /// Generate code and extract both the binary output and source map
+    fn generate_code_with_sourcemap(&self, ast: &MmlAst) -> MmlResult<(Vec<u8>, crate::compiler::codegen::SourceMap)> {
         match self.options.format {
             OutputFormat::VGM => {
                 let generator = crate::compiler::codegen::vgm::VgmGenerator::from_ast(ast, &self.options)?;
-                generator.generate()
+                let data = generator.generate()?;
+                let source_map = generator.source_map().clone();
+                Ok((data, source_map))
             }
             OutputFormat::XGM => {
                 let generator = crate::compiler::codegen::xgm::XgmGenerator::from_ast(ast, &self.options)?;
-                generator.generate()
+                let data = generator.generate()?;
+                Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
             OutputFormat::XGM2 => {
                 let generator = crate::compiler::codegen::xgm::Xgm2Generator::from_ast(ast, &self.options)?;
-                generator.generate()
+                let data = generator.generate()?;
+                Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
             OutputFormat::ZGM => {
                 let generator = crate::compiler::codegen::zgm::ZgmGenerator::from_ast(ast, &self.options)?;
-                generator.generate()
+                let data = generator.generate()?;
+                Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
         }
     }
@@ -273,7 +284,7 @@ impl MmlCompiler {
 
         // 3. Code Generation
         let part_count = ast.parts.len();
-        let output_data = self.generate_code(&ast)?;
+        let (output_data, source_map) = self.generate_code_with_sourcemap(&ast)?;
         let info = Self::info_from_vgm(&output_data, part_count);
 
         Ok(CompileResult {
@@ -281,7 +292,7 @@ impl MmlCompiler {
             output_path: None,
             warnings: Vec::new(),
             info,
-            source_map: crate::compiler::codegen::SourceMap::default(),
+            source_map,
         })
     }
 
@@ -303,14 +314,14 @@ impl MmlCompiler {
         }
         self.apply_chip_assignments(&mut ast, &pre.chip_map);
         let part_count = ast.parts.len();
-        let output_data = self.generate_code_with_resolver(&ast, resolver)?;
+        let (output_data, source_map) = self.generate_code_with_resolver_and_sourcemap(&ast, resolver)?;
         let info = Self::info_from_vgm(&output_data, part_count);
         Ok(CompileResult {
             data: output_data,
             output_path: None,
             warnings: Vec::new(),
             info,
-            source_map: crate::compiler::codegen::SourceMap::default(),
+            source_map,
         })
     }
 
@@ -320,6 +331,16 @@ impl MmlCompiler {
         ast: &MmlAst,
         resolver: &dyn SampleResolver,
     ) -> MmlResult<Vec<u8>> {
+        let (data, _source_map) = self.generate_code_with_resolver_and_sourcemap(ast, resolver)?;
+        Ok(data)
+    }
+
+    /// Generate code with resolver and extract both output and source map.
+    fn generate_code_with_resolver_and_sourcemap(
+        &self,
+        ast: &MmlAst,
+        resolver: &dyn SampleResolver,
+    ) -> MmlResult<(Vec<u8>, crate::compiler::codegen::SourceMap)> {
         match self.options.format {
             OutputFormat::VGM => {
                 let generator = crate::compiler::codegen::vgm::VgmGenerator::from_ast_with_resolver(
@@ -327,10 +348,12 @@ impl MmlCompiler {
                     &self.options,
                     resolver,
                 )?;
-                generator.generate()
+                let data = generator.generate()?;
+                let source_map = generator.source_map().clone();
+                Ok((data, source_map))
             }
             // XGM, XGM2, ZGM don't yet support embedded PCM samples; fall through.
-            _ => self.generate_code(ast),
+            _ => self.generate_code_with_sourcemap(ast),
         }
     }
 

@@ -4,11 +4,11 @@
 //! It takes tokens from the lexer and builds an Abstract Syntax Tree (AST).
 
 use crate::compiler::ast::{
-    Alias, Arpeggio, Envelope, FmInstrument, Include, Length, Loop, Metadata, MmlAst, MmlNode, 
+    Alias, Arpeggio, Envelope, FmInstrument, Include, Length, Loop, Metadata, MmlAst, MmlNode,
     Note, Octave, OctaveShift, PartDefinition, PcmInstrument, Rest, Tempo, Volume,
 };
 use crate::compiler::lexer::{Token, tokenize};
-use crate::{MmlError, MmlResult, Position};
+use crate::{MmlError, MmlResult, Position, Span};
 use std::path::PathBuf;
 
 /// Parser for MML tokens
@@ -864,35 +864,39 @@ impl Parser {
         if let Some(token) = self.current_token() {
             match token {
                 Token::Note(letter) => {
+                    let span_start = self.current_position();
                     self.advance();
                     let mut note = Note::new(letter, 0, self.current_octave);
-                    
+
                     if self.consume(Token::Sharp) {
                         note.accidental = 1;
                     } else if self.consume(Token::Flat) {
                         note.accidental = -1;
                     }
-                    
+
                     if let Some(Token::Number(n)) = self.current_token() {
                         note.octave = n as u8;
                         self.advance();
                     }
-                    
+
                     if let Some(Token::Number(d)) = self.current_token() {
                         note.duration = Some(d);
                         self.advance();
                     } else {
                         note.duration = Some(self.current_length);
                     }
-                    
+
                     if self.consume(Token::Dot) {
                         note.dotted = true;
                     }
-                    
+
                     if self.consume(Token::Underscore) {
                         note.tied = true;
                     }
-                    
+
+                    let span_end = self.current_position();
+                    note.span = Some(Span::new(span_start, span_end));
+
                     Ok(Some(MmlNode::Note(note)))
                 }
                 
@@ -902,6 +906,7 @@ impl Parser {
                 // Does NOT update current_octave; subsequent letter-notes continue at their
                 // current octave (same as 3MLE / Sitaraba behaviour).
                 Token::NoteNumberCommand => {
+                    let span_start = self.current_position();
                     self.advance();
                     if let Some(Token::Number(midi)) = self.current_token() {
                         let midi = midi.min(127);
@@ -930,6 +935,8 @@ impl Parser {
                         if self.consume(Token::Underscore) {
                             note.tied = true;
                         }
+                        let span_end = self.current_position();
+                        note.span = Some(Span::new(span_start, span_end));
                         Ok(Some(MmlNode::Note(note)))
                     } else {
                         Ok(None)
@@ -937,6 +944,7 @@ impl Parser {
                 }
 
                 Token::Rest => {
+                    let span_start = self.current_position();
                     self.advance();
                     let mut rest = Rest {
                         duration: self.current_length,
@@ -948,11 +956,14 @@ impl Parser {
                         rest.duration = d;
                         self.advance();
                     }
-                    
+
                     if self.consume(Token::Dot) {
                         rest.dotted = true;
                     }
-                    
+
+                    let span_end = self.current_position();
+                    rest.span = Some(Span::new(span_start, span_end));
+
                     Ok(Some(MmlNode::Rest(rest)))
                 }
                 
@@ -1026,11 +1037,13 @@ impl Parser {
                 }
                 
                 Token::AtSign => {
+                    let span_start = self.current_position();
                     self.advance();
                     if let Some(Token::Number(n)) = self.current_token() {
                         let number = n as usize;
                         self.advance();
-                        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: None })))
+                        let span_end = self.current_position();
+                        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: Some(Span::new(span_start, span_end)) })))
                     } else {
                         Ok(None)
                     }
