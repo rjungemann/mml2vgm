@@ -1392,6 +1392,17 @@ body {
   100% { background-color: rgba(255, 165, 0, 0) !important; }
 }
 
+/* Active note highlighting (from source map during playback) */
+.active-note {
+  background-color: rgba(147, 112, 219, 0.25) !important;
+  border-left: 3px solid rgba(147, 112, 219, 0.6) !important;
+  border-radius: 2px;
+}
+
+.active-note-glyph {
+  background-color: rgba(147, 112, 219, 0.4) !important;
+}
+
 /* ============================================================================
    Accessibility Styles (Phase 7)
    ============================================================================ */

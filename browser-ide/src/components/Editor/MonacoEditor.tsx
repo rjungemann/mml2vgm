@@ -36,6 +36,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
   const languageId = 'mml';
   const [currentLineDecorations, setCurrentLineDecorations] = useState<string[]>([]);
   const [navDecorations, setNavDecorations] = useState<string[]>([]);
+  const [noteEventDecorations, setNoteEventDecorations] = useState<string[]>([]);
 
   // Expose editor methods via ref
   useImperativeHandle(ref, () => ({
@@ -158,6 +159,46 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
 
     return () => clearTimeout(timer);
   }, [navigationPosition, navDecorations]);
+
+  // Highlight active note events from source map
+  useEffect(() => {
+    if (!editorRef.current || !activeNoteEvents || activeNoteEvents.length === 0) {
+      // Clear previous note event decorations if no active notes
+      if (noteEventDecorations.length > 0) {
+        editorRef.current?.deltaDecorations(noteEventDecorations, []);
+        setNoteEventDecorations([]);
+      }
+      return;
+    }
+
+    const editor = editorRef.current;
+    const monacoInstance = editor._monaco;
+
+    // Create decorations for each active note event
+    const newDecorations = activeNoteEvents.map((event) => ({
+      range: new monacoInstance.Range(
+        event.line,
+        event.col_start,
+        event.line,
+        event.col_end
+      ),
+      options: {
+        className: 'active-note',
+        glyphMarginClassName: 'active-note-glyph',
+        glyphMarginHoverMessage: {
+          value: `Note: ${event.note_midi}, Part: ${event.part}, Instrument: ${event.instrument}`,
+        },
+        minimap: {
+          color: '#FFD700',
+          rasterized: true,
+        },
+      },
+    }));
+
+    // Update decorations
+    const newDecorationIds = editor.deltaDecorations(noteEventDecorations, newDecorations);
+    setNoteEventDecorations(newDecorationIds);
+  }, [activeNoteEvents, noteEventDecorations]);
 
   // Handle editor mount
   const handleEditorDidMount: OnMount = useCallback((editor, _monaco) => {
