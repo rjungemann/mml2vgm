@@ -292,14 +292,422 @@
       "overall_status": "pending"
     }
   },
+  "ym2413": {
+    "chip_name": "YM2413 (OPLL)",
+    "tier": "tier2",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "opll",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.90",
+      "patch_match_percent": ">90"
+    },
+    "tests": {
+      "patches": {
+        "test_file": "tier2/test_ym2413_patches.gwi",
+        "description": "All 16 built-in patches",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "patch_match_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "custom": {
+        "test_file": "tier2/test_ym2413_custom.gwi",
+        "description": "Custom patch definition",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "rhythm": {
+        "test_file": "tier2/test_ym2413_rhythm.gwi",
+        "description": "Rhythm mode drums",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "timing_variance_samples": null
+        },
+        "passed": null,
+        "notes": "Uses channels 6-9 for percussion"
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "pending": 3,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "y8950": {
+    "chip_name": "Y8950 (OPL + ADPCM)",
+    "tier": "tier2",
+    "reference_emulator": "DOSBox-X 2026.05.02",
+    "emulator_driver": "opl_core",
+    "validation_method": "spectral_and_binary",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.90",
+      "adpcm_timing_accuracy": "±2 samples"
+    },
+    "tests": {
+      "opl": {
+        "test_file": "tier2/test_y8950_opl.gwi",
+        "description": "OPL core (compare to OPL2 reference)",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "frequency_error_hz": null
+        },
+        "passed": null,
+        "notes": "Should match YM3812 behavior"
+      },
+      "adpcm": {
+        "test_file": "tier2/test_y8950_adpcm.gwi",
+        "description": "ADPCM playback",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "timing_accuracy_samples": null,
+          "register_accuracy_percent": null
+        },
+        "passed": null,
+        "notes": "Requires sample data"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "rf5c164": {
+    "chip_name": "RF5C164 (Sega CD PCM)",
+    "tier": "tier2",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "segacd",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "register_accuracy_percent": "≥98",
+      "timing_variance_samples": "≤1"
+    },
+    "tests": {
+      "basic": {
+        "test_file": "tier2/test_rf5c164_basic.gwi",
+        "description": "All 8 channels, basic samples",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "sample_address_match": null
+        },
+        "passed": null,
+        "notes": "Requires Sega CD ROM samples"
+      },
+      "pitch": {
+        "test_file": "tier2/test_rf5c164_pitch.gwi",
+        "description": "Pitch sweep tracking",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "pitch_accuracy_percent": null,
+          "frequency_error_hz": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "c140": {
+    "chip_name": "C140 (Namco 163)",
+    "tier": "tier2",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "namco_c140",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "register_accuracy_percent": "≥98",
+      "loop_accuracy": "exact match"
+    },
+    "tests": {
+      "basic": {
+        "test_file": "tier2/test_c140_basic.gwi",
+        "description": "All 24 channels, various samples",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "channel_count": null
+        },
+        "passed": null,
+        "notes": "Requires Namco arcade ROM samples"
+      },
+      "loop": {
+        "test_file": "tier2/test_c140_loop.gwi",
+        "description": "Loop address and count",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "loop_address_accuracy": null,
+          "loop_count_accuracy": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "c352": {
+    "chip_name": "C352 (Namco System 21/22)",
+    "tier": "tier2",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "namco_c352",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "filter_response_match_db": "±2 dB",
+      "spectral_correlation": ">0.90"
+    },
+    "tests": {
+      "basic": {
+        "test_file": "tier2/test_c352_basic.gwi",
+        "description": "All 24 channels",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "channel_separation": null
+        },
+        "passed": null,
+        "notes": "16-bit stereo PCM"
+      },
+      "filter": {
+        "test_file": "tier2/test_c352_filter.gwi",
+        "description": "Filter parameter sweep",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "filter_response_match_db": null,
+          "frequency_accuracy_hz": null
+        },
+        "passed": null,
+        "notes": "Digital filter validation"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "k053260": {
+    "chip_name": "K053260 (Konami PCM)",
+    "tier": "tier2",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "k053260",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "register_accuracy_percent": "≥98",
+      "timing_variance_samples": "≤1"
+    },
+    "tests": {
+      "basic": {
+        "test_file": "tier2/test_k053260_basic.gwi",
+        "description": "4 channels",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "channel_count": null
+        },
+        "passed": null,
+        "notes": "16-bit PCM, 4 channels"
+      },
+      "pitch": {
+        "test_file": "tier2/test_konami_pcm_pitch.gwi",
+        "description": "Pitch tracking (shared with K054539)",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "pitch_accuracy_percent": null,
+          "frequency_error_hz": null
+        },
+        "passed": null,
+        "notes": "Shared test file, change #CHIP directive for K054539"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "k054539": {
+    "chip_name": "K054539 (Konami Enhanced PCM)",
+    "tier": "tier2",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "k054539",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "register_accuracy_percent": "≥98",
+      "timing_variance_samples": "≤1"
+    },
+    "tests": {
+      "basic": {
+        "test_file": "tier2/test_k054539_basic.gwi",
+        "description": "8 channels",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "channel_count": null
+        },
+        "passed": null,
+        "notes": "16-bit stereo PCM, 8 channels"
+      },
+      "pitch": {
+        "test_file": "tier2/test_konami_pcm_pitch.gwi",
+        "description": "Pitch tracking (shared with K053260)",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "pitch_accuracy_percent": null,
+          "frequency_error_hz": null
+        },
+        "passed": null,
+        "notes": "Shared test file, change #CHIP directive for K053260"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "ay8910": {
+    "chip_name": "AY8910 (General Instrument PSG)",
+    "tier": "tier2",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "ay8910",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.85",
+      "harmonic_match_percent": ">85"
+    },
+    "tests": {
+      "envelope": {
+        "test_file": "tier2/test_ay8910_envelope.gwi",
+        "description": "Envelope generator modes",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "envelope_accuracy": null
+        },
+        "passed": null,
+        "notes": "4 envelope modes: \\, /, /\\, custom"
+      },
+      "wavetable": {
+        "test_file": "tier2/test_ay8910_wavetable.gwi",
+        "description": "Wavetable waveforms",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "harmonic_match_percent": null
+        },
+        "passed": null,
+        "notes": "Square waves with various duty cycles"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "failed": 0,
+      "pending": 2,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "huc6280": {
+    "chip_name": "HuC6280 (PC Engine / TurboGrafx-16)",
+    "tier": "tier2",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "pce",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.85",
+      "wavetable_match_percent": ">85"
+    },
+    "tests": {
+      "wavetable": {
+        "test_file": "tier2/test_huc6280_wavetable.gwi",
+        "description": "Wavetable waveforms",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "wavetable_match_percent": null
+        },
+        "passed": null,
+        "notes": "32 built-in waveforms, 6 channels (5 wavetable + 1 noise)"
+      }
+    },
+    "summary": {
+      "total_tests": 1,
+      "passed": 0,
+      "failed": 0,
+      "pending": 1,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
   "summary": {
-    "total_chips": 7,
-    "total_tests": 21,
+    "total_chips": 16,
+    "total_tests": 38,
+    "tier1_chips": 7,
+    "tier1_tests": 21,
+    "tier2_chips": 9,
+    "tier2_tests": 17,
     "tests_passed": 0,
-    "tests_pending": 21,
+    "tests_pending": 38,
     "tests_failed": 0,
     "overall_pass_rate_percent": 0,
     "phase_1_status": "infrastructure_complete",
-    "phase_2_status": "ready_to_start"
+    "phase_2_status": "in_progress"
   }
 }

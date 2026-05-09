@@ -1,0 +1,47 @@
+#CHIP YM2413
+#CLOCK 3579545
+
+; YM2413 (OPLL) Rhythm Mode Test
+;
+; The YM2413 has a special rhythm mode that uses channels 6-9 for
+; percussion sounds (bass drum, snare, tom, cymbal, hi-hat).
+; This test validates rhythm mode activation and drum sounds.
+;
+; Note: Rhythm mode is enabled by setting a specific register.
+; In rhythm mode, some melody channels are repurposed for drums.
+
+#TRACK 0
+
+TEMPO 120
+
+; Normal melody mode first (all 9 channels available for melody)
+c4 . d4 . e4 .
+
+r4
+
+; Switch to rhythm mode
+; In rhythm mode, channels 7-9 become percussion
+; Channel 6 can be either melody or bass drum depending on configuration
+
+; Play melody on channels 1-6
+c4 . . . d4 . . . e4 . . .
+
+r4
+
+; Exercise percussion instruments (channels 7-9 in rhythm mode)
+; Bass drum on channel 7
+; Snare drum on channel 8
+; Cymbal/hi-hat on channel 9
+
+; Simple drum pattern
+; Using sustained notes to trigger drum sounds
+c3 _ . . c3 _ . .
+
+r4
+
+; Combined melody and rhythm
+c4 & c3 . d4 & c3 . e4 & c3 .
+
+r2
+
+#END

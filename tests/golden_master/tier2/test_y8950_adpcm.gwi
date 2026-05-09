@@ -1,0 +1,44 @@
+#CHIP Y8950
+#CLOCK 3579545
+
+; Y8950 ADPCM Playback Test
+;
+; The Y8950 includes an ADPCM playback channel that can play back
+; 12-bit ADPCM samples at various sample rates.
+; This test validates ADPCM playback functionality.
+;
+; Note: This test requires sample data to be loaded.
+; For validation purposes, we'll use a simple test pattern.
+
+#TRACK 0
+
+TEMPO 120
+
+; OPL melody first (to verify OPL core is working)
+c4 . d4 . e4 .
+
+r4
+
+; Trigger ADPCM playback
+; In Y8950, ADPCM is controlled via register 0x10-0x12
+; Sample start address, end address, and playback control
+
+; Play a note to trigger ADPCM (channel 10+)
+; This would typically use a special directive for ADPCM
+c4 . . .
+
+r4
+
+; OPL + ADPCM simultaneous playback
+; Melody on OPL channels, drum sample on ADPCM
+c4 & [ADPCM_SAMPLE] .
+
+r4
+
+; Pitch modulation test for ADPCM
+; Play same sample at different pitches
+c4 . d4 . e4 .
+
+r2
+
+#END

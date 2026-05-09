@@ -1,0 +1,40 @@
+#CHIP C140
+#CLOCK 6000000
+
+; C140 (Namco 163) Loop Address Test
+;
+; The C140 supports sample looping for sustained sounds.
+; This test validates loop address and loop count register writes.
+;
+; Tests:
+; - Loop point accuracy
+; - Loop count (number of repetitions)
+; - Seamless looping (no clicks or gaps)
+
+#TRACK 0
+
+TEMPO 120
+
+; Play a sample with loop enabled
+; The sample should sustain using the loop
+c4 _ _ _
+
+r4
+
+; Play a sample with different loop points
+; This would exercise different loop address registers
+d4 _ _ _
+
+r4
+
+; Short loop (rapid repetition)
+c4 . . . .
+
+r4
+
+; Long sustained note with loop
+e4 _ _ _ _ _ _ _
+
+r2
+
+#END

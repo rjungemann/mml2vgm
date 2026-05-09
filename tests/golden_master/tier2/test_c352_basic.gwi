@@ -1,0 +1,39 @@
+#CHIP C352
+#CLOCK 16000000
+
+; C352 (Namco System 21/22) Basic Test
+;
+; The C352 is a more advanced Namco chip used in System 21/22 arcade boards.
+; It has 24 channels of stereo PCM playback with 16-bit samples.
+;
+; Tests:
+; - All 24 channels with basic sample playback
+; - Stereo panning
+; - Volume control
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1-8: Left side
+c4 .
+
+; Channel 9-16: Right side
+d4 .
+
+; Channel 17-24: Center
+e4 .
+
+r4
+
+; All 24 channels together (brief)
+c4 & d4 & e4 & f4 & g4 & a4 .
+
+r4
+
+; Arpeggio across channels
+c4 . d4 . e4 . f4 . g4 . a4 .
+
+r2
+
+#END

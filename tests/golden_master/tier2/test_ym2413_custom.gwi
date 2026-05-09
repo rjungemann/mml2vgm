@@ -1,0 +1,38 @@
+#CHIP YM2413
+#CLOCK 3579545
+
+; YM2413 (OPLL) Custom Patch Test
+;
+; The YM2413 supports custom patch definitions by writing directly to
+; the operator registers. This test creates a custom patch and plays it.
+;
+; Test sequence:
+; 1. Create a custom patch with specific operator parameters
+; 2. Play notes with the custom patch
+; 3. Modify the patch in real-time
+
+#TRACK 0
+
+TEMPO 120
+
+; First, play with default patch
+c4 . d4 . e4 .
+
+r4
+
+; Custom patch definition would go here
+; (mml2vgm syntax for custom patches on YM2413)
+; For now, we'll use a placeholder that exercises the chip
+
+; Play with modified parameters
+; Using sustained notes to hear the custom timbre
+c4 _ d4 _ e4 _
+
+r4
+
+; Rapid arpeggio with custom patch
+c4 . . d4 . . e4 . . f4 . .
+
+r2
+
+#END

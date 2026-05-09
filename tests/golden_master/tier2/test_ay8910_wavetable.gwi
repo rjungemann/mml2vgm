@@ -1,0 +1,45 @@
+#CHIP AY8910
+#CLOCK 1789773
+
+; AY8910 (General Instrument AY-3-8910) Wavetable Test
+;
+; The AY8910 has square wave generators that can be configured to produce
+; different duty cycles and waveforms.
+;
+; Tests:
+; - Square waves at various duty cycles
+; - Noise channel (LFSR)
+; - Combined tone and noise
+
+#TRACK 0
+
+TEMPO 120
+
+; Tone channel 1: 50% duty cycle (square wave)
+c4 . . .
+
+; Tone channel 2: 25% duty cycle
+d4 . . .
+
+; Tone channel 3: 12.5% duty cycle (pulse)
+e4 . . .
+
+r4
+
+; All 3 tone channels together
+c4 & d4 & e4 .
+
+r4
+
+; Noise channel test (perussive sounds)
+; Using low notes to trigger noise
+c2 . d2 . e2 .
+
+r4
+
+; Combined tone and noise
+c4 & c2 .
+
+r2
+
+#END

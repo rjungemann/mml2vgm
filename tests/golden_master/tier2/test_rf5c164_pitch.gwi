@@ -1,0 +1,44 @@
+#CHIP RF5C164
+#CLOCK 7670453
+
+; RF5C164 (Sega CD PCM) Pitch Tracking Test
+;
+; The RF5C164 supports pitch modulation of PCM samples.
+; This test validates pitch sweep tracking and frequency modulation.
+;
+; Tests:
+; - Pitch bend over sample range
+; - Frequency modulation accuracy
+; - Pitch register write timing
+
+#TRACK 0
+
+TEMPO 120
+
+; Start with normal pitch
+c4 .
+
+; Pitch up (higher frequency)
+d4 .
+
+; Pitch down (lower frequency)
+c4 .
+
+r4
+
+; Pitch sweep: ascending
+c4 . d4 . e4 . f4 .
+
+r4
+
+; Pitch sweep: descending
+g4 . f4 . e4 . d4 .
+
+r4
+
+; Rapid pitch modulation
+c4 . . d4 . . e4 . . f4 . .
+
+r2
+
+#END

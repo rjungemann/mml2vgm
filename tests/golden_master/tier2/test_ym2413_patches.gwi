@@ -1,0 +1,75 @@
+#CHIP YM2413
+#CLOCK 3579545
+
+; YM2413 (OPLL) Built-in Patches Test
+;
+; The YM2413 has 16 built-in patches (preset voices) plus a custom patch mode.
+; This test validates all 16 built-in patches by playing a simple melody
+; with each patch to verify correct voice selection.
+;
+; Test sequence: Play each of the 16 patches with a C4 note
+
+#TRACK 0
+
+TEMPO 120
+
+; Patch 0: User patch (default) - we'll use this as baseline
+@0 c4 .
+
+; Patch 1: Violin
+@1 c4 .
+
+; Patch 2: Guitar
+@2 c4 .
+
+; Patch 3: Piano
+@3 c4 .
+
+; Patch 4: Flute
+@4 c4 .
+
+; Patch 5: Clarinet
+@5 c4 .
+
+; Patch 6: Trumpet
+@6 c4 .
+
+; Patch 7: Organ
+@7 c4 .
+
+r4
+
+; Patch 8: Horn
+@8 c4 .
+
+; Patch 9: Synth
+@9 c4 .
+
+; Patch 10: Harpsichord
+@10 c4 .
+
+; Patch 11: Vibraphone
+@11 c4 .
+
+; Patch 12: Synth Bass
+@12 c4 .
+
+; Patch 13: Wood Bass
+@13 c4 .
+
+r4
+
+; Patch 14: Electric Guitar
+@14 c4 .
+
+; Patch 15: Synth Strings
+@15 c4 .
+
+; Patch 16: Piano 2 (actually index 15 in some implementations)
+; Note: OPLL has 15 preset patches + 1 user patch = 16 total
+; Using patch 0 again to verify it hasn't changed
+@0 c4 .
+
+r2
+
+#END

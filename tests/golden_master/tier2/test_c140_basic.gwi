@@ -1,0 +1,45 @@
+#CHIP C140
+#CLOCK 6000000
+
+; C140 (Namco 163) Basic Test
+;
+; The C140 is a Namco custom chip used in various arcade games.
+; It has 8 channels of 8-bit PCM playback with a fixed sample rate.
+;
+; Note: The actual C140 has 24 channels in some configurations.
+; This test targets the basic 8-channel variant.
+;
+; Tests:
+; - All 8 channels with basic sample playback
+; - Various waveforms (square, sawtooth, noise if supported)
+; - Volume control
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1: Sample 1
+c4 .
+
+; Channel 2: Sample 2
+d4 .
+
+; Channel 3: Sample 3
+e4 .
+
+; Channel 4: Sample 4
+f4 .
+
+r4
+
+; All 8 channels together
+c4 & d4 & e4 & f4 & g4 & a4 & b4 & c5 .
+
+r4
+
+; Staccato pattern
+c4 . d4 . e4 . f4 .
+
+r2
+
+#END

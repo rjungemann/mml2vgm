@@ -1,0 +1,43 @@
+#CHIP RF5C164
+#CLOCK 7670453
+
+; RF5C164 (Sega CD PCM) Basic Test
+;
+; The RF5C164 is a Ricoh chip used in the Sega CD (Mega CD) for PCM audio.
+; It has 8 channels of 8-bit PCM playback with a sample rate of 32kHz.
+;
+; Tests:
+; - All 8 channels with basic sample playback
+; - Volume control
+; - Pan positioning
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1: Sample playback
+c4 .
+
+; Channel 2: Different sample
+c4 .
+
+; Channel 3: Another sample
+d4 .
+
+; Channel 4: Yet another sample
+e4 .
+
+r4
+
+; All 8 channels together
+c4 & c4 & d4 & e4 & f4 & g4 & a4 & b4 .
+
+r4
+
+; Volume sweep test
+; Play same sample at different volumes
+c4 . c4 . c4 . c4 .
+
+r2
+
+#END

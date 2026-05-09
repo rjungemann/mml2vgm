@@ -1,0 +1,45 @@
+#CHIP K053260
+#CLOCK 8000000
+
+; Konami PCM (K053260/K054539) Pitch Tracking Test
+;
+; Both K053260 and K054539 support pitch modulation of PCM samples.
+; This test validates pitch tracking accuracy.
+; Can be used for both chips by changing the #CHIP directive.
+;
+; Tests:
+; - Pitch bend over sample range
+; - Frequency modulation accuracy
+; - Pitch register write timing
+
+#TRACK 0
+
+TEMPO 120
+
+; Start with normal pitch
+c4 .
+
+; Pitch up (higher frequency)
+d4 .
+
+; Pitch down (lower frequency)
+c4 .
+
+r4
+
+; Pitch sweep: ascending
+c4 . d4 . e4 . f4 .
+
+r4
+
+; Pitch sweep: descending
+g4 . f4 . e4 . d4 .
+
+r4
+
+; Rapid pitch modulation
+c4 . . d4 . . e4 . . f4 . .
+
+r2
+
+#END

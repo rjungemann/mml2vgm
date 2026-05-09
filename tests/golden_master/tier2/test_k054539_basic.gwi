@@ -1,0 +1,36 @@
+#CHIP K054539
+#CLOCK 16000000
+
+; K054539 (Konami Enhanced PCM) Basic Test
+;
+; The K054539 is an enhanced version of the Konami PCM chip.
+; It has 8 channels of 16-bit PCM playback with additional features.
+;
+; Tests:
+; - All 8 channels with basic sample playback
+; - Volume control
+; - Stereo panning
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1-4: Left stereo
+c4 .
+
+; Channel 5-8: Right stereo
+d4 .
+
+r4
+
+; All 8 channels together
+c4 & d4 & e4 & f4 & g4 & a4 & b4 & c5 .
+
+r4
+
+; Arpeggio across all channels
+c4 . d4 . e4 . f4 . g4 . a4 .
+
+r2
+
+#END

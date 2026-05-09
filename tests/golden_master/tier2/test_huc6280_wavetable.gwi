@@ -1,0 +1,46 @@
+#CHIP HuC6280
+#CLOCK 7159090
+
+; HuC6280 (Hudson Soft) Wavetable Test
+;
+; The HuC6280 is the sound chip used in the PC Engine / TurboGrafx-16.
+; It has 6 channels: 5 wavetable channels and 1 noise channel.
+; Each wavetable channel can use one of 32 built-in waveforms.
+;
+; Tests:
+; - Wavetable playback with different waveforms
+; - Volume control
+; - Pitch modulation
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1: Sine wave wavetable
+c4 .
+
+; Channel 2: Square wave wavetable
+d4 .
+
+; Channel 3: Sawtooth wavetable
+e4 .
+
+; Channel 4: Triangle wavetable
+f4 .
+
+; Channel 5: Pulse wavetable
+g4 .
+
+r4
+
+; All 5 wavetable channels together
+c4 & d4 & e4 & f4 & g4 .
+
+r4
+
+; Wavetable pitch sweep
+c4 . d4 . e4 . f4 .
+
+r2
+
+#END

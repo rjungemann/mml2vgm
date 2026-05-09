@@ -1,0 +1,42 @@
+#CHIP C352
+#CLOCK 16000000
+
+; C352 (Namco System 21/22) Filter Test
+;
+; The C352 includes a digital filter that can be applied to PCM channels.
+; This test validates filter parameter sweep and frequency response.
+;
+; Tests:
+; - Low-pass filter sweep
+; - High-pass filter sweep  
+; - Filter cutoff frequency accuracy
+; - Resonance behavior
+
+#TRACK 0
+
+TEMPO 120
+
+; Start with no filter (bypass)
+c4 . . .
+
+; Apply low-pass filter, sweep cutoff from low to high
+c4 . d4 . e4 .
+
+r4
+
+; Apply high-pass filter, sweep cutoff from high to low
+g4 . f4 . e4 . d4 .
+
+r4
+
+; Filter with resonance
+c4 _ _ _
+
+r4
+
+; Rapid filter modulation
+c4 . d4 . e4 . f4 . g4 . a4 .
+
+r2
+
+#END

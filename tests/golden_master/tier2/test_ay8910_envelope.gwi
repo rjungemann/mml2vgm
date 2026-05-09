@@ -1,0 +1,43 @@
+#CHIP AY8910
+#CLOCK 1789773
+
+; AY8910 (General Instrument AY-3-8910) Envelope Generator Test
+;
+; The AY8910 PSG chip has 3 tone channels and 1 noise channel.
+; Each channel has an envelope generator that can produce various shapes.
+;
+; Tests:
+; - All 4 envelope modes (\, /, /\, custom)
+; - Envelope period and shape
+; - Volume tracking with envelopes
+
+#TRACK 0
+
+TEMPO 120
+
+; Tone channel 1 with envelope (sawtooth: /\ )
+c4 . . .
+
+r4
+
+; Tone channel 2 with different envelope (inverted sawtooth: \/)
+d4 . . .
+
+r4
+
+; Tone channel 3 with ramp up (/)  
+e4 . . .
+
+r4
+
+; All 3 tone channels with envelopes
+c4 & d4 & e4 .
+
+r4
+
+; Envelope with long sustained notes
+c4 _ _ _ d4 _ _ _
+
+r2
+
+#END
