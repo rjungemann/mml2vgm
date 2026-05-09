@@ -263,7 +263,7 @@ Beyond the basics, each sound chip exposes hardware-specific features through `@
 
 For the complete chip-specific command reference (FM operator commands, PSG/POKEY commands, wavetable commands, PCM commands), see:
 - [MML_Commands.md § Chip-Specific Commands](MML_Commands.md#chip-specific-commands-phase-9)
-- [PHASE_9_MML_COMMANDS.md](PHASE_9_MML_COMMANDS.md) — implementation status, register-level details
+- [Console_Chips_Design.md](Console_Chips_Design.md) — per-chip register and clock reference
 
 Commands silently no-op on chips that don't support them, so it's safe to use chip-targeted commands across multi-chip parts.
 

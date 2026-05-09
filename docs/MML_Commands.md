@@ -456,7 +456,7 @@ Example — using `n` to access a note that would otherwise require an octave sw
 
 ## Chip-Specific Commands (Phase 9)
 
-These `@CMD` commands target hardware-specific features of individual sound chips. The chip context is determined by the part's chip declaration; commands silently no-op on chips that don't support them. See [PHASE_9_MML_COMMANDS.md](PHASE_9_MML_COMMANDS.md) for the full implementation status and register-level details.
+These `@CMD` commands target hardware-specific features of individual sound chips. The chip context is determined by the part's chip declaration; commands silently no-op on chips that don't support them. For per-chip register details, see [Console_Chips_Design.md](Console_Chips_Design.md).
 
 ### FM Operator Commands (YM2608/YM2151/YM2203/YM2413/YM3526/YM3812/Y8950/YMF262)
 

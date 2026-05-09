@@ -1,4 +1,9 @@
-# Example MML Tracks & Instrument Definitions Plan
+# Example MML Tracks & Instrument Definitions — Design Reference
+
+> **Status:** Implemented (May 2026). All planned tiers and patch libraries
+> were delivered into `browser-ide/public/samples/`. Retained as a reference
+> for the example-corpus design and the per-tier learning progression. For
+> overall project status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Overview
 

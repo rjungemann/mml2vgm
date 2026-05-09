@@ -1,8 +1,12 @@
-# mml2vgm Performance Improvement Plan
+# mml2vgm Performance Improvement — Design Reference
 
-**Date:** May 5, 2026  
-**Status:** ✅ COMPLETED — avg 0.23 ms/file (browser-IDE samples); goal exceeded by 20,000×  
-**Goal:** ~~Reduce WASM compilation time from 60+ seconds to < 5 seconds~~ — achieved and closed
+> **Status:** Implemented (May 2026). The lexer O(n²) bottleneck was fixed and
+> WASM compilation now averages ~0.23 ms/file (down from 60+ seconds — a
+> ~20,000× improvement). Retained as a reference for the profiling methodology
+> and design rationale. For overall project status, see
+> [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
+**Date:** May 5, 2026
 
 ## Critical Optimizations Applied
 

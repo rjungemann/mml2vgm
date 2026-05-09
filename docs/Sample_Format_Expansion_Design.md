@@ -1,10 +1,15 @@
-# Plan: PCM Sample Format Expansion
+# PCM Sample Format Expansion — Design Reference
+
+> **Status:** Implemented (May 2026). WAV, OGG Vorbis, raw PCM and ADPCM are
+> all supported in the browser sample-ingest path. Retained as a reference
+> for the per-format decoder strategy. For overall project status, see
+> [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Goal
 
-Extend the browser IDE sample library (see [Sample_Upload_Plan.md](./Sample_Upload_Plan.md)) beyond
-WAV to support additional audio formats that MML authors commonly use: OGG Vorbis, raw PCM, and
-ADPCM-encoded files.
+Extend the browser IDE sample library beyond WAV to support additional audio
+formats that MML authors commonly use: OGG Vorbis, raw PCM, and ADPCM-encoded
+files.
 
 ---
 

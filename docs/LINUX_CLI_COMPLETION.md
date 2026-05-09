@@ -1,8 +1,10 @@
-# Linux CLI Improvements - Completion Summary
+# Linux CLI Improvements — Completion Summary
 
-**Date**: May 8, 2026  
-**Status**: ✅ **COMPLETE** (Phase 15 - Extended Documentation)  
-**Executed**: Excluding "Defer for now" tasks as requested
+> **Status:** Implemented (May 2026). Retained as a reference describing the
+> Linux-specific CLI enhancements. For overall project status, see
+> [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
+**Date**: May 8, 2026
 
 ## Overview
 
@@ -211,18 +213,14 @@ Finished `release` profile [optimized] target/s) in 0.21s
 3. `docs/mml2vgm-rs.1`: Man page documentation (200 lines)
 4. `INSTALL.md`: Installation and usage guide (200+ lines)
 
-## Integration with PHASES_14-15_COMPLETION_REPORT.md
+## Completion Summary
 
-**Updated Section**: "Linux CLI improvements" (line 694)
+- Enhanced command-line interface: complete
+- Terminal enhancements: complete
+- Batch processing features: complete (`--batch`; `--watch` and parallel
+  compilation deferred to a future phase)
 
-**Status**: Marked as ✅ **COMPLETE**
-
-**Completion Details**:
-- Enhanced command-line interface: ✅ COMPLETE
-- Terminal enhancements: ✅ COMPLETE
-- Batch processing features: ✅ COMPLETE (batch, deferred watch/parallel)
-
-## Deferred Tasks (As Requested)
+## Deferred Tasks
 
 The following "Defer for now" tasks were excluded per user request:
 

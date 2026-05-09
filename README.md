@@ -140,16 +140,16 @@ mml2vgm/
 │   └── samples/                  # Test MML and VGM files
 │
 ├── docs/                         # Documentation
-│   ├── PLAN.md                   # Overall project plans
-│   ├── Browser_IDE_Plan.md       # Browser IDE development plan
-│   ├── Browser_IDE_Implementation.md # Implementation details
-│   ├── Browser_IDE_Limitations.md # Known limitations
-│   ├── PLAN_Rust_CLI.md          # Rust CLI development plan
-│   ├── Cloudflare_Pages_Deployment.md # Cloudflare hosting
-│   ├── Tauri_Desktop_Setup.md    # Tauri desktop setup
+│   ├── PROJECT_STATUS.md         # Project status and component index
+│   ├── Browser_IDE_Implementation.md
+│   ├── Browser_IDE_Limitations.md
+│   ├── Rust_CLI_Design.md        # Rust CLI design reference
+│   ├── Console_Chips_Design.md   # Per-chip register/MML reference
+│   ├── Cloudflare_Pages_Deployment.md
 │   ├── MML_Commands.md           # MML command reference
-│   ├── ZGM_Specification.md      # ZGM format specification
-│   └── External_Driver_Support.md # External driver support
+│   ├── User_Manual.md
+│   ├── ZGM_Specification.md
+│   └── External_Driver_Support.md
 │
 └── LICENSE.txt                  # GPL-3.0 License
 ```
@@ -174,7 +174,7 @@ The new Rust implementation (`mml2vgm-rs`) supports the following sound chips:
 - YM2151, YM2203, YM3526, Y8950, YM3812, YMF262, YM2413
 - C140, C352, AY8910, YM2609, YM2610
 
-See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
+See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for chip implementation status and overall project state.
 
 ---
 
@@ -237,14 +237,16 @@ See [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) for chip implementation status.
 
 | Document | Description |
 |----------|-------------|
-| [PLAN.md](docs/PLAN.md) | Project plans and feature status overview |
-| [Browser_IDE_Implementation.md](docs/Browser_IDE_Implementation.md) | Web IDE feature status and architecture |
-| [Browser_IDE_Limitations.md](docs/Browser_IDE_Limitations.md) | Known limitations and workarounds |
-| [PLAN_Rust_CLI.md](docs/PLAN_Rust_CLI.md) | Rust CLI compiler implementation status |
-| [PLAN_egui_Desktop.md](docs/PLAN_egui_Desktop.md) | Desktop app architecture and features |
+| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Project status and component index |
+| [User_Manual.md](docs/User_Manual.md) | End-user guide for the CLI |
+| [MML_Commands.md](docs/MML_Commands.md) | MML command reference |
+| [Browser_IDE_Implementation.md](docs/Browser_IDE_Implementation.md) | Web IDE architecture and feature status |
+| [Browser_IDE_Limitations.md](docs/Browser_IDE_Limitations.md) | Known browser-IDE limitations |
+| [Rust_CLI_Design.md](docs/Rust_CLI_Design.md) | Rust CLI design reference |
+| [Console_Chips_Design.md](docs/Console_Chips_Design.md) | Per-chip register and MML reference |
 | [External_Driver_Support.md](docs/External_Driver_Support.md) | Multi-format MML driver implementation |
 | [Cloudflare_Pages_Deployment.md](docs/Cloudflare_Pages_Deployment.md) | Deploying to Cloudflare Pages |
-| [MML_Commands.md](docs/MML_Commands.md) | MML command reference |
+| [Development.md](docs/Development.md) | Development setup |
 | [ZGM_Specification.md](docs/ZGM_Specification.md) | ZGM format specification |
 
 ---

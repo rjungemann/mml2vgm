@@ -1,4 +1,9 @@
-# External Driver Support Plan - Rust Implementation
+# External Driver Support — Design Reference
+
+> **Status:** Implemented and shipped (May 2026). All five drivers (M98,
+> Mucom, MoonDriver, PMD, Muap) are integrated with WASM bindings. Retained
+> as a reference for the per-driver architecture. For overall project
+> status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Overview
 
@@ -1202,7 +1207,7 @@ The **15-month timeline** allows for careful implementation of each driver with 
 
 ## References
 
-- [Browser IDE Plan](./Browser_IDE_Plan.md)
+- [Browser IDE Implementation](./Browser_IDE_Implementation.md)
 - [mml2vgm README](../README.md)
 - [Rust and WebAssembly](https://rustwasm.github.io/docs/book/)
 - [wasm-bindgen Documentation](https://rustwasm.github.io/docs/wasm-bindgen/)

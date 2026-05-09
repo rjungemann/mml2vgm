@@ -1,4 +1,9 @@
-# Plan: QSound (Capcom DL-1425) Complete Implementation
+# QSound (Capcom DL-1425) — Design Reference
+
+> **Status:** Phases 1–4 implemented (May 2026); Phase 5 (Q1 FIR filter) is
+> deferred as low priority. Retained as a reference for the design rationale
+> and the hardware notes that drove the implementation. For overall project
+> status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Overview
 

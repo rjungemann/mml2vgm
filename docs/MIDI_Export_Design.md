@@ -1,4 +1,9 @@
-# MIDI File Export Plan
+# MIDI File Export — Design Reference
+
+> **Status:** Implemented and shipped in both the Browser IDE and the egui
+> desktop app (May 2026). All planned phases complete. Retained as a reference
+> for the design rationale. For overall project status, see
+> [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Overview
 
@@ -746,7 +751,7 @@ No new dependencies required for core functionality:
 ### Documentation Updated
 - `docs/MML_Commands.md` - Added comprehensive MIDI Commands Reference section
 - `docs/User_Manual.md` - Added MIDI Export section with usage examples
-- `docs/MIDI_Export_Plan.md` - Updated with progress and completion status
+- `docs/MIDI_Export_Design.md` (this file) - Updated with progress and completion status
 
 ### Example Files Created
 - `examples/midi_basic.gwi` - Basic MIDI multi-part song

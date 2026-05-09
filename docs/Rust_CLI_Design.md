@@ -1,4 +1,8 @@
-# Plan: Rust Command-Line Utility for MML Compilation and VGM Playback
+# Rust CLI — Design Reference
+
+> **Status:** Implemented and shipped (May 2026). All planned phases complete.
+> Retained as a reference for the design rationale and architectural choices.
+> For overall project status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
 ## Overview
 

@@ -400,9 +400,9 @@ Once you have the ROMs:
    - YM2151 ROM: `/path/to/arcade_game.bin`
    - YM2203 ROM: `/path/to/pc88_game.d88`
 
-3. **Start Phase 2 validation**:
+3. **Start golden-master validation**:
    ```bash
-   # Follow WEEK_2_3_VALIDATION_PLAN.md
+   # See Validation_Status.md and Golden_Master_Comparison_Plan.md
    /opt/homebrew/bin/mednafen -vgm_out golden.vgm /path/to/arcade_game.bin
    ```
 

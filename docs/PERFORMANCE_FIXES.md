@@ -1,7 +1,11 @@
 # Performance Optimization Results
 
-**Date:** May 5, 2026  
-**Status:** Critical optimizations implemented and built
+> **Status:** Implemented (May 2026). Retained as a reference describing the
+> O(n²) lexer fix and the resulting throughput numbers. See also the
+> companion [Performance_Improvement_Design.md](./Performance_Improvement_Design.md).
+> For overall project status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
+**Date:** May 5, 2026
 
 ## Summary
 
@@ -109,7 +113,7 @@ time ./mml2vgm-rs <example.gwi>
 
 ## Remaining Optimization Opportunities
 
-If further performance is needed, see Phase 2-3 in `Performance_Improvement_Plan.md`:
+If further performance is needed, see Phase 2-3 in [`Performance_Improvement_Design.md`](./Performance_Improvement_Design.md):
 - String allocation reduction (Tier 1)
 - Caching/memoization (Tier 1)
 - Parallel compilation (Tier 2)

@@ -1,5 +1,11 @@
 # Browser IDE Implementation
 
+> **Status:** Implemented and shipped (May 2026). All seven build phases are
+> complete; the IDE is deployed via Cloudflare Pages. Retained as a reference
+> for the implementation architecture and per-feature notes. For overall
+> project status, see [PROJECT_STATUS.md](./PROJECT_STATUS.md). For known
+> limitations, see [Browser_IDE_Limitations.md](./Browser_IDE_Limitations.md).
+
 ## 📊 Overall Progress
 
 **Last Updated:** 2026-05-04 17:30 UTC
@@ -614,7 +620,7 @@ Phase 5 focuses on implementing advanced IDE features including part management,
 
 ### Phase 5 Deliverables Status
 
-From Browser_IDE_Plan.md Phase 5 Deliverables:
+From the original Browser IDE plan, Phase 5 Deliverables:
 - ✅ Part Counter with full functionality
 - ✅ MIDI Keyboard support via Web MIDI API
 - ✅ Folder Tree with file operations
@@ -713,7 +719,7 @@ Phase 6 focuses on achieving feature parity with the .NET IDE by implementing mu
 
 ### Phase 6 Deliverables Status
 
-From Browser_IDE_Plan.md Phase 6 Deliverables:
+From the original Browser IDE plan, Phase 6 Deliverables:
 - ✅ Multi-format MML support (formatService.ts with detection, handlers, syntax config)
 - ✅ Script integration (Python via Pyodide) (scriptService.ts with Pyodide support, templates)
 - ✅ Lyrics display and synchronization (LyricsPanel.tsx - created in Phase 3, available for integration)
@@ -783,7 +789,6 @@ From Browser_IDE_Plan.md Phase 6 Deliverables:
 - `browser-ide/src/services/audioService.ts` - Per-chip volume/mute/solo
 - `browser-ide/src/components/panels/LyricsPanel.tsx` - \ly command parsing
 - `browser-ide/src/components/panels/MixerPanel.tsx` - audioService integration
-- `docs/Browser_IDE_Plan.md` - Updated Phase 6 status
 - `docs/Browser_IDE_Implementation.md` - Added Phase 6 section
 
 ---
@@ -867,7 +872,7 @@ Phase 7 focuses on optimizing performance, adding offline support, improving acc
 
 ### Phase 7 Deliverables Status
 
-From Browser_IDE_Plan.md Phase 7 Deliverables:
+From the original Browser IDE plan, Phase 7 Deliverables:
 
 #### Performance Optimization
 - ✅ WASM Size: Current WASM bundle is ~311KB (compressed), well under 5MB target
