@@ -31,11 +31,14 @@ class VgmParser:
     CMD_PSG = 0x50
     CMD_FM = 0x51
     CMD_FM2 = 0x52
+    CMD_YM2151 = 0x54  # OPM
+    CMD_YM2203 = 0x55  # OPN
     CMD_SEGA_PCM = 0x67
     CMD_OPL2 = 0x5B
     CMD_OPL3 = 0x5E
     CMD_DUAL_FM = 0x30
-    CMD_WAIT_SAMPLES = 0x61
+    CMD_WAIT_SAMPLES = 0x60
+    CMD_WAIT_SAMPLES_2 = 0x61
     CMD_WAIT_735 = 0x62
     CMD_WAIT_882 = 0x63
     CMD_DATA_BLOCK = 0x67
@@ -65,7 +68,7 @@ class VgmParser:
             if cmd == self.CMD_END:
                 break
             elif cmd == self.CMD_WAIT_SAMPLES:
-                # Wait 1 sample
+                # Wait 1 sample (0x60)
                 current_time += 1
             elif cmd == self.CMD_WAIT_735:
                 # Wait 735 samples
@@ -73,7 +76,7 @@ class VgmParser:
             elif cmd == self.CMD_WAIT_882:
                 # Wait 882 samples
                 current_time += 882
-            elif cmd == 0x61:  # Wait n samples
+            elif cmd == self.CMD_WAIT_SAMPLES_2:  # 0x61: Wait n samples
                 wait_samples = struct.unpack('<H', self.data[self.pos:self.pos+2])[0]
                 self.pos += 2
                 current_time += wait_samples
@@ -82,6 +85,16 @@ class VgmParser:
                 value = self.data[self.pos+1]
                 self.pos += 2
                 self.registers.append(RegisterWrite(current_time, 0, register, value, "YM2413"))
+            elif cmd == self.CMD_YM2151:  # YM2151 (0x54)
+                register = self.data[self.pos]
+                value = self.data[self.pos+1]
+                self.pos += 2
+                self.registers.append(RegisterWrite(current_time, 0, register, value, "YM2151"))
+            elif cmd == self.CMD_YM2203:  # YM2203 (0x55)
+                register = self.data[self.pos]
+                value = self.data[self.pos+1]
+                self.pos += 2
+                self.registers.append(RegisterWrite(current_time, 0, register, value, "YM2203"))
             elif cmd == self.CMD_PSG:  # SN76489
                 value = self.data[self.pos]
                 self.pos += 1
@@ -102,8 +115,9 @@ class VgmParser:
                 size = struct.unpack('<I', self.data[self.pos:self.pos+4])[0]
                 self.pos += 4 + size
             else:
-                # Skip unknown command (simple implementation)
-                break
+                # Unknown command - try to skip safely or continue
+                # Some commands have variable length, for now just continue
+                pass
 
         return self.registers
 

@@ -1,0 +1,167 @@
+{
+  "timestamp": "2026-05-08T23:26:58.175424",
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "total": 12
+  },
+  "results": [
+    {
+      "test": "test_ym2151_envelope.gwi",
+      "chip": "YM2151",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.128337",
+      "stats": {
+        "parts": 1,
+        "commands": 89,
+        "duration": "441000"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_envelope.vgm"
+    },
+    {
+      "test": "test_nes_pulse.gwi",
+      "chip": "NES",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.133311",
+      "stats": {
+        "parts": 1,
+        "commands": 76,
+        "duration": "496125"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_pulse.vgm"
+    },
+    {
+      "test": "test_nes_triangle.gwi",
+      "chip": "NES",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.137553",
+      "stats": {
+        "parts": 1,
+        "commands": 76,
+        "duration": "485100"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_triangle.vgm"
+    },
+    {
+      "test": "test_nes_noise.gwi",
+      "chip": "NES",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.142323",
+      "stats": {
+        "parts": 1,
+        "commands": 106,
+        "duration": "573300"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_noise.vgm"
+    },
+    {
+      "test": "test_ym2203_fm.gwi",
+      "chip": "YM2203",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.146344",
+      "stats": {
+        "parts": 1,
+        "commands": 65,
+        "duration": "485100"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_fm.vgm"
+    },
+    {
+      "test": "test_ym2203_ssg.gwi",
+      "chip": "YM2203",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.150247",
+      "stats": {
+        "parts": 1,
+        "commands": 45,
+        "duration": "396900"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_ssg.vgm"
+    },
+    {
+      "test": "test_ym2203_mixed.gwi",
+      "chip": "YM2203",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.154522",
+      "stats": {
+        "parts": 1,
+        "commands": 93,
+        "duration": "694575"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_mixed.vgm"
+    },
+    {
+      "test": "test_ym2608_fm.gwi",
+      "chip": "YM2608",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.158841",
+      "stats": {
+        "parts": 1,
+        "commands": 82,
+        "duration": "429975"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_fm.vgm"
+    },
+    {
+      "test": "test_ym2608_ssg.gwi",
+      "chip": "YM2608",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.162811",
+      "stats": {
+        "parts": 1,
+        "commands": 54,
+        "duration": "308700"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_ssg.vgm"
+    },
+    {
+      "test": "test_opl2_basic.gwi",
+      "chip": "YM3812",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.166726",
+      "stats": {
+        "parts": 1,
+        "commands": 54,
+        "duration": "485100"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl2_basic.vgm"
+    },
+    {
+      "test": "test_opl_envelope.gwi",
+      "chip": "YM3812",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.170768",
+      "stats": {
+        "parts": 1,
+        "commands": 39,
+        "duration": "385875"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl_envelope.vgm"
+    },
+    {
+      "test": "test_opl3_4op.gwi",
+      "chip": "YMF262",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-08T23:26:58.175297",
+      "stats": {
+        "parts": 1,
+        "commands": 52,
+        "duration": "374850"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl3_4op.vgm"
+    }
+  ]
+}
