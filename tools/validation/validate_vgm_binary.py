@@ -24,8 +24,23 @@ class VgmValidator:
     CMD_YM2151 = 0x54
     CMD_YM2203 = 0x55
     CMD_YM2608 = 0x56
-    CMD_YM3812 = 0x5B
+    CMD_YM3812 = 0x5A
+    CMD_YM3526 = 0x5B
+    CMD_Y8950 = 0x5C
     CMD_YMF262 = 0x5E
+    CMD_RF5C164 = 0x68
+    CMD_C140 = 0x7F
+    CMD_C352 = 0x8E
+    CMD_AY8910 = 0xA0
+    CMD_SEGAPCM = 0xA4
+    CMD_DMG = 0xB3
+    CMD_NESAPU = 0xB4
+    CMD_VRC6 = 0xB6
+    CMD_HUC6280 = 0xB9
+    CMD_K053260 = 0xBA
+    CMD_QSOUND = 0xC4
+    CMD_K051649 = 0xD2
+    CMD_K054539 = 0xD3
     CMD_WAIT_SAMPLES = 0x60
     CMD_WAIT_SAMPLES_2 = 0x61
     CMD_WAIT_735 = 0x62
@@ -39,8 +54,23 @@ class VgmValidator:
         0x54: "YM2151",
         0x55: "YM2203",
         0x56: "YM2608",
-        0x5B: "OPL2",
+        0x5A: "YM3812",
+        0x5B: "YM3526",
+        0x5C: "Y8950",
         0x5E: "OPL3",
+        0x68: "RF5C164",
+        0x7F: "C140",
+        0x8E: "C352",
+        0xA0: "AY8910",
+        0xA4: "SegaPCM",
+        0xB3: "DMG",
+        0xB4: "NES APU",
+        0xB6: "VRC6",
+        0xB9: "HuC6280",
+        0xBA: "K053260",
+        0xC4: "QSound",
+        0xD2: "K051649",
+        0xD3: "K054539",
         0x60: "WAIT1",
         0x61: "WAITn",
         0x62: "WAIT735",
@@ -133,7 +163,11 @@ class VgmValidator:
                     self.waits.append((self.current_time, wait_samples))
 
                 elif cmd in [self.CMD_FM, self.CMD_YM2151, self.CMD_YM2203,
-                            self.CMD_YM2608, self.CMD_YM3812, self.CMD_YMF262]:
+                            self.CMD_YM2608, self.CMD_YM3812, self.CMD_YM3526, self.CMD_Y8950,
+                            self.CMD_YMF262, self.CMD_RF5C164, self.CMD_C140, self.CMD_C352,
+                            self.CMD_AY8910, self.CMD_SEGAPCM, self.CMD_DMG, self.CMD_NESAPU,
+                            self.CMD_VRC6, self.CMD_HUC6280, self.CMD_K053260, self.CMD_QSOUND,
+                            self.CMD_K051649, self.CMD_K054539]:
                     if self.pos + 2 > len(self.data):
                         self.errors.append(f"Incomplete {self.COMMAND_NAMES.get(cmd, 'UNKNOWN')} command")
                         break
