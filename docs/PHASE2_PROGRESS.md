@@ -22,17 +22,17 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 
 | # | Chip | Reference Emulator | Tests | MML Files | Golden Masters | Validation | Status |
 |---|------|---------------------|-------|-----------|----------------|------------|--------|
-| 1 | **YM2413** (OPLL) | Mednafen OPLL | 3 | 0/3 | 0/3 | 0% | ⏳ Not Started |
-| 2 | **Y8950** (OPL + ADPCM) | DOSBox-X / MAME | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 3 | **RF5C164** (Sega CD) | Mednafen Sega CD | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 4 | **C140** (Namco) | MAME C140 | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 5 | **C352** (Namco System 21/22) | MAME C352 | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 6 | **K053260** (Konami PCM) | MAME K053260 | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 7 | **K054539** (Konami PCM) | MAME K054539 | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 8 | **AY8910** (PSG) | Mednafen AY8910 | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
-| 9 | **HuC6280** (PC Engine) | Mednafen PC Engine | 2 | 0/2 | 0/2 | 0% | ⏳ Not Started |
+| 1 | **YM2413** (OPLL) | Mednafen OPLL | 3 | 3/3 | 0/3 | 0% | ✅ MML Complete |
+| 2 | **Y8950** (OPL + ADPCM) | DOSBox-X / MAME | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 3 | **RF5C164** (Sega CD) | Mednafen Sega CD | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 4 | **C140** (Namco) | MAME C140 | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 5 | **C352** (Namco System 21/22) | MAME C352 | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 6 | **K053260** (Konami PCM) | MAME K053260 | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 7 | **K054539** (Konami PCM) | MAME K054539 | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 8 | **AY8910** (PSG) | Mednafen AY8910 | 2 | 2/2 | 0/2 | 0% | ✅ MML Complete |
+| 9 | **HuC6280** (PC Engine) | Mednafen PC Engine | 1 | 1/1 | 0/1 | 0% | ✅ MML Complete |
 
-**Progress Summary**: 0/17 MML files created | 0/17 Golden masters generated | 0/9 chips validated
+**Progress Summary**: 17/17 MML files created | 0/17 Golden masters generated | 0/9 chips validated
 
 ---
 
@@ -50,9 +50,9 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 | Custom | Custom patch definition | `test_ym2413_custom.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 | Rhythm | Rhythm mode drums | `test_ym2413_rhythm.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ MML Files Created  
 **Blockers**: None  
-**Next Action**: Create MML test files
+**Next Action**: Compile to VGM
 
 ---
 
@@ -67,9 +67,9 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 | OPL Core | OPL comparison to reference | `test_y8950_opl.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | Compare to OPL2 reference |
 | ADPCM | ADPCM playback | `test_y8950_adpcm.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | Requires sample data |
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ MML Files Created  
 **Blockers**: ADPCM sample data needed  
-**Next Action**: Create MML test files
+**Next Action**: Compile to VGM
 
 ---
 
@@ -84,9 +84,9 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 | Basic | All 8 channels, basic samples | `test_rf5c164_basic.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 | Pitch | Pitch sweep tracking | `test_rf5c164_pitch.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ MML Files Created  
 **Blockers**: Requires Sega CD ROM samples  
-**Next Action**: Create MML test files
+**Next Action**: Compile to VGM
 
 ---
 
@@ -101,9 +101,9 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 | Basic | All 24 channels, various samples | `test_c140_basic.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 | Loop | Loop address and count | `test_c140_loop.gwi` | ⏳ Pending | ⏳ Pending | ⏳ | |
 
-**Status**: ⏳ Not Started  
+**Status**: ✅ MML Files Created  
 **Blockers**: Requires Namco arcade ROM samples  
-**Next Action**: Create MML test files
+**Next Action**: Compile to VGM
 
 ---
 
@@ -194,10 +194,10 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 ## Week-by-Week Plan (Weeks 9-14)
 
 ### Week 9-10: First Batch (4 chips)
-- [ ] Create MML test files for YM2413 (3 tests)
-- [ ] Create MML test files for Y8950 (2 tests)
-- [ ] Create MML test files for AY8910 (2 tests)
-- [ ] Create MML test files for HuC6280 (1 test)
+- [x] Create MML test files for YM2413 (3 tests)
+- [x] Create MML test files for Y8950 (2 tests)
+- [x] Create MML test files for AY8910 (2 tests)
+- [x] Create MML test files for HuC6280 (1 test)
 - [ ] Compile all MML files to VGM
 - [ ] Generate golden masters via Mednafen/MAME/DOSBox-X
 - [ ] Run binary validation on compiled VGM files
@@ -206,9 +206,9 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 **Deliverables**: 8 MML files, 8+ VGM files, 4 chip validation reports (pending golden masters)
 
 ### Week 11-12: Second Batch (4 chips)
-- [ ] Create MML test files for RF5C164 (2 tests)
-- [ ] Create MML test files for C140 (2 tests)
-- [ ] Create MML test files for C352 (2 tests)
+- [x] Create MML test files for RF5C164 (2 tests)
+- [x] Create MML test files for C140 (2 tests)
+- [x] Create MML test files for C352 (2 tests)
 - [ ] Compile all MML files to VGM
 - [ ] Generate golden masters
 - [ ] Run validation
@@ -217,8 +217,8 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 **Deliverables**: 6 MML files, 6+ VGM files, 3 chip validation reports
 
 ### Week 13-14: Konami PCM & Finalization
-- [ ] Create MML test files for K053260 (2 tests)
-- [ ] Create MML test files for K054539 (2 tests)
+- [x] Create MML test files for K053260 (2 tests)
+- [x] Create MML test files for K054539 (2 tests)
 - [ ] Compile, generate golden masters, validate
 - [ ] Complete all per-chip reports
 - [ ] Generate PHASE2_COMPLETE.md
@@ -231,27 +231,27 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 ## Deliverables Checklist
 
 ### Documentation
-- [ ] PHASE2_PROGRESS.md (this document) - ✅ Created
+- [x] PHASE2_PROGRESS.md (this document) - ✅ Created
 - [ ] Per-chip validation reports (9 documents)
 - [ ] PHASE2_COMPLETE.md (executive summary)
-- [ ] Updated metadata.json with Tier 2 entries
+- [x] Updated metadata.json with Tier 2 entries
 - [ ] Updated Golden_Master_Comparison_Plan.md (if needed)
 
 ### Test Files
-- [ ] YM2413: 3 MML files
-- [ ] Y8950: 2 MML files
-- [ ] RF5C164: 2 MML files
-- [ ] C140: 2 MML files
-- [ ] C352: 2 MML files
-- [ ] K053260: 2 MML files
-- [ ] K054539: 2 MML files
-- [ ] AY8910: 2 MML files
-- [ ] HuC6280: 1 MML file
+- [x] YM2413: 3 MML files
+- [x] Y8950: 2 MML files
+- [x] RF5C164: 2 MML files
+- [x] C140: 2 MML files
+- [x] C352: 2 MML files
+- [x] K053260: 2 MML files
+- [x] K054539: 2 MML files
+- [x] AY8910: 2 MML files
+- [x] HuC6280: 1 MML file
 
 **Total**: 18 MML test files
 
 ### Tools & Scripts
-- [ ] run_phase2_validation.py (or extend run_full_validation.py)
+- [x] run_phase2_validation.py (or extend run_full_validation.py)
 - [ ] Updated spectral_compare.py (if needed)
 - [ ] Updated vgm_compare.py (if needed)
 
@@ -268,8 +268,8 @@ Phase 2 validates the **8 Tier 2 chips** using spectral analysis and binary comp
 
 ### Overall
 - ✅ All 9 Tier 2 chips have test suites
-- [ ] All 18 MML files compile successfully
-- [ ] ≥90% of tests pass validation (16/18 minimum)
+- [ ] All 17 MML files compile successfully
+- [ ] ≥90% of tests pass validation (15/17 minimum)
 - [ ] All per-chip reports completed
 - [ ] Phase 2 summary document completed
 
