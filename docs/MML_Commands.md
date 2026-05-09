@@ -454,6 +454,78 @@ Example — using `n` to access a note that would otherwise require an octave sw
 
 ---
 
+## Chip-Specific Commands (Phase 9)
+
+These `@CMD` commands target hardware-specific features of individual sound chips. The chip context is determined by the part's chip declaration; commands silently no-op on chips that don't support them. See [PHASE_9_MML_COMMANDS.md](PHASE_9_MML_COMMANDS.md) for the full implementation status and register-level details.
+
+### FM Operator Commands (YM2608/YM2151/YM2203/YM2413/YM3526/YM3812/Y8950/YMF262)
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `@AR<n>` | 0–31 | Attack rate (operator register 0x30) |
+| `@DR<n>` | 0–31 | Decay rate (operator register 0x31) |
+| `@SR<n>` | 0–31 | Sustain rate (operator register 0x32) |
+| `@RR<n>` | 0–15 | Release rate (operator register 0x33) |
+| `@SL<n>` | 0–15 | Sustain level (operator register 0x34) |
+| `@TL<n>` | 0–127 | Total level / volume (operator register 0x35) |
+| `@KS<n>` | 0–3 | Key scale rate (operator register 0x36) |
+| `@ML<n>` | 0–15 | Frequency multiplier (operator register 0x37) |
+| `@DT<n>` | 0–7 | Detune (operator register 0x38) |
+| `@AL<n>` | 0–7 | Algorithm selection (channel register 0x04) — YM2151/YM2608 |
+| `@FB<n>` | 0–7 | Feedback level (channel register 0x05 bits 3-5) |
+
+### YMF262 (OPL3) Special Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `@OPL3MODE<n>` | 0/1 | Enable OPL3 4-op mode (port 1, register 0x05, bit 0). |
+| `@4OP<bitmask>` | 0–63 | 4-operator channel-pair link bitmask (port 1, register 0x04). Each set bit pairs two channels for 4-op FM. |
+
+### PSG / AY8910 / POKEY Commands
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `@EN<n>` | 0/1 | Envelope enable (AY8910 register 0x0D bit 4). |
+| `@MIX<n>` | 0–7 | Mixer control (AY8910 register 0x07): tone / noise / envelope routing. |
+| `@NOISE<n>` | 0–31 | Noise period (AY8910 register 0x06). |
+| `@FILTER<n>` | 0–3 | POKEY low-pass filter mode (register 0x2A). |
+| `@DIST<n>` | 0–3 | POKEY distortion mode (register 0x2B). |
+| `@HPOLY<n>` | 0/1 | POKEY high-bit polyphone — 9-bit poly select (AUDCTL register 0x08, bit 7). |
+
+### Wavetable Commands (HuC6280, K051649/SCC, DMG)
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `@W<n>` | 0–31 | Waveform select (chip-specific built-in tables). |
+| `@WAVE` | block | Custom waveform definition (K051649: 32 signed bytes; DMG: 32 nibbles). |
+| `@KEYON` / `@KEYOFF` | — | Manual key gate (K051649). |
+| `@NW<v>` | bit7+bits0-4 | HuC6280 noise mode/period (channel register 0x07). High bit enables noise; low 5 bits set period. |
+| `@SW<time>,<dir>,<shift>` | 0–7 / 0–1 / 0–7 | DMG sweep configuration (NR10 / `$FF10`). `dir`: 0=increase, 1=decrease. |
+| `@P<n>` | 0/1 | DMG noise LFSR width (NR43 / `$FF22` bit 3). 0=15-bit (long noise), 1=7-bit (short metallic). |
+
+### PCM Commands (SegaPCM, RF5C164, C140, C352, K053260, K054539, QSound)
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `@BANK<n>` | 0–255 | Bank select. SegaPCM uses high address byte; C140 writes register 0x1E. |
+| `@START<lo>[,<mid>[,<hi>]]` | bytes | Sample start address. SegaPCM/C140 write per-channel start registers; RF5C164 writes the high byte at 0x06. |
+| `@END<lo>[,<mid>]` | bytes | Sample end address (SegaPCM 0x04/0x05, C140 0x08/0x09). |
+| `@LOOP<n>` | 0/1 | Loop enable flag (C140 / C352 / K054539 register 0x1F). |
+| `@VOLUME<left>[,<right>]` | 0–255 | Stereo volume. RF5C164: envelope reg 0x00 + pan reg 0x01. SegaPCM: per-channel L/R registers 0x02/0x03. |
+| `@REVERSE[<n>]` | 0/1 | Play sample in reverse. C140/C352 reg 0x05; K054539 reg 0x22. Argless form turns it on. |
+| `@PAN<signed>` | -64…+64 | Panning. QSound: latched pan register pair. RF5C164: high-nibble L / low-nibble R format. |
+| `@REVERB<n>` | 0–127 | QSound reverb depth (latched reverb register). |
+
+### Deferred Short-Form Aliases
+
+- `@S` — no long-form synonym; use driver-specific instrument selection (`@<n>`).
+- `@L` — alias for `@LOOP` (use the long form).
+- `@B` — alias for `@BANK` (use the long form).
+
+These short forms collide with core MML commands (`l` length, `b` note B, `s` slur) and are intentionally not parsed; the long-form commands above already cover the same semantics.
+
+---
+
 ## MIDI-Specific Commands
 
 These commands are available when compiling to MIDI format (`--format mid`).

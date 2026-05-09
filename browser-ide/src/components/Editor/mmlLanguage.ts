@@ -72,7 +72,7 @@ export function registerMmlLanguage(
       // PSG / AY8910 / POKEY Commands
       'EN', 'MIX', 'FILTER', 'DIST', 'HPOLY', 'NOISE',
       // Wavetable Commands
-      'WAVE', 'NW', 'SW', 'KEYON', 'KEYOFF', 'NOCTRL',
+      'WAVE', 'NW', 'SW', 'P', 'KEYON', 'KEYOFF', 'NOCTRL',
       // PCM Commands
       'BANK', 'START', 'LOOP', 'END', 'REVERSE', 'LOOPSTART', 'LOOPLEN',
       'LVOL', 'RVOL', 'ADPCM_MODE', 'PAN', 'REVERB', 'PITCH', 'VOLUME',

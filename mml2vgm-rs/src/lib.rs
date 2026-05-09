@@ -42,6 +42,9 @@ pub mod player;
 // Drivers module (external driver support)
 pub mod drivers;
 
+// C FFI bindings for integration with C/C++ code
+pub mod ffi;
+
 // Live playback via direct register writes
 pub mod live_player;
 pub use live_player::LivePlayer;

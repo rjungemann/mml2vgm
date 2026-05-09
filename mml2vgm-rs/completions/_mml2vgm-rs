@@ -1,0 +1,44 @@
+#compdef mml2vgm-rs
+# Zsh completion script for mml2vgm-rs
+# Install with: sudo install -Dm644 completions/mml2vgm-rs.zsh /usr/share/zsh/site-functions/_mml2vgm-rs
+
+_mml2vgm_rs() {
+    local ret=1
+    
+    _arguments \
+        '(- :)--version[Show version information]' \
+        '(- :)--help[Print help information]' \
+        '(- :)--list-chips[List supported sound chips]' \
+        '(- :)--list-formats[List supported output formats]' \
+        '(- :)-h[Print help information]' \
+        '*-o+[Output file]:output file:_files' \
+        '*--output=[Output file]:output file:_files' \
+        '*-f+[Output format]:format:(vgm xgm xgm2 zgm mid)' \
+        '*--format=[Output format]:format:(vgm xgm xgm2 zgm mid)' \
+        '-p[Play output file after compilation]' \
+        '--play[Play output file after compilation]' \
+        '-w+[Export audio to WAV file]:WAV file:_files' \
+        '--export-wav=[Export audio to WAV file]:WAV file:_files' \
+        '-v[Show verbose output]' \
+        '--verbose[Show verbose output]' \
+        '-q[Suppress all output except errors]' \
+        '--quiet[Suppress all output except errors]' \
+        '--debug[Show debug output]' \
+        '--trace[Output trace information file]' \
+        '--check[Validate MML only]' \
+        '--no-color[Disable colored output]' \
+        '*-c+[Target sound chip]:chip:(YM2612 YM2612X YM2612X2 SN76489 SN76489X2 AY8910 YM2608 YM2609 YM2610B YM2203 YM2151 YM3526 Y8950 YM3812 YMF262 YM2413 RF5C164 SegaPCM C140 C352 QSound HuC6280 K051649 K053260 K054539 NES DMG VRC6 POKEY MIDI)' \
+        '*--chip=[Target sound chip]:chip:(YM2612 YM2612X YM2612X2 SN76489 SN76489X2 AY8910 YM2608 YM2609 YM2610B YM2203 YM2151 YM3526 Y8950 YM3812 YMF262 YM2413 RF5C164 SegaPCM C140 C352 QSound HuC6280 K051649 K053260 K054539 NES DMG VRC6 POKEY MIDI)' \
+        '--clock-count=[Clock count override]:count' \
+        '*-I+[Add include path]:include path:_files -/' \
+        '*--include=[Add include path]:include path:_files -/' \
+        '--batch=[Batch compile directory]:directory:_files -/' \
+        '--watch=[Watch directory for changes]:directory:_files -/' \
+        '--progress[Show progress bar during compilation]' \
+        '*:input file:_files -g "*.gwi"' \
+        && ret=0
+    
+    return $ret
+}
+
+_mml2vgm_rs "$@"

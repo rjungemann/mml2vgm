@@ -2567,20 +2567,25 @@ impl VgmGenerator {
             "AL" | "FB" => {
                 self.handle_fm_control_command(&cmd_upper, args, state, time, chip)?;
             }
+            // YMF262/OPL3 mode commands
+            "OPL3MODE" | "4OP" => {
+                self.handle_ymf262_mode_command(&cmd_upper, args, time)?;
+            }
             // PSG/AY8910 Commands
             "EN" | "MIX" | "NOISE" => {
                 self.handle_ay8910_command(&cmd_upper, args, state, time)?;
             }
             // POKEY Commands
-            "FILTER" | "DIST" => {
+            "FILTER" | "DIST" | "HPOLY" => {
                 self.handle_pokey_command(&cmd_upper, args, state, time)?;
             }
             // Wavetable Commands
-            "WAVE" | "SW" | "KEYON" | "KEYOFF" => {
+            "WAVE" | "SW" | "KEYON" | "KEYOFF" | "NW" | "P" => {
                 self.handle_wavetable_command(&cmd_upper, args, state, time)?;
             }
             // PCM Commands
-            "BANK" | "LOOP" | "START" | "END" => {
+            "BANK" | "LOOP" | "START" | "END" |
+            "VOLUME" | "REVERSE" | "PAN" | "REVERB" => {
                 self.handle_pcm_command(&cmd_upper, args, state, time)?;
             }
             // Special/Meta commands
@@ -2756,9 +2761,15 @@ impl VgmGenerator {
                 let dist_mode = value & 0x03;
                 self.pokey_write(0x2B, dist_mode, time);
             }
+            "HPOLY" => {
+                // High-bit polyphone (AUDCTL @ 0x08, bit 7 = 9-bit poly select).
+                // Arg 0 disables, non-zero enables.
+                let bit = if value != 0 { 0x80 } else { 0x00 };
+                self.pokey_write(0x08, bit, time);
+            }
             _ => {}
         }
-        
+
         Ok(())
     }
 
@@ -2790,14 +2801,74 @@ impl VgmGenerator {
                 // Manual key control
                 let key_on = command == "KEYON";
                 let key_byte = if key_on { 0xF0 } else { 0x00 };
-                
+
                 if state.chip.as_deref() == Some("K051649") {
                     self.k051649_write(0, 0x08, key_byte, time);
                 }
             }
+            "NW" => {
+                // HuC6280 noise mode/period for channels 4-5.
+                // Reg 0x07 (DDA / noise control on noise-capable channels):
+                //   bit 7 = noise enable, bits 0-4 = noise frequency.
+                if args.is_empty() { return Ok(()); }
+                if state.chip.as_deref() == Some("HuC6280") {
+                    let val = args[0] as u8;
+                    let enable = if val != 0 { 0x80 } else { 0x00 };
+                    let period = val & 0x1F;
+                    self.huc6280_write(0x07, enable | period, time);
+                }
+            }
+            "SW" => {
+                // DMG NR10 sweep register ($FF10).
+                // Args: [time(0-7), direction(0=inc/1=dec), shift(0-7)].
+                // NR10 layout: bit 7=0, bits 6-4 = sweep time,
+                //              bit 3 = 1 for decrease, 0 for increase,
+                //              bits 2-0 = shift.
+                if state.chip.as_deref() == Some("DMG") {
+                    let sweep_time = args.get(0).copied().unwrap_or(0) as u8 & 0x07;
+                    let direction  = args.get(1).copied().unwrap_or(0) as u8 & 0x01;
+                    let shift      = args.get(2).copied().unwrap_or(0) as u8 & 0x07;
+                    let nr10 = (sweep_time << 4) | (direction << 3) | shift;
+                    self.dmg_write(0x00, nr10, time);
+                }
+            }
+            "P" => {
+                // DMG NR43 LFSR width selector ($FF22), bit 3.
+                // 0 = 15-bit (long noise), 1 = 7-bit (short / metallic).
+                if state.chip.as_deref() == Some("DMG") {
+                    if args.is_empty() { return Ok(()); }
+                    let lfsr = args[0] as u8 & 0x01;
+                    self.dmg_write(0x22 - 0x10, lfsr << 3, time);
+                }
+            }
             _ => {}
         }
-        
+
+        Ok(())
+    }
+
+    /// Handle YMF262 (OPL3) mode commands: OPL3MODE, 4OP
+    fn handle_ymf262_mode_command(
+        &mut self,
+        command: &str,
+        args: &[u32],
+        time: u64,
+    ) -> MmlResult<()> {
+        match command {
+            "OPL3MODE" => {
+                // Port 1 reg 0x05 bit 0: enable OPL3 (4-op + 18 channel) mode.
+                let enable = args.first().map_or(1, |&a| if a != 0 { 1 } else { 0 });
+                self.ymf262_write_reg(1, 0x05, enable as u8, time);
+            }
+            "4OP" => {
+                // Port 1 reg 0x04: 4-operator channel-pair connection enables.
+                // Bits 0-5 enable 4-op mode for channel pairs 0-5.
+                // Arg is the bitmask (0..0x3F).
+                let mask = args.first().copied().unwrap_or(0) as u8 & 0x3F;
+                self.ymf262_write_reg(1, 0x04, mask, time);
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -2809,16 +2880,14 @@ impl VgmGenerator {
         state: &PartCodegenState,
         time: u64,
     ) -> MmlResult<()> {
-        if args.is_empty() {
-            return Ok(());
-        }
-        
-        let value = (args[0].min(255)) as u8;
         let chip = state.chip.as_deref().unwrap_or("Generic");
-        
+        // First arg as a clamped byte (where applicable). Commands that
+        // need 0 args or multiple args validate locally.
+        let value = args.first().copied().unwrap_or(0).min(255) as u8;
+
         match command {
             "BANK" => {
-                // Bank selection (chip-specific)
+                if args.is_empty() { return Ok(()); }
                 match chip {
                     "SegaPCM" => {
                         // Bank select via address high byte
@@ -2831,6 +2900,7 @@ impl VgmGenerator {
                 }
             }
             "LOOP" => {
+                if args.is_empty() { return Ok(()); }
                 // Loop enable flag
                 let loop_enable = if value != 0 { 0x10 } else { 0x00 };
                 match chip {
@@ -2840,9 +2910,109 @@ impl VgmGenerator {
                     _ => {}
                 }
             }
+            "START" => {
+                // Start address. Args: [low] or [low, mid, high]; missing bytes default to 0.
+                if args.is_empty() { return Ok(()); }
+                let lo = args.first().copied().unwrap_or(0) as u8;
+                let mid = args.get(1).copied().unwrap_or(0) as u8;
+                let hi = args.get(2).copied().unwrap_or(0) as u8;
+                match chip {
+                    "RF5C164" => {
+                        // Channel start-address registers (high byte at 0x06).
+                        self.rf5c164_write(0x06, hi, time);
+                    }
+                    "SegaPCM" => {
+                        // SegaPCM start = (addr_lo, addr_hi) at offsets 0x06/0x07 of channel.
+                        self.segapcm_write(0, 0x06, lo, time);
+                        self.segapcm_write(0, 0x07, mid, time);
+                    }
+                    "C140" => {
+                        self.c140_write(0x06, lo, time);
+                        self.c140_write(0x07, mid, time);
+                    }
+                    _ => {}
+                }
+            }
+            "END" => {
+                if args.is_empty() { return Ok(()); }
+                let lo = args.first().copied().unwrap_or(0) as u8;
+                let mid = args.get(1).copied().unwrap_or(0) as u8;
+                match chip {
+                    "SegaPCM" => {
+                        self.segapcm_write(0, 0x04, lo, time);
+                        self.segapcm_write(0, 0x05, mid, time);
+                    }
+                    "C140" => {
+                        self.c140_write(0x08, lo, time);
+                        self.c140_write(0x09, mid, time);
+                    }
+                    _ => {}
+                }
+            }
+            "VOLUME" => {
+                // Stereo volume. Args: [left, right] (0-255). Defaults: right=left.
+                if args.is_empty() { return Ok(()); }
+                let left = args.first().copied().unwrap_or(0) as u8;
+                let right = args.get(1).copied().unwrap_or(args[0]) as u8;
+                match chip {
+                    "RF5C164" => {
+                        // Per-channel envelope (0x00) and pan (0x01).
+                        self.rf5c164_write(0x00, left, time);
+                        // Pan: high nibble = left, low nibble = right.
+                        let pan = (left & 0xF0) | (right >> 4);
+                        self.rf5c164_write(0x01, pan, time);
+                    }
+                    "SegaPCM" => {
+                        // SegaPCM channel volume registers 0x02/0x03 (left/right).
+                        self.segapcm_write(0, 0x02, left, time);
+                        self.segapcm_write(0, 0x03, right, time);
+                    }
+                    _ => {}
+                }
+            }
+            "REVERSE" => {
+                // Play sample in reverse (toggle / explicit).
+                let on = if args.is_empty() { true } else { value != 0 };
+                let flag = if on { 0x40 } else { 0x00 };
+                match chip {
+                    "C140" => self.c140_write(0x05, flag, time),
+                    "C352" => self.c352_write(0x05, flag, time),
+                    "K054539" => self.k054539_write_ported(0, 0x22, flag, time),
+                    _ => {}
+                }
+            }
+            "PAN" => {
+                if args.is_empty() { return Ok(()); }
+                // QSound pan: 16-bit register 0x00 (channel-relative); arg is
+                // the signed pan position [-64, +64] mapped to 0x80 center.
+                let signed = args[0] as i32;
+                let pan = (0x80 + signed.clamp(-128, 127)) as u8;
+                match chip {
+                    "QSound" => {
+                        // Hi/lo pair for the pan register, latched via 0x03 (key-on).
+                        self.qsound_write(0x00, 0x00, time);
+                        self.qsound_write(0x01, pan, time);
+                    }
+                    "RF5C164" => {
+                        // RF5C164 pan: high nibble = left, low nibble = right.
+                        let l = if signed <= 0 { 0xF } else { (0xF as i32 - signed.min(0xF)) as u8 };
+                        let r = if signed >= 0 { 0xF } else { (0xF as i32 + signed.max(-0xF)) as u8 };
+                        self.rf5c164_write(0x01, (l << 4) | (r & 0xF), time);
+                    }
+                    _ => {}
+                }
+            }
+            "REVERB" => {
+                if args.is_empty() { return Ok(()); }
+                // QSound: reverb level is set via global register 0xCD/0xCE.
+                if chip == "QSound" {
+                    self.qsound_write(0x00, 0x00, time);
+                    self.qsound_write(0x01, value, time);
+                }
+            }
             _ => {}
         }
-        
+
         Ok(())
     }
 }

@@ -1,0 +1,144 @@
+.TH MML2VGM-RS 1 "May 8, 2026" "mml2vgm-rs 0.1.0" "MML Compiler Manual"
+.SH NAME
+mml2vgm-rs \- Compile MML (Music Macro Language) files to VGM/XGM/ZGM formats
+.SH SYNOPSIS
+.B mml2vgm-rs
+[\fIOPTIONS\fR] [\fIINPUT\fR]
+.SH DESCRIPTION
+.B mml2vgm-rs
+is a command-line compiler for Music Macro Language (MML) files that converts them to various video game music formats including VGM (Video Game Music), XGM (eXtendable Game Music), XGM2 (eXtendable Game Music 2), ZGM (Zipped Game Music), and MIDI.
+
+The tool supports compilation for 21 different sound chips used in various gaming consoles and arcade systems, including Yamaha FM chips (YM2612, YM2608, YM2609, YM2151, YM3812, YMF262), programmable sound generators (SN76489, AY8910, POKEY), and various wavetable and PCM-based chips.
+.SH ARGUMENTS
+.TP
+.I INPUT
+Input MML file (.gwi extension). If not specified, reads from stdin.
+.SH OPTIONS
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Specify output file path. If not specified, uses the input filename with the appropriate extension (.vgm, .xgm, .zgm, or .mid).
+.TP
+.BR \-f ", " \-\-format " " \fIFORMAT\fR
+Select output format. Available formats are:
+.RS
+.IP "vgm" 4
+Standard VGM format (default)
+.IP "xgm"
+XGM format for Mega Drive
+.IP "xgm2"
+XGM2 format with extended features
+.IP "zgm"
+ZGM format with YM2609 and MIDI support
+.IP "mid"
+Standard MIDI File format
+.RE
+.TP
+.BR \-p ", " \-\-play
+Play the compiled output file immediately after compilation using the system's default audio player.
+.TP
+.BR \-w ", " \-\-export\-wav " " \fIFILE\fR
+Export rendered audio to WAV format in addition to the primary output format. Can be combined with \-\-play for listening while rendering.
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output showing detailed compilation progress and diagnostics.
+.TP
+.BR \-q ", " \-\-quiet
+Suppress all output except error messages. Useful for scripting and batch operations.
+.TP
+.BR \-\-debug
+Show extremely verbose debug output for development and troubleshooting.
+.TP
+.BR \-\-trace
+Generate a trace information file containing detailed execution trace data.
+.TP
+.BR \-\-check
+Validate the MML file syntax without performing compilation. Useful for checking file correctness.
+.TP
+.BR \-\-list\-chips
+Display all 21 supported sound chips organized by category and exit.
+.TP
+.BR \-\-list\-formats
+Display all supported output formats and exit.
+.TP
+.BR \-c ", " \-\-chip " " \fICHIP\fR
+Restrict compilation to specific sound chip(s). Can be specified multiple times to target multiple chips. Chip names include: YM2612, YM2608, YM2609, SN76489, AY8910, POKEY, NES, DMG, and others.
+.TP
+.BR \-\-clock\-count " " \fIVALUE\fR
+Override the default clock count (192) used for MIDI timing calculations.
+.TP
+.BR \-I ", " \-\-include " " \fIPATH\fR
+Add a directory to the MML include search path. Can be specified multiple times. Used for finding #include files in MML scripts.
+.TP
+.BR \-\-batch " " \fIDIRECTORY\fR
+Compile all .gwi files found in the specified directory recursively. Useful for batch processing.
+.TP
+.BR \-\-watch " " \fIDIRECTORY\fR
+Monitor the specified directory for changes and automatically recompile when .gwi files are modified. Useful for live development workflows.
+.TP
+.BR \-\-progress
+Display a progress bar during compilation. Automatically enabled unless \-\-quiet is specified.
+.TP
+.BR \-\-no\-color
+Disable ANSI color codes in terminal output. Automatically detected but can be forced for certain terminal environments.
+.TP
+.BR \-\-version
+Display version information and exit.
+.TP
+.BR \-h ", " \-\-help
+Display help information and exit.
+.SH ENVIRONMENT VARIABLES
+.TP
+.B MML2VGM_COLORS
+Set to "0" or "false" to disable colored output globally. Overridden by \-\-no\-color flag.
+.TP
+.B MML2VGM_QUIET
+Set to "1" or "true" to enable quiet mode globally.
+.TP
+.B MML2VGM_VERBOSE
+Set to "1" or "true" to enable verbose output globally.
+.TP
+.B MML2VGM_FORMAT
+Set default output format when not specified on command line.
+.SH EXAMPLES
+.TP
+Compile a single MML file to VGM:
+.B mml2vgm-rs song.gwi \-o song.vgm
+.TP
+Compile with color output and play immediately:
+.B mml2vgm-rs song.gwi \-\-play
+.TP
+Validate MML syntax without compilation:
+.B mml2vgm-rs song.gwi \-\-check
+.TP
+Batch compile all MML files in a directory:
+.B mml2vgm-rs \-\-batch ./mml_files \-f vgm
+.TP
+Watch a directory and recompile on file changes:
+.B mml2vgm-rs \-\-watch ./dev \-f vgm \-\-progress
+.TP
+Compile for specific sound chip:
+.B mml2vgm-rs song.gwi \-c YM2612 \-c SN76489 \-o song.vgm
+.TP
+Convert to MIDI format with verbose output:
+.B mml2vgm-rs song.gwi \-\-format mid \-\-verbose
+.TP
+Export both VGM and WAV:
+.B mml2vgm-rs song.gwi \-o song.vgm \-\-export\-wav song.wav
+.SH EXIT STATUS
+.TP
+.B 0
+Successful compilation or validation.
+.TP
+.B 1
+Compilation or validation failed, or an error occurred during execution.
+.SH FILES
+.TP
+.B ~/.config/mml2vgm/mml2vgm.conf
+User configuration file (future enhancement).
+.SH BUGS
+Report bugs at https://github.com/example/mml2vgm-rs/issues
+.SH AUTHOR
+mml2vgm Team
+.SH SEE ALSO
+.BR vgplay(1)
+\- Video Game Music player for VGM files

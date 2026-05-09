@@ -248,6 +248,25 @@ Repeat a section a fixed number of times using `(body)N`:
 'A1 l16 o4 (c e g)4   ; play c-e-g four times
 ```
 
+### Chip-Specific Commands
+
+Beyond the basics, each sound chip exposes hardware-specific features through `@CMD` commands. Examples:
+
+```
+'A1 @AR31 @DR8 @SL10 @RR7   ; FM operator envelope (YM2608/YM2151/etc.)
+'B1 @MIX5 @NOISE12 @EN1     ; AY8910 mixer + noise + envelope
+'C1 @WAVE 0,15,31,15,...    ; Custom wavetable for K051649/SCC
+'D1 @SW2,1,3 @P1            ; DMG sweep + LFSR width
+'E1 @OPL3MODE 1 @4OP 5      ; YMF262 4-op linking
+'F1 @PAN -32 @REVERB 64     ; QSound spatial effects
+```
+
+For the complete chip-specific command reference (FM operator commands, PSG/POKEY commands, wavetable commands, PCM commands), see:
+- [MML_Commands.md § Chip-Specific Commands](MML_Commands.md#chip-specific-commands-phase-9)
+- [PHASE_9_MML_COMMANDS.md](PHASE_9_MML_COMMANDS.md) — implementation status, register-level details
+
+Commands silently no-op on chips that don't support them, so it's safe to use chip-targeted commands across multi-chip parts.
+
 ---
 
 ## Multi-Chip and Multi-Part Setups

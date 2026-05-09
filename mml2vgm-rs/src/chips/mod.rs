@@ -27,6 +27,163 @@ pub mod qsound;
 
 use crate::MmlResult;
 
+// Chip type enum for FFI
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ChipType {
+    YM2151,
+    YM2612,
+    SN76489,
+    OPL2,
+    OPL3,
+    QSound,
+    C140,
+    POKEY,
+    VRC6,
+}
+
+impl ChipType {
+    pub fn from_index(index: usize) -> Option<Self> {
+        match index {
+            0 => Some(Self::YM2151),
+            1 => Some(Self::YM2612),
+            2 => Some(Self::SN76489),
+            3 => Some(Self::OPL2),
+            4 => Some(Self::OPL3),
+            5 => Some(Self::QSound),
+            6 => Some(Self::C140),
+            7 => Some(Self::POKEY),
+            8 => Some(Self::VRC6),
+            _ => None,
+        }
+    }
+    
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::YM2151,
+            Self::YM2612,
+            Self::SN76489,
+            Self::OPL2,
+            Self::OPL3,
+            Self::QSound,
+            Self::C140,
+            Self::POKEY,
+            Self::VRC6,
+        ]
+    }
+    
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::YM2151 => "YM2151",
+            Self::YM2612 => "YM2612",
+            Self::SN76489 => "SN76489",
+            Self::OPL2 => "OPL2",
+            Self::OPL3 => "OPL3",
+            Self::QSound => "QSound",
+            Self::C140 => "C140",
+            Self::POKEY => "POKEY",
+            Self::VRC6 => "VRC6",
+        }
+    }
+    
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Self::YM2151 => "FM (Arcade)",
+            Self::YM2612 => "FM (Genesis)",
+            Self::SN76489 => "PSG (SMS)",
+            Self::OPL2 => "FM (SB)",
+            Self::OPL3 => "FM (SB Pro)",
+            Self::QSound => "QSound",
+            Self::C140 => "Wave (Namco)",
+            Self::POKEY => "POKEY (Atari)",
+            Self::VRC6 => "VRC6 (NES)",
+        }
+    }
+    
+    pub fn param_count(&self) -> usize {
+        // Placeholder - actual counts should be determined per-chip
+        64
+    }
+    
+    pub fn param_name(&self, _param_id: usize) -> &'static str {
+        // Placeholder
+        "unknown"
+    }
+}
+
+// Implement TryFrom<i32> for FFI compatibility
+impl std::convert::TryFrom<i32> for ChipType {
+    type Error = ();
+    
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        Self::from_index(value as usize).ok_or(())
+    }
+}
+
+/// Chip instance wrapper for FFI
+pub struct ChipInstance {
+    chip: Box<dyn SoundChipEmulator>,
+    sample_rate: f64,
+    // Buffer for single-sample rendering
+    sample_buffer: Vec<f32>,
+}
+
+impl ChipInstance {
+    pub fn new(chip: Box<dyn SoundChipEmulator>, sample_rate: f64) -> Self {
+        Self {
+            chip,
+            sample_rate,
+            sample_buffer: vec![0.0, 0.0],
+        }
+    }
+    
+    pub fn reset(&mut self) {
+        self.chip.reset();
+    }
+    
+    pub fn render_sample(&mut self) -> (f64, f64) {
+        // For now, return silence
+        // In a real implementation, we'd render a single sample
+        (0.0, 0.0)
+    }
+    
+    pub fn get_param(&self, _param_id: usize) -> f32 {
+        0.0
+    }
+    
+    pub fn set_param(&mut self, _param_id: usize, _value: f32) {
+        // Placeholder
+    }
+}
+
+/// Create a chip instance from ChipType
+pub fn create_chip(chip_type: ChipType, _sample_rate: f64) -> Option<Box<dyn SoundChipEmulator>> {
+    match chip_type {
+        ChipType::YM2151 => Some(Box::new(ym2151::YM2151::new())),
+        ChipType::YM2612 => Some(Box::new(ym2612::YM2612::new())),
+        ChipType::SN76489 => Some(Box::new(sn76489::SN76489::new())),
+        ChipType::OPL2 => Some(Box::new(SilentChip::new("OPL2", 3579545))),
+        ChipType::OPL3 => Some(Box::new(SilentChip::new("OPL3", 3579545))),
+        ChipType::QSound => Some(Box::new(qsound::QSound::new())),
+        ChipType::C140 => Some(Box::new(SilentChip::new("C140", 16000000))),
+        ChipType::POKEY => Some(Box::new(pokey::Pokey::new())),
+        ChipType::VRC6 => Some(Box::new(vrc6::VRC6::new())),
+    }
+}
+
+/// All chip types
+pub const CHIP_TYPES: &[ChipType] = &[
+    ChipType::YM2151,
+    ChipType::YM2612,
+    ChipType::SN76489,
+    ChipType::OPL2,
+    ChipType::OPL3,
+    ChipType::QSound,
+    ChipType::C140,
+    ChipType::POKEY,
+    ChipType::VRC6,
+];
+
 /// Trait for all sound chips
 pub trait SoundChipEmulator {
     fn name(&self) -> &'static str;

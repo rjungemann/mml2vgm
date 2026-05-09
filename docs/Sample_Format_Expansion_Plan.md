@@ -184,8 +184,54 @@ async put(projectId: string, name: string, file: ArrayBuffer, hint?: string): Pr
 
 ## Success Criteria
 
-- [ ] OGG files decode correctly in Chrome, Firefox, and Safari 17+; graceful error in older Safari
-- [ ] Raw PCM import dialog pre-fills sensible defaults and round-trips correctly for 8/16-bit s/u PCM
-- [ ] IMA-ADPCM `.adp` files produced by the YM2608 toolchain decode to audible output
-- [ ] All three new formats stored as `Float32Array` and passed to the compiler worker identically to WAV
-- [ ] No regression in WAV upload flow
+- [x] OGG files decode correctly in Chrome, Firefox, and Safari 17+; graceful error in older Safari
+- [x] Raw PCM import dialog pre-fills sensible defaults and round-trips correctly for 8/16-bit s/u PCM
+- [x] IMA-ADPCM `.adp` files produced by the YM2608 toolchain decode to audible output
+- [x] All three new formats stored as `Float32Array` and passed to the compiler worker identically to WAV
+- [x] No regression in WAV upload flow
+
+---
+
+## 🎉 PLAN COMPLETE — All Phases Delivered
+
+**Status**: ✅ **COMPLETE** (May 8, 2026)
+
+### Implementation Summary
+
+**Phase 2 — OGG Vorbis** ✅
+- Native browser support via `AudioContext.decodeAudioData()`
+- Extended `SamplesPanel` to accept `.ogg` files
+- Updated MIME checks in `sampleService.put()`
+- Safari < 17 fallback with graceful error messaging
+- i18n strings added for OGG format
+
+**Phase 3 — Raw PCM** ✅
+- Created Raw PCM import dialog with user-configurable parameters
+- Pure-JS decoder supporting 8/16/24/32-bit, signed/unsigned, mono/stereo
+- Little-endian and big-endian support
+- Parameters stored in `importParams` field for auditing
+- Round-trip tested on all supported bit depths
+
+**Phase 4 — ADPCM (IMA & Yamaha OKI)** ✅
+- Implemented `adpcmDecoder.ts` with dual-codec support
+- IMA-ADPCM decoder for YM2608 ADPCM-A/B samples
+- Yamaha OKI decoder for RF5C164 PCM samples
+- Lookup-table optimization for fast decoding
+- Integration with `sampleService.put()` for automatic format detection
+
+### Infrastructure Changes ✅
+- Extended `StoredSample` interface with `importParams` and `sourceFormat` fields
+- Unified format detection in `sampleService.put()` with switch-based routing
+- Updated `SamplesPanel.tsx` with multi-format file accept list
+- i18n strings for all new formats in `en.json` and `ja.json`
+
+### Total Format Support
+
+- **5 audio formats** now supported (WAV, OGG Vorbis, Raw PCM, IMA-ADPCM, Yamaha OKI)
+- **All formats convert to Float32Array** internally for compiler consistency
+- **No regressions** in existing WAV pipeline
+- **Future-ready** deferred support path for MP3 and FLAC
+
+**Document Status**: CLOSED OUT — All planned phases complete  
+**Last Updated**: May 8, 2026  
+**Owner**: mml2vgm Browser IDE Team

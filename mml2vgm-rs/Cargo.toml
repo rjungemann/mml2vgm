@@ -11,7 +11,6 @@ repository = "https://github.com/example/mml2vgm-rs"
 keywords = ["mml", "vgm", "xgm", "zgm", "sound", "music", "chiptune"]
 categories = ["command-line-utilities", "multimedia::audio"]
 
-# We'll use a library + binary structure
 [[bin]]
 name = "mml2vgm-rs"
 path = "src/main.rs"
@@ -53,6 +52,9 @@ rayon = "1.7"
 
 # Path manipulation
 pathdiff = "0.2"
+
+# TTY detection for colors
+atty = "0.2"
 
 [dev-dependencies]
 # Testing

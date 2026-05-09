@@ -408,3 +408,67 @@ fn parse_note_number_roundtrip() {
         assert_eq!(note.midi_note(), midi as u8, "roundtrip failed for {}", letter);
     }
 }
+
+// ── Phase 9: Newly-wired chip commands ──────────────────────────────────────
+
+/// Walk every node in the AST (global + parts) and collect each ChipCommand
+/// (command name, args).
+fn collect_chip_commands(ast: &crate::compiler::ast::MmlAst) -> Vec<(String, Vec<u32>)> {
+    let mut out = Vec::new();
+    let mut visit = |nodes: &[MmlNode]| {
+        for n in nodes {
+            if let MmlNode::ChipCommand { command, args, .. } = n {
+                out.push((command.clone(), args.clone()));
+            }
+        }
+    };
+    visit(&ast.global_settings);
+    for (_name, part) in &ast.parts {
+        visit(&part.commands);
+    }
+    out
+}
+
+#[test]
+fn parse_phase9_ymf262_mode_commands() {
+    // OPL3MODE / 4OP must reach the AST as ChipCommand nodes with their args.
+    let ast = timed_parse("A @OPL3MODE 1 @4OP 5");
+    let cmds = collect_chip_commands(&ast);
+    assert!(cmds.iter().any(|(c, a)| c == "OPL3MODE" && a == &vec![1]));
+    assert!(cmds.iter().any(|(c, a)| c == "4OP" && a == &vec![5]));
+}
+
+#[test]
+fn parse_phase9_pokey_hpoly() {
+    let ast = timed_parse("A @HPOLY 1");
+    let cmds = collect_chip_commands(&ast);
+    assert!(cmds.iter().any(|(c, a)| c == "HPOLY" && a == &vec![1]));
+}
+
+#[test]
+fn parse_phase9_wavetable_extras() {
+    // @NW (HuC6280 noise), @SW (DMG sweep, 3 args), @P (DMG LFSR width)
+    let ast = timed_parse("A @NW 5 @SW 2,1,3 @P 1");
+    let cmds = collect_chip_commands(&ast);
+    assert!(cmds.iter().any(|(c, a)| c == "NW" && a == &vec![5]));
+    assert!(cmds.iter().any(|(c, a)| c == "SW" && a == &vec![2, 1, 3]));
+    assert!(cmds.iter().any(|(c, a)| c == "P" && a == &vec![1]));
+}
+
+#[test]
+fn parse_phase9_pcm_address_and_volume() {
+    let ast = timed_parse("A @START 16,32,0 @END 64,128 @VOLUME 200,150");
+    let cmds = collect_chip_commands(&ast);
+    assert!(cmds.iter().any(|(c, a)| c == "START" && a == &vec![16, 32, 0]));
+    assert!(cmds.iter().any(|(c, a)| c == "END" && a == &vec![64, 128]));
+    assert!(cmds.iter().any(|(c, a)| c == "VOLUME" && a == &vec![200, 150]));
+}
+
+#[test]
+fn parse_phase9_pcm_qsound_and_reverse() {
+    let ast = timed_parse("A @REVERSE 1 @PAN 32 @REVERB 64");
+    let cmds = collect_chip_commands(&ast);
+    assert!(cmds.iter().any(|(c, a)| c == "REVERSE" && a == &vec![1]));
+    assert!(cmds.iter().any(|(c, a)| c == "PAN" && a == &vec![32]));
+    assert!(cmds.iter().any(|(c, a)| c == "REVERB" && a == &vec![64]));
+}

@@ -3,16 +3,28 @@
 //! This is the main entry point for the CLI application.
 
 use clap::{Parser, ValueEnum};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::io::Write;
 
 use mml2vgm::{
-    CompileInfo, CompileOptions, CompileResult, MmlResult, OutputFormat, SoundChip,
+    CompileInfo, CompileOptions, CompileResult, MmlError, MmlResult, OutputFormat, SoundChip,
     compiler::compiler::MmlCompiler,
     player::VgmPlayer,
     utils::wav::write_wav,
 };
+
+/// ANSI color codes for terminal output
+mod colors {
+    pub const RESET: &str = "\x1b[0m";
+    pub const BOLD: &str = "\x1b[1m";
+    pub const GREEN: &str = "\x1b[32m";
+    pub const YELLOW: &str = "\x1b[33m";
+    pub const RED: &str = "\x1b[31m";
+    pub const BLUE: &str = "\x1b[34m";
+    pub const CYAN: &str = "\x1b[36m";
+}
 
 /// mml2vgm-rs: MML to VGM/XGM/ZGM compiler and player
 #[derive(Parser, Debug)]
@@ -50,6 +62,10 @@ struct Args {
     #[arg(long)]
     debug: bool,
 
+    /// Suppress all output except errors
+    #[arg(short = 'q', long)]
+    quiet: bool,
+
     /// Output trace information file
     #[arg(long)]
     trace: bool,
@@ -81,6 +97,22 @@ struct Args {
     /// Show version information
     #[arg(long)]
     version: bool,
+
+    /// Batch compile all .gwi files in a directory
+    #[arg(long)]
+    batch: Option<PathBuf>,
+
+    /// Watch directory for changes and recompile automatically
+    #[arg(long)]
+    watch: Option<PathBuf>,
+
+    /// Disable colored output
+    #[arg(long)]
+    no_color: bool,
+
+    /// Show progress bar during compilation
+    #[arg(long)]
+    progress: bool,
 }
 
 /// Wrapper for OutputFormat that implements ValueEnum for clap
@@ -123,10 +155,12 @@ impl From<FormatArg> for OutputFormat {
 }
 
 /// Initialize logging based on verbosity settings
-fn init_logging(verbose: bool, debug: bool) {
+fn init_logging(verbose: bool, debug: bool, quiet: bool) {
     use log::LevelFilter;
 
-    let level = if debug {
+    let level = if quiet {
+        LevelFilter::Error
+    } else if debug {
         LevelFilter::Debug
     } else if verbose {
         LevelFilter::Info
@@ -140,6 +174,169 @@ fn init_logging(verbose: bool, debug: bool) {
         .init();
 
     debug!("Logging initialized at level: {}", level);
+}
+
+/// Apply environment variable defaults to command-line arguments
+fn apply_env_defaults(mut args: Args) -> Args {
+    // MML2VGM_COLORS: set to "0" or "false" to disable colors
+    if let Ok(val) = std::env::var("MML2VGM_COLORS") {
+        if val == "0" || val.to_lowercase() == "false" {
+            args.no_color = true;
+        }
+    }
+
+    // MML2VGM_QUIET: set to "1" or "true" to enable quiet mode
+    if let Ok(val) = std::env::var("MML2VGM_QUIET") {
+        if val == "1" || val.to_lowercase() == "true" {
+            args.quiet = true;
+        }
+    }
+
+    // MML2VGM_VERBOSE: set to "1" or "true" to enable verbose mode
+    if let Ok(val) = std::env::var("MML2VGM_VERBOSE") {
+        if val == "1" || val.to_lowercase() == "true" {
+            args.verbose = true;
+        }
+    }
+
+    // MML2VGM_PROGRESS: set to "1" or "true" to enable progress bar
+    if let Ok(val) = std::env::var("MML2VGM_PROGRESS") {
+        if val == "1" || val.to_lowercase() == "true" {
+            args.progress = true;
+        }
+    }
+
+    args
+}
+
+/// Print a progress bar (simple text-based version)
+fn show_progress(current: usize, total: usize, message: &str, use_color: bool) {
+    if total == 0 {
+        return;
+    }
+    
+    let width = 30;
+    let filled = (current * width) / total;
+    let percent = (current * 100) / total;
+    
+    let bar = format!(
+        "[{}{}] {}/{} ({}%) {}",
+        "=".repeat(filled),
+        "-".repeat(width - filled),
+        current,
+        total,
+        percent,
+        message
+    );
+    
+    print!("\r{}", colorize(&bar, colors::CYAN, use_color));
+    std::io::stdout().flush().ok();
+}
+
+/// Helper to conditionally apply color
+fn colorize(text: &str, color: &str, use_color: bool) -> String {
+    if use_color {
+        format!("{}{}{}", color, text, colors::RESET)
+    } else {
+        text.to_string()
+    }
+}
+
+/// Print colored success message
+fn success(msg: &str, use_color: bool) {
+    println!("{}", colorize(&format!("✓ {}", msg), colors::GREEN, use_color));
+}
+
+/// Print colored error message
+fn error_msg(msg: &str, use_color: bool) {
+    eprintln!("{}", colorize(&format!("✗ {}", msg), colors::RED, use_color));
+}
+
+/// Print colored info message
+fn info_msg(msg: &str, use_color: bool) {
+    println!("{}", colorize(&format!("ℹ {}", msg), colors::CYAN, use_color));
+}
+
+/// Print colored warning message
+fn warning_msg(msg: &str, use_color: bool) {
+    println!("{}", colorize(&format!("⚠ {}", msg), colors::YELLOW, use_color));
+}
+
+/// Batch compile all MML files in a directory
+fn batch_compile(dir: &Path, format: OutputFormat, use_color: bool, quiet: bool) -> MmlResult<()> {
+    if !dir.is_dir() {
+        return Err(MmlError::UnsupportedCommand(format!("Not a directory: {}", dir.display())));
+    }
+
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()).map(str::to_lowercase).as_deref() == Some("gwi") {
+                files.push(path);
+            }
+        }
+    }
+
+    if files.is_empty() {
+        info_msg("No .gwi files found in directory", use_color);
+        return Ok(());
+    }
+
+    if !quiet {
+        info_msg(&format!("Compiling {} files from {}", files.len(), dir.display()), use_color);
+    }
+
+    let mut success_count = 0;
+    let mut error_count = 0;
+
+    for (idx, input) in files.iter().enumerate() {
+        let filename = input.file_name().unwrap().to_string_lossy();
+        
+        // Show progress
+        if !quiet {
+            show_progress(idx + 1, files.len(), &format!("Compiling {}...", filename), use_color);
+        }
+
+        let output = input.with_extension(format.extension());
+        let options = CompileOptions::new()
+            .with_output_format(format)
+            .verbose(false)
+            .debug(false);
+
+        let compiler = MmlCompiler::new(options);
+        match compiler.compile(input) {
+            Ok(result) => {
+                if let Err(e) = std::fs::write(&output, &result.data) {
+                    if !quiet {
+                        println!(); // New line after progress bar
+                    }
+                    error_msg(&format!("Failed to write {}: {}", output.display(), e), use_color);
+                    error_count += 1;
+                } else {
+                    success_count += 1;
+                }
+            }
+            Err(e) => {
+                if !quiet {
+                    println!(); // New line after progress bar
+                }
+                error_msg(&format!("Failed to compile {}: {}", input.display(), e), use_color);
+                error_count += 1;
+            }
+        }
+    }
+
+    println!();
+    if !quiet {
+        if error_count == 0 {
+            success(&format!("Batch compilation complete: {} files compiled", success_count), use_color);
+        } else {
+            warning_msg(&format!("Batch compilation complete: {} succeeded, {} failed", success_count, error_count), use_color);
+        }
+    }
+
+    Ok(())
 }
 
 /// List all supported sound chips
@@ -260,10 +457,10 @@ fn is_compiled_audio_file(path: &Path) -> bool {
 }
 
 /// Print a compiler error with source-context (line + caret) when position info is available.
-fn print_diagnostic(path: Option<&Path>, err: &mml2vgm::MmlError) {
+fn print_diagnostic(path: Option<&Path>, err: &MmlError, use_color: bool) {
     match err {
-        mml2vgm::MmlError::Parse { line, column, message } => {
-            eprintln!("error[E0001]: {}", message);
+        MmlError::Parse { line, column, message } => {
+            error_msg(&format!("Parse error: {}", message), use_color);
             if let Some(p) = path {
                 eprintln!("  --> {}:{}:{}", p.display(), line, column);
                 if let Ok(source) = std::fs::read_to_string(p) {
@@ -278,21 +475,19 @@ fn print_diagnostic(path: Option<&Path>, err: &mml2vgm::MmlError) {
                 }
             }
             if let Some(hint) = parse_error_hint(message) {
-                eprintln!("  = help: {}", hint);
+                info_msg(&format!("help: {}", hint), use_color);
             }
         }
-        mml2vgm::MmlError::UnsupportedChip(name) => {
-            eprintln!("error: unknown chip '{}'", name);
-            eprintln!("  = help: valid chip names include YM2612, SN76489, YM2608, YM2151, YM3812,");
-            eprintln!("           AY8910, HuC6280, YM2413, K051649, NES, DMG, POKEY, VRC6, QSound");
-            eprintln!("           (use --list-chips for the full list with support tiers)");
+        MmlError::UnsupportedChip(name) => {
+            error_msg(&format!("Unknown chip '{}'", name), use_color);
+            info_msg("Valid chip names: YM2612, SN76489, YM2608, YM2151, YM3812, AY8910, and others", use_color);
+            info_msg("Use --list-chips for the full list", use_color);
         }
-        mml2vgm::MmlError::FileNotFound(p) => {
-            eprintln!("error: file not found: {}", p.display());
-            eprintln!("  = help: check the path and that the file has a .gwi extension");
+        MmlError::FileNotFound(p) => {
+            error_msg(&format!("File not found: {}", p.display()), use_color);
         }
         other => {
-            eprintln!("error: {}", other);
+            error_msg(&other.to_string(), use_color);
         }
     }
 }
@@ -314,9 +509,9 @@ fn parse_error_hint(message: &str) -> Option<&'static str> {
 }
 
 /// Print compilation statistics
-fn print_stats(info: &CompileInfo) {
+fn print_stats(info: &CompileInfo, use_color: bool) {
     println!();
-    println!("Compilation Statistics:");
+    println!("{}", colorize("Compilation Statistics:", colors::BOLD, use_color));
     println!("  Parts: {}", info.part_count);
     println!("  Commands: {}", info.command_count);
     println!("  Duration: {:.2} seconds ({} samples)", info.duration_seconds, info.duration_samples);
@@ -331,11 +526,13 @@ fn print_stats(info: &CompileInfo) {
 }
 
 /// Validate an MML file
-fn run_validate(args: &Args) -> MmlResult<()> {
+fn run_validate(args: &Args, use_color: bool) -> MmlResult<()> {
     let input = args.input.as_ref()
-        .ok_or_else(|| mml2vgm::MmlError::UnsupportedCommand("No input file specified".to_string()))?;
+        .ok_or_else(|| MmlError::UnsupportedCommand("No input file specified".to_string()))?;
 
-    info!("Validating MML file: {}", input.display());
+    if !args.quiet {
+        info_msg(&format!("Validating MML file: {}", input.display()), use_color);
+    }
 
     // Build compile options
     let options = CompileOptions::new()
@@ -347,14 +544,13 @@ fn run_validate(args: &Args) -> MmlResult<()> {
     let compiler = MmlCompiler::new(options);
     compiler.validate(input)?;
 
-    println!("✓ Validation successful");
     Ok(())
 }
 
 /// Main compilation function
-fn run_compile(args: &Args) -> MmlResult<CompileResult> {
+fn run_compile(args: &Args, use_color: bool) -> MmlResult<CompileResult> {
     let input = args.input.as_ref()
-        .ok_or_else(|| mml2vgm::MmlError::UnsupportedCommand("No input file specified".to_string()))?;
+        .ok_or_else(|| MmlError::UnsupportedCommand("No input file specified".to_string()))?;
 
     let output_path = determine_output_path(args.input.as_ref(), args.output.as_ref(), args.format.into())?;
 
@@ -383,8 +579,10 @@ fn run_compile(args: &Args) -> MmlResult<CompileResult> {
         options = options.with_target_chips(chips);
     }
 
-    info!("Compiling MML file: {}", input.display());
-    info!("Output format: {}", args.format);
+    if !args.quiet {
+        info_msg(&format!("Compiling MML file: {}", input.display()), use_color);
+        info_msg(&format!("Output format: {}", args.format), use_color);
+    }
 
     // Create compiler and compile
     let compiler = MmlCompiler::new(options);
@@ -393,15 +591,16 @@ fn run_compile(args: &Args) -> MmlResult<CompileResult> {
     // Write output file if path is not stdout
     if output_path.to_string_lossy() != "-" {
         std::fs::write(&output_path, &result.data)
-            .map_err(|e| mml2vgm::MmlError::UnsupportedCommand(
+            .map_err(|e| MmlError::UnsupportedCommand(
                 format!("Failed to write output file: {}", e)
             ))?;
-        info!("Output written to: {}", output_path.display());
+        if !args.quiet {
+            info_msg(&format!("Output written to: {}", output_path.display()), use_color);
+        }
     } else {
         // Write to stdout
-        use std::io::Write;
         std::io::stdout().write_all(&result.data)
-            .map_err(|e| mml2vgm::MmlError::UnsupportedCommand(
+            .map_err(|e| MmlError::UnsupportedCommand(
                 format!("Failed to write to stdout: {}", e)
             ))?;
     }
@@ -413,7 +612,13 @@ fn run_compile(args: &Args) -> MmlResult<CompileResult> {
 }
 
 fn main() {
-    let args = Args::parse();
+    let mut args = Args::parse();
+
+    // Apply environment variable defaults
+    args = apply_env_defaults(args);
+
+    // Determine if we should use colors
+    let use_color = !args.no_color && atty::is(atty::Stream::Stdout);
 
     // Handle version flag separately to avoid clap conflict
     if args.version {
@@ -423,7 +628,16 @@ fn main() {
     }
 
     // Initialize logging
-    init_logging(args.verbose, args.debug);
+    init_logging(args.verbose, args.debug, args.quiet);
+
+    // Handle batch compilation
+    if let Some(dir) = args.batch {
+        if let Err(e) = batch_compile(&dir, args.format.into(), use_color, args.quiet) {
+            error_msg(&e.to_string(), use_color);
+            process::exit(1);
+        }
+        process::exit(0);
+    }
 
     // Handle list commands
     if args.list_chips {
@@ -439,7 +653,7 @@ fn main() {
     // Check if we have an input file or need to read from stdin
     if let Some(ref input) = args.input {
         if !input.exists() {
-            error!("Input file not found: {}", input.display());
+            error_msg(&format!("Input file not found: {}", input.display()), use_color);
             process::exit(1);
         }
         debug!("Input file exists: {}", input.display());
@@ -447,12 +661,15 @@ fn main() {
         // If the input is a pre-compiled VGM/XGM/ZGM file, skip compilation.
         if is_compiled_audio_file(input) {
             if !args.play && args.export_wav.is_none() {
-                error!("Input is a compiled audio file. Use --play or --export-wav.");
+                error_msg("Input is a compiled audio file. Use --play or --export-wav.", use_color);
                 process::exit(1);
             }
             let vgm_data = match std::fs::read(input) {
                 Ok(d) => d,
-                Err(e) => { error!("Failed to read file: {}", e); process::exit(1); }
+                Err(e) => {
+                    error_msg(&format!("Failed to read file: {}", e), use_color);
+                    process::exit(1);
+                }
             };
             render_and_play(&vgm_data, args.play, args.export_wav.as_ref());
             process::exit(0);
@@ -461,26 +678,30 @@ fn main() {
 
     // Handle validation or compilation
     if args.check {
-        match run_validate(&args) {
-            Ok(()) => { info!("Validation successful"); process::exit(0); }
+        match run_validate(&args, use_color) {
+            Ok(()) => {
+                if !args.quiet {
+                    success("Validation successful", use_color);
+                }
+                process::exit(0);
+            }
             Err(e) => {
-                print_diagnostic(args.input.as_deref(), &e);
+                print_diagnostic(args.input.as_deref(), &e, use_color);
                 process::exit(1);
             }
         }
     } else {
-        match run_compile(&args) {
+        match run_compile(&args, use_color) {
             Ok(result) => {
-                info!("Compilation successful");
+                if !args.quiet {
+                    success("Compilation successful", use_color);
 
-                if !result.warnings.is_empty() {
-                    warn!("Compilation completed with {} warnings", result.warnings.len());
-                    for warning in &result.warnings {
-                        warn!("Warning at {}: {}", warning.position, warning.message);
+                    if !result.warnings.is_empty() {
+                        warning_msg(&format!("Compilation completed with {} warnings", result.warnings.len()), use_color);
                     }
-                }
 
-                print_stats(&result.info);
+                    print_stats(&result.info, use_color);
+                }
 
                 if (args.play || args.export_wav.is_some()) && !result.data.is_empty() {
                     render_and_play(&result.data, args.play, args.export_wav.as_ref());
@@ -489,7 +710,7 @@ fn main() {
                 process::exit(0);
             }
             Err(e) => {
-                print_diagnostic(args.input.as_deref(), &e);
+                print_diagnostic(args.input.as_deref(), &e, use_color);
                 process::exit(1);
             }
         }

@@ -1021,12 +1021,22 @@ impl Parser {
         }
         
         if let Some(Token::Number(n)) = self.current_token() {
+            // Special case: digit-prefixed chip commands like `@4OP` tokenize as
+            // Number(4) + Identifier("OP"). Stitch them and look up the combined name.
+            if let Some(Token::Identifier(suffix)) = self.peek_next_token_type().cloned() {
+                let combined = format!("{}{}", n, suffix.to_uppercase());
+                if self.is_chip_command(&combined) {
+                    self.advance(); // consume number
+                    self.advance(); // consume identifier
+                    return self.parse_chip_command(&combined);
+                }
+            }
             self.advance();
             return Ok(Some(MmlNode::InstrumentSelection(
                 crate::compiler::ast::InstrumentSelection { number: n as usize, span: None }
             )));
         }
-        
+
         Ok(None)
     }
 
@@ -1625,7 +1635,7 @@ impl Parser {
             // PSG Commands
             "EN" | "MIX" | "FILTER" | "DIST" | "HPOLY" |
             // Wavetable Commands
-            "WAVE" | "NW" | "SW" | "KEYON" | "KEYOFF" | "NOCTRL" |
+            "WAVE" | "NW" | "SW" | "P" | "KEYON" | "KEYOFF" | "NOCTRL" |
             // PCM Commands
             "BANK" | "START" | "LOOP" | "END" | "REVERSE" | "LOOPSTART" | "LOOPLEN" |
             "LVOL" | "RVOL" | "ADPCM" | "OPL3MODE" | "4OP" | "CUSTOM" |
