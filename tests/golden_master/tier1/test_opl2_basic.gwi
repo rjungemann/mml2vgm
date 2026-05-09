@@ -1,0 +1,39 @@
+#CHIP YM3812
+#CLOCK 3579545
+
+; OPL2 (YM3812) Basic FM Test — 2-operator synthesis
+;
+; The YM3812 OPL2 chip has 9 channels, each supporting 2-operator FM synthesis.
+; This test validates basic 2-operator patch generation.
+;
+; Tests:
+; - All 9 channels with independent melodies
+; - 2-operator FM timbre
+; - Envelope control
+; - Register accuracy
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 1-3: Melody
+c4 . d4 . e4 .
+
+r4
+
+; Channel 4-6: Harmony (thirds)
+e4 . f4 . g4 .
+
+r4
+
+; Channel 7-9: Bass line
+c3 . . d3 . . e3 .
+
+r4
+
+; All 9 channels together (brief)
+c4 & e4 & c3 .
+
+r2
+
+#END

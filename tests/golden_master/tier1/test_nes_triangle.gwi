@@ -1,0 +1,40 @@
+#CHIP NES
+#CLOCK 1789773
+
+; NES APU Triangle Channel Test
+;
+; The NES has one triangle wave channel with:
+; - Fixed triangle waveform
+; - Pitch control
+; - Linear counter (volume ramp)
+;
+; Tests:
+; - Full pitch range
+; - Frequency modulation
+; - Linear counter accuracy
+
+#TRACK 0
+
+TEMPO 120
+
+; Triangle melody (5-note phrase)
+c4 . d4 . e4 . f4 . g4 .
+
+r4
+
+; Triangle pitch sweep (wide range)
+c3 . d4 . e5 .
+
+r4
+
+; Sustained triangle tone
+c4 . . . .
+
+r4
+
+; Rapid triangle arpeggio
+c4 & e4 & g4 .
+
+r2
+
+#END

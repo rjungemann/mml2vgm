@@ -1,0 +1,44 @@
+#CHIP QSound
+#CLOCK 24576000
+
+; QSound (Capcom Arcade) Basic Test — 16-channel synthesis
+;
+; QSound is Capcom's proprietary audio synthesizer used in arcade systems.
+; It supports:
+; - 16 simultaneous sound channels
+; - FM synthesis
+; - PCM sample playback
+; - Advanced echo/reverb effects
+;
+; Tests:
+; - All 16 channels
+; - Basic melody and harmony
+; - Pitch and volume control
+
+#TRACK 0
+
+TEMPO 120
+
+; Channels 1-4: Lead melody
+c4 . d4 . e4 . f4 .
+
+r4
+
+; Channels 5-8: Harmony (thirds)
+e4 . f4 . g4 . a4 .
+
+r4
+
+; Channels 9-12: Bass line
+c3 . . d3 . . e3 . .
+
+r4
+
+; Channels 13-16: Drums/percussion
+n4 . . n4 . . n4 . .
+
+r4
+
+r2
+
+#END

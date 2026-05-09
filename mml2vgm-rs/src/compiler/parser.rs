@@ -99,6 +99,15 @@ impl Parser {
     /// Add a node to the current part or global settings
     fn add_node_to_current_part(&mut self, ast: &mut MmlAst, node: MmlNode) {
         if let Some(ref part_name) = self.current_part {
+            // Create part if it doesn't exist
+            if !ast.parts.contains_key(part_name) {
+                ast.parts.insert(part_name.clone(), PartDefinition {
+                    name: part_name.clone(),
+                    chip: None,
+                    tempo: None,
+                    commands: Vec::new(),
+                });
+            }
             if let Some(part) = ast.parts.get_mut(part_name) {
                 part.commands.push(node);
             }
@@ -127,6 +136,59 @@ impl Parser {
                         self.advance(); // Consume the '
                         self.parse_definition_line(&mut ast)?;
                         self.in_definition_context = false;
+                    }
+                    Token::Sharp => {
+                        // Handle #CHIP and #CLOCK directives
+                        self.advance(); // Consume #
+                        if let Some(Token::Identifier(directive)) = self.current_token() {
+                            let directive_upper = directive.to_uppercase();
+                            if directive_upper == "CHIP" {
+                                self.advance(); // Consume CHIP
+                                // Skip whitespace
+                                while let Some(Token::Whitespace(_)) = self.current_token() {
+                                    self.advance();
+                                }
+                                // Get the chip name (can be identifier or multiple tokens for names like C140, C352)
+                                if let Some(Token::Identifier(chip_name)) = self.current_token() {
+                                    let chip_value = chip_name.clone();
+                                    self.advance();
+                                    // Handle multi-token chip names like C140, C352
+                                    if let Some(Token::Number(num)) = self.current_token() {
+                                        let combined = format!("{}{}", chip_value, num);
+                                        ast.metadata.insert("CHIP".to_string(), combined);
+                                        self.advance();
+                                    } else {
+                                        ast.metadata.insert("CHIP".to_string(), chip_value);
+                                    }
+                                } else if let Some(Token::Number(num)) = self.current_token() {
+                                    ast.metadata.insert("CHIP".to_string(), num.to_string());
+                                    self.advance();
+                                }
+                            } else if directive_upper == "CLOCK" {
+                                self.advance(); // Consume CLOCK
+                                // Skip whitespace
+                                while let Some(Token::Whitespace(_)) = self.current_token() {
+                                    self.advance();
+                                }
+                                if let Some(Token::Number(clock_val)) = self.current_token() {
+                                    ast.metadata.insert("CLOCK".to_string(), clock_val.to_string());
+                                    self.advance();
+                                }
+                            } else if directive_upper.starts_with("TRACK") {
+                                self.advance(); // Consume TRACK
+                                // Skip whitespace
+                                while let Some(Token::Whitespace(_)) = self.current_token() {
+                                    self.advance();
+                                }
+                                if let Some(Token::Number(track_num)) = self.current_token() {
+                                    let track_name = track_num.to_string();
+                                    self.current_part = Some(track_name);
+                                    self.advance();
+                                }
+                            } else {
+                                // Unknown directive, skip it
+                            }
+                        }
                     }
                     Token::Comment(_) => {
                         self.advance();

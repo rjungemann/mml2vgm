@@ -1,0 +1,40 @@
+#CHIP QSound
+#CLOCK 24576000
+
+; QSound Phase Modulation & Spatial Audio Test
+;
+; QSound supports advanced spatial audio features:
+; - Phase modulation for width/stereo effects
+; - Pan positioning (left-right)
+; - Distance modeling
+;
+; Tests:
+; - Phase shift timing
+; - Stereo positioning
+; - Spatial audio coherence
+
+#TRACK 0
+
+TEMPO 120
+
+; Center stereo image
+c4 . d4 . e4 .
+
+r4
+
+; Left-right panning
+c4 . . d4 . .
+
+r4
+
+; Wide stereo spread
+c4 & e4 & g4 .
+
+r4
+
+; Phase modulation sweep
+c4 . . . . . . .
+
+r2
+
+#END

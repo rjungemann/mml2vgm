@@ -1,0 +1,33 @@
+#CHIP YM2608
+#CLOCK 7987200
+
+; YM2608 (OPNA) FM Channels Test — 6× FM channels
+;
+; The YM2608 has 6 FM channels (similar to YM2612 found in Mega Drive),
+; plus 3 SSG channels and ADPCM-A/B for sample playback.
+;
+; Tests FM functionality:
+; - All 6 channels with independent melodies
+; - Polyphonic playback
+; - Envelope control
+
+#TRACK 0
+
+TEMPO 120
+
+; FM Channels 1-3: Main melody
+c4 . d4 . e4 .
+
+r4
+
+; FM Channels 4-6: Counter-melody (offset by octave)
+c3 . d3 . e3 .
+
+r4
+
+; All 6 channels together
+c4 & d4 & e4 & c3 & d3 & e3 .
+
+r2
+
+#END

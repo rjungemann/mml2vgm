@@ -1,0 +1,67 @@
+#CHIP YM2151
+#CLOCK 3579545
+
+; YM2151 FM Algorithms Test — Testing all 8 algorithm combinations
+;
+; YM2151 supports 8 different FM algorithms (0-7):
+; 0: Op1 mod (Op2→Op1→out)
+; 1: Op1,2 mod (Op1,Op2→out)
+; 2: Op1,2+3 mod (Op1→out, Op2→Op3→out)
+; 3: Op1+2 mod (Op1→out, Op2→Op3→Op4→out)
+; 4: Op1+2 mod2 (Op1+Op2→out, Op3→Op4→out)
+; 5: Op1+2+3 mod (Op1+Op2→out, Op3→Op4→out)
+; 6: Op1+2+3+4 mod (all to output)
+; 7: Op1+2+3+4 simple (all independent)
+;
+; Test plays the same note through all 8 algorithms to demonstrate
+; the different timbral characteristics.
+
+#TRACK 0
+
+TEMPO 120
+
+; Algorithm 0: Op1 mod (Op2→Op1→out)
+; C4 quarter note
+c4 .
+
+r4
+
+; Algorithm 1: Op1,2 mod (Op1,Op2→out)
+c4 .
+
+r4
+
+; Algorithm 2: Op1,2+3 mod (Op1→out, Op2→Op3→out)
+c4 .
+
+r4
+
+; Algorithm 3: Op1+2 mod (Op1→out, Op2→Op3→Op4→out)
+c4 .
+
+r4
+
+; Algorithm 4: Op1+2 mod2 (Op1+Op2→out, Op3→Op4→out)
+c4 .
+
+r4
+
+; Algorithm 5: Op1+2+3 mod (Op1+Op2→out, Op3→Op4→out)
+c4 .
+
+r4
+
+; Algorithm 6: Op1+2+3+4 mod (all to output)
+c4 .
+
+r4
+
+; Algorithm 7: Op1+2+3+4 simple (all independent)
+c4 .
+
+r4
+
+; Hold for note decay
+r1
+
+#END

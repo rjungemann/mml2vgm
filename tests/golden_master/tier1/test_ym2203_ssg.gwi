@@ -1,0 +1,40 @@
+#CHIP YM2203
+#CLOCK 3579545
+
+; YM2203 (OPN) SSG (Square/Sawtooth/Noise) Channels Test
+;
+; The YM2203 has 3 SSG channels that operate independently of the FM engine.
+; These channels support square waves, envelope control, and noise.
+;
+; Tests SSG channels:
+; - Envelope variations
+; - Tone/Noise mixing
+; - Register accuracy
+
+#TRACK 0
+
+TEMPO 120
+
+; SSG Channel 1: Square wave melody
+c4 . d4 . e4 .
+
+r4
+
+; SSG Channel 2: With envelope
+f4 . . g4 . .
+
+r4
+
+; SSG Channel 3: Noise channel
+r4 . . .
+
+r4
+
+; Mixed tone/noise
+c4 . n . d4 . n .
+
+r4
+
+r2
+
+#END

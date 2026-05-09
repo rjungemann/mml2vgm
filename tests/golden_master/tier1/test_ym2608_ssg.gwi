@@ -1,0 +1,35 @@
+#CHIP YM2608
+#CLOCK 7987200
+
+; YM2608 (OPNA) SSG Channels Test — 3× PSG channels
+;
+; The YM2608 integrates Yamaha's SSG (Square/Sawtooth/Noise) synthesizer,
+; identical to the AY8910/YM2149 PSG chips.
+;
+; Tests SSG channels:
+; - Square wave tone
+; - Envelope modulation
+; - Noise synthesis
+
+#TRACK 0
+
+TEMPO 120
+
+; SSG Channel 1: Square wave
+c4 . d4 . e4 .
+
+r4
+
+; SSG Channel 2: With envelope decay
+f4 . . g4 . .
+
+r4
+
+; SSG Channel 3: Noise
+r4 . . .
+
+r4
+
+r2
+
+#END

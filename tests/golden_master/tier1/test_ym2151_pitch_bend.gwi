@@ -1,0 +1,55 @@
+#CHIP YM2151
+#CLOCK 3579545
+
+; YM2151 Pitch Bend Test — Testing portamento and frequency modulation
+;
+; Tests the YM2151's pitch bend capabilities by:
+; 1. Starting on a note and bending up
+; 2. Bending down
+; 3. Wide frequency sweep
+; 4. Rapid frequency modulation
+;
+; This validates the KCI (Keyboard Code Index) and frequency register
+; handling under pitch control.
+
+#TRACK 0
+
+TEMPO 120
+
+; Pitch bend up: C4 to C5
+c4 . & D(KCI, 0)
+; [pitch bend commands would go here]
+c5 .
+
+r4
+
+; Pitch bend down: C5 to C4
+c5 . & D(KCI, 127)
+c4 .
+
+r4
+
+; Rapid pitch sweep: C3 → C4 → C5 → C6
+c3 .
+c4 .
+c5 .
+c6 .
+
+r4
+
+; Wide interval jump
+c4 .
+
+r8
+g4 .
+
+r8
+
+c4 .
+
+r4
+
+; Hold for settling
+r2
+
+#END

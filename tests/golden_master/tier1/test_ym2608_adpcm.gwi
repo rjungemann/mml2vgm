@@ -1,0 +1,31 @@
+#CHIP YM2608
+#CLOCK 7987200
+
+; YM2608 (OPNA) ADPCM Channels Test
+;
+; The YM2608 includes two ADPCM sample playback channels:
+; - ADPCM-A: 6 channels of high-quality sample playback
+; - ADPCM-B: 1 channel of drum sample playback
+;
+; Tests ADPCM functionality:
+; - Sample start address
+; - Pitch/frequency control
+; - Envelope (volume sweep)
+
+#TRACK 0
+
+TEMPO 120
+
+; ADPCM-A: Play sample at varying pitches
+; Note: Actual sample data would be required in production
+; This test validates register writes and timing
+
+; ADPCM-B: Drum sample (single drum hit)
+; Expected: crisp attack, natural decay
+
+; Simple note sequence to validate ADPCM register timing
+c4 . d4 . e4 .
+
+r2
+
+#END

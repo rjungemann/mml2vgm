@@ -1,0 +1,28 @@
+#CHIP SegaPCM
+#CLOCK 7670454
+
+; SegaPCM Pitch Sweep Test
+;
+; Tests pitch modulation capabilities:
+; - Frequency sweep up
+; - Frequency sweep down
+; - Rapid frequency changes
+; - Register write accuracy for pitch control
+
+#TRACK 0
+
+TEMPO 120
+
+; Pitch sweep up: C4 to C5
+c4 . . d4 . . e4 . . f4 . . g4 . . a4 . . b4 . . >c5 .
+
+r4
+
+; Pitch sweep down: C5 to C4
+>c5 . . b4 . . a4 . . g4 . . f4 . . e4 . . d4 . . c4 .
+
+r4
+
+r2
+
+#END

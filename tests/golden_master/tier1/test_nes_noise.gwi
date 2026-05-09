@@ -1,0 +1,45 @@
+#CHIP NES
+#CLOCK 1789773
+
+; NES APU Noise Channel Test
+;
+; The NES has one noise channel that generates pseudo-random noise for:
+; - Percussion sounds (drums, cymbals)
+; - Bass effects
+; - Atmospheric textures
+;
+; Features:
+; - LFSR (Linear Feedback Shift Register) modes
+; - Pitch control (via loop counter)
+; - Volume envelope
+;
+; Tests:
+; - Different LFSR modes
+; - Noise pitch variations
+; - Volume control
+
+#TRACK 0
+
+TEMPO 120
+
+; Noise drum pattern (periodic noise hits)
+n4 . . n4 . . n4 . .
+
+r4
+
+; Noise with pitch variation
+n8 n8 n8 n8 n8 n8 n8 n8
+
+r4
+
+; Sustained noise (cymbal-like)
+n2 . .
+
+r4
+
+; Complex noise rhythm
+n4 . n16 n16 n16 n16 n4 .
+
+r2
+
+#END

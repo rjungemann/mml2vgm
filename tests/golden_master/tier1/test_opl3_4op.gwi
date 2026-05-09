@@ -1,0 +1,39 @@
+#CHIP YMF262
+#CLOCK 14318180
+
+; OPL3 (YMF262) 4-operator FM Test
+;
+; The YMF262 OPL3 is an enhanced version of OPL2 that doubles the channels
+; and supports 4-operator FM synthesis (pairing two 2-op channels).
+;
+; OPL3 has 18 channels total (9 pairs), each pair can be:
+; - Two independent 2-op channels (OPL2 mode)
+; - One 4-op channel (OPL3 mode)
+;
+; Tests:
+; - 4-operator FM synthesis
+; - Complex timbral possibilities
+; - Register accuracy for 4-op patches
+
+#TRACK 0
+
+TEMPO 120
+
+; 4-operator channels (pairs 1-3): Complex lead synth
+c4 . d4 . e4 .
+
+r4
+
+; 4-operator channels (pairs 4-6): Rich pad
+f4 . . g4 . .
+
+r4
+
+; 2-operator channels (remaining): Bass and drums
+c3 . d3 . e3 .
+
+r4
+
+r2
+
+#END

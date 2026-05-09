@@ -496,7 +496,7 @@ impl VgmGenerator {
         part_names.sort();
 
         // Build effective chip map from metadata + explicit part annotations.
-        // Priority: explicit part.chip > PartYM2612/PartSN76489 metadata > ForcedMonoPartYM2612 > default YM2612.
+        // Priority: explicit part.chip > PartYM2612/PartSN76489 metadata > global CHIP directive > ForcedMonoPartYM2612 > default YM2612.
         let mut effective_chip_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         // Explicit part chips
         for name in &part_names {
@@ -534,6 +534,14 @@ impl VgmGenerator {
             for name in &part_names {
                 if !effective_chip_map.contains_key(name) && name.starts_with(value.trim()) {
                     effective_chip_map.insert(name.clone(), chip_name.to_string());
+                }
+            }
+        }
+        // Global CHIP directive (from #CHIP directive) → assign to all otherwise unassigned parts
+        if let Some(global_chip) = ast.metadata.get("CHIP") {
+            for name in &part_names {
+                if !effective_chip_map.contains_key(name) {
+                    effective_chip_map.insert(name.clone(), global_chip.clone());
                 }
             }
         }

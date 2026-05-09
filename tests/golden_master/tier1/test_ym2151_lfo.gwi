@@ -1,0 +1,49 @@
+#CHIP YM2151
+#CLOCK 3579545
+
+; YM2151 LFO Test — Testing Low-Frequency Oscillator modulation
+;
+; The YM2151 includes a built-in LFO that can modulate:
+; - Amplitude (tremolo)
+; - Frequency (vibrato)
+;
+; Tests:
+; 1. LFO with tremolo (amplitude modulation)
+; 2. LFO with vibrato (frequency modulation)
+; 3. Different LFO speeds (fast, medium, slow)
+; 4. Combined amplitude + frequency modulation
+
+#TRACK 0
+
+TEMPO 120
+
+; LFO at slow speed with tremolo modulation
+; Playing steady note with amplitude modulation
+c4 . . . .
+
+r4
+
+; LFO at medium speed with vibrato (frequency modulation)
+c4 . . . .
+
+r4
+
+; LFO at fast speed with vibrato
+c4 . . . .
+
+r4
+
+; Combined tremolo + vibrato
+c4 . . . .
+
+r4
+
+; LFO sweep (variable speed)
+c4 . . . .
+
+r4
+
+; Hold for LFO effects to settle
+r2
+
+#END

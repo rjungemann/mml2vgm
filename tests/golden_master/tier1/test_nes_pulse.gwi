@@ -1,0 +1,43 @@
+#CHIP NES
+#CLOCK 1789773
+
+; NES APU Pulse Channels Test
+;
+; The NES Audio Processing Unit has 2 pulse wave channels (Pulse 1 & 2).
+; Each pulse channel supports:
+; - Duty cycle control (12.5%, 25%, 50%, 75%)
+; - Volume control
+; - Frequency modulation
+; - Sweep effects
+;
+; Tests:
+; - Both pulse channels
+; - Duty cycle variations
+; - Pitch sweep
+; - Volume envelope
+
+#TRACK 0
+
+TEMPO 120
+
+; Pulse 1: Melody with duty cycle sweep
+c4 . d4 . e4 .
+
+r4
+
+; Pulse 2: Counter-melody (different duty)
+g3 . a3 . b3 .
+
+r4
+
+; Both pulses together (harmonic interval)
+c4 & g3 .
+
+r4
+
+; Staccato pulse pattern
+c4 . d4 . e4 . f4 .
+
+r2
+
+#END

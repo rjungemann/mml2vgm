@@ -1,0 +1,36 @@
+#CHIP YM2203
+#CLOCK 3579545
+
+; YM2203 (OPN) FM + SSG Mixed Test
+;
+; Tests the YM2203 with FM and SSG channels playing simultaneously.
+; This validates that both subsystems work without interference.
+;
+; FM channels (3) play melodic content
+; SSG channels (3) play harmonic support and bass
+
+#TRACK 0
+
+TEMPO 120
+
+; FM melody with SSG harmony
+c4 & c3 . d4 & d3 . e4 & e3 .
+
+r4
+
+; FM polyphony with SSG bass
+c4 & e4 & g4 & c3 .
+
+r2
+
+; SSG rhythmic accompaniment under FM lead
+f4 . g4 . a4 . & c4 . c4 . c4 .
+
+r2
+
+; All channels in unison (brief)
+c4 & c4 & c4 .
+
+r2
+
+#END

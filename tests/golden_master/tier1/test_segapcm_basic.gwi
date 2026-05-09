@@ -1,0 +1,43 @@
+#CHIP SegaPCM
+#CLOCK 7670454
+
+; SegaPCM (Sega Genesis) Basic Test — 16-channel sample playback
+;
+; The Sega Genesis/Mega Drive includes a built-in PCM sample player
+; capable of playing up to 16 simultaneous samples with:
+; - Individual pitch control
+; - Volume/envelope control
+; - Loop points
+;
+; Tests:
+; - All 16 channels
+; - Pitch modulation
+; - Volume envelope
+
+#TRACK 0
+
+TEMPO 120
+
+; Channels 1-4: Melodic sequence
+c4 . d4 . e4 . f4 .
+
+r4
+
+; Channels 5-8: Offset by octave
+c3 . d3 . e3 . f3 .
+
+r4
+
+; Channels 9-12: Harmony
+g4 . a4 . b4 . >c5 .
+
+r4
+
+; Channels 13-16: Bass foundation
+c2 . . c2 . . c2 . .
+
+r4
+
+r2
+
+#END

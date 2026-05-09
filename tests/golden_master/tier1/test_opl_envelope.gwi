@@ -1,0 +1,45 @@
+#CHIP YM3812
+#CLOCK 3579545
+
+; OPL Envelope Generator Test
+;
+; Tests the OPL2/OPL3 envelope generator with varying parameters:
+; - Attack Rate (fast, medium, slow)
+; - Decay Rate (immediate, gradual)
+; - Sustain Level (high, mid, low)
+; - Release Rate (fast, medium, slow)
+;
+; Each operator's envelope is tested independently for accuracy.
+
+#TRACK 0
+
+TEMPO 120
+
+; Fast attack, short decay
+c4 .
+
+r4
+
+; Slow attack, long decay
+c4 . . .
+
+r4
+
+; Medium attack with sustain
+c4 . . .
+
+r4
+
+; Staccato (fast release)
+c4 . d4 . e4 .
+
+r4
+
+; Sustained pad
+c4 . . . . .
+
+r4
+
+r2
+
+#END

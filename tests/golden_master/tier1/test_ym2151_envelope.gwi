@@ -1,0 +1,38 @@
+#CHIP YM2151
+#CLOCK 3579545
+
+; YM2151 FM Envelope Test
+;
+; This test validates envelope behavior of the YM2151 OPM chip
+; by playing notes with different durations to observe:
+; - Attack (note start)
+; - Sustain (note hold)
+; - Release (note end)
+;
+; Test sequence: ascending scale with variable note lengths
+
+#TRACK 0
+
+TEMPO 120
+
+; Short notes (fast attack/release)
+c4 . d4 . e4 .
+
+r4
+
+; Medium notes (normal envelope)
+c4 - d4 - e4 -
+
+r4
+
+; Long notes (sustained envelope)
+f4 _ g4 _ a4 _
+
+r4
+
+; Staccato pattern (short bursts)
+c4 . . d4 . . e4 . .
+
+r2
+
+#END

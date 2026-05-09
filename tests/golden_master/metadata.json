@@ -1,0 +1,305 @@
+{
+  "golden_master_database": {
+    "version": "1.0",
+    "created": "2026-05-08",
+    "last_updated": "2026-05-08",
+    "description": "Track all golden master references for validation",
+    "note": "Populated during Week 2-8 validation phases"
+  },
+  "ym2151": {
+    "chip_name": "YM2151 (OPM)",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "arcade",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "frequency_error_hz": "<1",
+      "harmonic_variance_db": "<3",
+      "phase_coherence": ">0.90",
+      "correlation": ">0.95"
+    },
+    "tests": {
+      "envelope": {
+        "test_file": "test_ym2151_envelope.gwi",
+        "description": "Envelope generator with AR/DR/SL/RR variations",
+        "rom_source": "taito_arcade_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "correlation": null,
+          "frequency_error_hz": null,
+          "phase_coherence": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "algorithms": {
+        "test_file": "test_ym2151_algorithms.gwi",
+        "description": "All 8 FM algorithms with same note",
+        "rom_source": "taito_arcade_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "correlation": null,
+          "frequency_error_hz": null,
+          "algorithm_match": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "pitch_bend": {
+        "test_file": "test_ym2151_pitch_bend.gwi",
+        "description": "Pitch bend tracking over frequency range",
+        "rom_source": "taito_arcade_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "pitch_accuracy": null,
+          "frequency_error_hz": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "lfo": {
+        "test_file": "test_ym2151_lfo.gwi",
+        "description": "LFO frequency modulation and tremolo",
+        "rom_source": "taito_arcade_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "lfo_frequency_tracking": null,
+          "phase_coherence": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "pending": 4,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "ym2203": {
+    "chip_name": "YM2203 (OPN)",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "pc88",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "fm_register_accuracy_percent": "≥95",
+      "ssg_register_accuracy_percent": "≥98",
+      "timing_variance_samples": "≤2"
+    },
+    "tests": {
+      "fm": {
+        "test_file": "test_ym2203_fm.gwi",
+        "description": "3 FM channels with various patches",
+        "rom_source": "pc88_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "register_accuracy_percent": null,
+          "timing_variance_samples": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "ssg": {
+        "test_file": "test_ym2203_ssg.gwi",
+        "description": "3 SSG channels with tone/noise mix",
+        "rom_source": "pc88_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "register_accuracy_percent": null,
+          "harmonic_match": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "mixed": {
+        "test_file": "test_ym2203_mixed.gwi",
+        "description": "FM and SSG simultaneous playback",
+        "rom_source": "pc88_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "cross_channel_interference": null,
+          "register_accuracy_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "pending": 3,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "ym2608": {
+    "chip_name": "YM2608 (OPNA)",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "pc98",
+    "validation_method": "spectral_and_binary",
+    "tests": {
+      "fm": {
+        "test_file": "test_ym2608_fm.gwi",
+        "validation_status": "pending"
+      },
+      "ssg": {
+        "test_file": "test_ym2608_ssg.gwi",
+        "validation_status": "pending"
+      },
+      "adpcm": {
+        "test_file": "test_ym2608_adpcm.gwi",
+        "validation_status": "pending"
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "pending": 3,
+      "overall_status": "pending"
+    }
+  },
+  "opl": {
+    "chip_name": "OPL Family (YM3812, YMF262, Y8950, YM3526)",
+    "reference_emulator": "DOSBox-X 2026.05.02",
+    "emulator_driver": "opl_core",
+    "validation_method": "spectral_analysis",
+    "tests": {
+      "opl2_basic": {
+        "test_file": "test_opl2_basic.gwi",
+        "chip": "YM3812",
+        "validation_status": "pending"
+      },
+      "opl3_4op": {
+        "test_file": "test_opl3_4op.gwi",
+        "chip": "YMF262",
+        "validation_status": "pending"
+      },
+      "envelope": {
+        "test_file": "test_opl_envelope.gwi",
+        "chip": "YM3812",
+        "validation_status": "pending"
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "pending": 3,
+      "overall_status": "pending"
+    }
+  },
+  "segapcm": {
+    "chip_name": "SegaPCM (Sega Genesis)",
+    "reference_emulator": "Mednafen 1.32.1",
+    "emulator_driver": "genesis",
+    "validation_method": "binary_comparison",
+    "tests": {
+      "basic": {
+        "test_file": "test_segapcm_basic.gwi",
+        "validation_status": "pending"
+      },
+      "pitch_sweep": {
+        "test_file": "test_segapcm_pitch_sweep.gwi",
+        "validation_status": "pending"
+      }
+    },
+    "summary": {
+      "total_tests": 2,
+      "passed": 0,
+      "pending": 2,
+      "overall_status": "pending"
+    }
+  },
+  "nes": {
+    "chip_name": "NES APU (2A03)",
+    "reference_emulator": "Mesen-X",
+    "emulator_driver": "nes",
+    "validation_method": "binary_comparison",
+    "tests": {
+      "pulse": {
+        "test_file": "test_nes_pulse.gwi",
+        "validation_status": "pending"
+      },
+      "triangle": {
+        "test_file": "test_nes_triangle.gwi",
+        "validation_status": "pending"
+      },
+      "noise": {
+        "test_file": "test_nes_noise.gwi",
+        "validation_status": "pending"
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "pending": 3,
+      "overall_status": "pending"
+    }
+  },
+  "qsound": {
+    "chip_name": "QSound (Capcom Arcade)",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "qsound_core",
+    "validation_method": "spectral_analysis",
+    "tests": {
+      "basic": {
+        "test_file": "test_qsound_basic.gwi",
+        "validation_status": "pending"
+      },
+      "echo": {
+        "test_file": "test_qsound_echo.gwi",
+        "validation_status": "pending"
+      },
+      "phase": {
+        "test_file": "test_qsound_phase.gwi",
+        "validation_status": "pending"
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "pending": 3,
+      "overall_status": "pending"
+    }
+  },
+  "summary": {
+    "total_chips": 7,
+    "total_tests": 21,
+    "tests_passed": 0,
+    "tests_pending": 21,
+    "tests_failed": 0,
+    "overall_pass_rate_percent": 0,
+    "phase_1_status": "infrastructure_complete",
+    "phase_2_status": "ready_to_start"
+  }
+}

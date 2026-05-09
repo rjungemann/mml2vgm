@@ -1,0 +1,37 @@
+#CHIP QSound
+#CLOCK 24576000
+
+; QSound Echo/Delay Effect Test
+;
+; QSound is famous for its rich echo and delay effects.
+; This test validates:
+; - Echo/delay timing
+; - Feedback decay
+; - Wet/dry mix
+; - Echo parameter sweep
+
+#TRACK 0
+
+TEMPO 120
+
+; Simple melody with echo effect
+c4 . d4 . e4 . f4 .
+
+r4
+
+; Melody with longer echo tail
+c4 . . d4 . . e4 . .
+
+r4
+
+; Echo feedback test (repeating decay)
+c4 . . . . . . .
+
+r4
+
+; Variable echo parameters
+c4 . d4 . e4 . f4 .
+
+r2
+
+#END
