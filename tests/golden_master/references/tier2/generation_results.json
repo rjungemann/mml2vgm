@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-05-09T00:50:16.041688",
+  "source_dir": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2",
+  "output_dir": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2",
+  "mame_version": "vgmplay",
+  "total_files": 17,
+  "passed": 0,
+  "failed": 17,
+  "results": [
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_envelope.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_ay8910_envelope.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_envelope.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_wavetable.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_ay8910_wavetable.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_wavetable.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_c140_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_loop.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_c140_loop.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_loop.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_c352_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_filter.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_c352_filter.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_filter.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_huc6280_wavetable.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_huc6280_wavetable.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_huc6280_wavetable.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k053260_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_k053260_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k053260_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k054539_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_k054539_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k054539_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_konami_pcm_pitch.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_konami_pcm_pitch.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_konami_pcm_pitch.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_rf5c164_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_pitch.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_rf5c164_pitch.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_pitch.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_adpcm.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_y8950_adpcm.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_adpcm.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_opl.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_y8950_opl.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_opl.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_custom.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_ym2413_custom.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_custom.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_patches.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_ym2413_patches.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_patches.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_rhythm.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/test_ym2413_rhythm.wav",
+      "status": "FAIL",
+      "reason": "MAME error: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_rhythm.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n"
+    }
+  ]
+}

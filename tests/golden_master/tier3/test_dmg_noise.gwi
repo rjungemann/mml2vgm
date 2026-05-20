@@ -1,0 +1,37 @@
+#CHIP DMG
+#CLOCK 4194304
+
+; DMG (Game Boy) APU - Noise Channel (CH4) Test
+;
+; CH4 generates pseudo-random noise via a linear-feedback shift register.
+; Tracks 0, 1, 2 are silent (consume pulse/wave channels),
+; so track 3 lands on the noise channel (ch index 3).
+; MIDI note value low nibble selects noise period (0-15).
+
+#TRACK 0
+
+TEMPO 120
+
+; Pulse 1 silent (channel allocation placeholder)
+r1
+
+#TRACK 1
+
+; Pulse 2 silent (channel allocation placeholder)
+r1
+
+#TRACK 2
+
+; Wave silent (channel allocation placeholder)
+r1
+
+#TRACK 3
+
+; Noise channel pattern
+c4 r4 d4 r4
+
+e4 r4 g4 r4
+
+r2
+
+#END

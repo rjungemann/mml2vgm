@@ -1,0 +1,36 @@
+#CHIP K051649
+#CLOCK 1789772
+
+; K051649 (SCC) - Wavetable Synthesis Test
+;
+; The SCC has 5 channels, each with a 32-byte signed waveform and
+; 12-bit frequency divider. This test exercises the wavetable synthesis
+; across all 5 channels with a simple chord and melody.
+
+#TRACK 0
+
+TEMPO 120
+
+; Channel 0: melody
+c4 d4 e4 f4
+
+g4 a4 b4 c5
+
+; Channel 1: harmony (third above)
+e4 f4 g4 a4
+
+; Channel 2: inner voice
+g4 . a4 . b4 .
+
+; Channel 3: bass
+c3 . d3 . e3 .
+
+; Channel 4: bass pedal
+c2 . . . . .
+
+; All together
+c4 & e4 & g4
+
+r2
+
+#END

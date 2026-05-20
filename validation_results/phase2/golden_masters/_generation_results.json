@@ -1,0 +1,19 @@
+{
+  "test_ay8910_envelope.vgm": true,
+  "test_ay8910_wavetable.vgm": true,
+  "test_c140_basic.vgm": true,
+  "test_c140_loop.vgm": true,
+  "test_c352_basic.vgm": true,
+  "test_c352_filter.vgm": true,
+  "test_huc6280_wavetable.vgm": true,
+  "test_k053260_basic.vgm": true,
+  "test_k054539_basic.vgm": true,
+  "test_konami_pcm_pitch.vgm": true,
+  "test_rf5c164_basic.vgm": true,
+  "test_rf5c164_pitch.vgm": true,
+  "test_y8950_adpcm.vgm": true,
+  "test_y8950_opl.vgm": true,
+  "test_ym2413_custom.vgm": true,
+  "test_ym2413_patches.vgm": true,
+  "test_ym2413_rhythm.vgm": true
+}

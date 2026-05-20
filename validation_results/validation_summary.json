@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-08T23:53:37.755289",
+  "timestamp": "2026-05-09T00:42:00.640908",
   "phases": {
     "compilation": {
       "status": "PASS",
@@ -11,7 +11,7 @@
       "results": [
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_noise.vgm",
-          "timestamp": "2026-05-08T23:53:37.873266",
+          "timestamp": "2026-05-09T00:42:00.831726",
           "file_size": 668,
           "status": "PASS",
           "summary": {
@@ -62,7 +62,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_pulse.vgm",
-          "timestamp": "2026-05-08T23:53:37.905784",
+          "timestamp": "2026-05-09T00:42:00.884743",
           "file_size": 560,
           "status": "PASS",
           "summary": {
@@ -113,7 +113,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_triangle.vgm",
-          "timestamp": "2026-05-08T23:53:37.938425",
+          "timestamp": "2026-05-09T00:42:00.937905",
           "file_size": 560,
           "status": "PASS",
           "summary": {
@@ -164,7 +164,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl2_basic.vgm",
-          "timestamp": "2026-05-08T23:53:37.973324",
+          "timestamp": "2026-05-09T00:42:00.991611",
           "file_size": 494,
           "status": "PASS",
           "summary": {
@@ -218,7 +218,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl3_4op.vgm",
-          "timestamp": "2026-05-08T23:53:38.006476",
+          "timestamp": "2026-05-09T00:42:01.045922",
           "file_size": 476,
           "status": "PASS",
           "summary": {
@@ -357,7 +357,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl_envelope.vgm",
-          "timestamp": "2026-05-08T23:53:38.038762",
+          "timestamp": "2026-05-09T00:42:01.100223",
           "file_size": 440,
           "status": "PASS",
           "summary": {
@@ -411,7 +411,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_basic.vgm",
-          "timestamp": "2026-05-08T23:53:38.071558",
+          "timestamp": "2026-05-09T00:42:01.155371",
           "file_size": 341,
           "status": "PASS",
           "summary": {
@@ -427,7 +427,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_echo.vgm",
-          "timestamp": "2026-05-08T23:53:38.105929",
+          "timestamp": "2026-05-09T00:42:01.209516",
           "file_size": 332,
           "status": "PASS",
           "summary": {
@@ -443,7 +443,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_phase.vgm",
-          "timestamp": "2026-05-08T23:53:38.138269",
+          "timestamp": "2026-05-09T00:42:01.262861",
           "file_size": 323,
           "status": "PASS",
           "summary": {
@@ -459,7 +459,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_basic.vgm",
-          "timestamp": "2026-05-08T23:53:38.171478",
+          "timestamp": "2026-05-09T00:42:01.319088",
           "file_size": 344,
           "status": "PASS",
           "summary": {
@@ -475,7 +475,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_pitch_sweep.vgm",
-          "timestamp": "2026-05-08T23:53:38.204842",
+          "timestamp": "2026-05-09T00:42:01.372632",
           "file_size": 341,
           "status": "PASS",
           "summary": {
@@ -491,7 +491,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_algorithms.vgm",
-          "timestamp": "2026-05-08T23:53:38.239122",
+          "timestamp": "2026-05-09T00:42:01.427141",
           "file_size": 557,
           "status": "PASS",
           "summary": {
@@ -563,7 +563,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_envelope.vgm",
-          "timestamp": "2026-05-08T23:53:38.273657",
+          "timestamp": "2026-05-09T00:42:01.481214",
           "file_size": 599,
           "status": "PASS",
           "summary": {
@@ -635,7 +635,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_lfo.vgm",
-          "timestamp": "2026-05-08T23:53:38.306222",
+          "timestamp": "2026-05-09T00:42:01.535671",
           "file_size": 500,
           "status": "PASS",
           "summary": {
@@ -707,7 +707,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_pitch_bend.vgm",
-          "timestamp": "2026-05-08T23:53:38.340788",
+          "timestamp": "2026-05-09T00:42:01.589633",
           "file_size": 623,
           "status": "PASS",
           "summary": {
@@ -779,7 +779,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_fm.vgm",
-          "timestamp": "2026-05-08T23:53:38.375296",
+          "timestamp": "2026-05-09T00:42:01.645787",
           "file_size": 527,
           "status": "PASS",
           "summary": {
@@ -833,7 +833,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_mixed.vgm",
-          "timestamp": "2026-05-08T23:53:38.416211",
+          "timestamp": "2026-05-09T00:42:01.699388",
           "file_size": 632,
           "status": "PASS",
           "summary": {
@@ -887,7 +887,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_ssg.vgm",
-          "timestamp": "2026-05-08T23:53:38.452497",
+          "timestamp": "2026-05-09T00:42:01.754556",
           "file_size": 458,
           "status": "PASS",
           "summary": {
@@ -941,7 +941,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_adpcm.vgm",
-          "timestamp": "2026-05-08T23:53:38.486640",
+          "timestamp": "2026-05-09T00:42:01.813540",
           "file_size": 434,
           "status": "PASS",
           "summary": {
@@ -1020,7 +1020,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_fm.vgm",
-          "timestamp": "2026-05-08T23:53:38.520055",
+          "timestamp": "2026-05-09T00:42:01.872117",
           "file_size": 575,
           "status": "PASS",
           "summary": {
@@ -1099,7 +1099,7 @@
         },
         {
           "file": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_ssg.vgm",
-          "timestamp": "2026-05-08T23:53:38.555676",
+          "timestamp": "2026-05-09T00:42:01.930295",
           "file_size": 476,
           "status": "PASS",
           "summary": {

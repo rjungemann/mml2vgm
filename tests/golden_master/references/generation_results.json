@@ -1,0 +1,313 @@
+{
+  "generated_at": "2026-05-20T23:19:07.708515+00:00",
+  "vgm2wav": "/Users/rjungemann/Projects/libvgm/build/bin/vgm2wav",
+  "sample_rate": 44100,
+  "loops": 1,
+  "fade_seconds": 1.0,
+  "passed": 43,
+  "failed": 0,
+  "skipped": 0,
+  "files": [
+    {
+      "vgm": "validation_results/test_nes_noise.vgm",
+      "wav": "tests/golden_master/references/nes/test_nes_noise.wav",
+      "ok": true,
+      "size_bytes": 2293268,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 573300, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x14 #0, Core NSFP, Clock 1789772, Rate 447443, Volume 0x80\n    Cores: NSFP MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_noise.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/nes/test_nes_noise.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 13.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_nes_pulse.vgm",
+      "wav": "tests/golden_master/references/nes/test_nes_pulse.wav",
+      "ok": true,
+      "size_bytes": 1984568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 496125, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x14 #0, Core NSFP, Clock 1789772, Rate 447443, Volume 0x80\n    Cores: NSFP MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/nes/test_nes_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_nes_triangle.vgm",
+      "wav": "tests/golden_master/references/nes/test_nes_triangle.wav",
+      "ok": true,
+      "size_bytes": 1940468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 485100, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x14 #0, Core NSFP, Clock 1789772, Rate 447443, Volume 0x80\n    Cores: NSFP MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_triangle.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/nes/test_nes_triangle.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_opl2_basic.vgm",
+      "wav": "tests/golden_master/references/opl/test_opl2_basic.wav",
+      "ok": true,
+      "size_bytes": 1940468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 485100, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x08 #0, Core MAME, Clock 3579545, Rate 24857, Volume 0x40\n    Cores: MAME\n  Dev 4: Type 0x12 #0, Core EMU, Clock 894886, Rate 111860, Volume 0x40\n    Cores: EMU MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_opl2_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/opl/test_opl2_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_opl3_4op.vgm",
+      "wav": "tests/golden_master/references/opl/test_opl3_4op.wav",
+      "ok": true,
+      "size_bytes": 1499468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 374850, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0B #0, Core MAME, Clock 14318180, Rate 198863, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_opl3_4op.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/opl/test_opl3_4op.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_opl_envelope.vgm",
+      "wav": "tests/golden_master/references/opl/test_opl_envelope.wav",
+      "ok": true,
+      "size_bytes": 1543568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 385875, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x08 #0, Core MAME, Clock 3579545, Rate 24857, Volume 0x40\n    Cores: MAME\n  Dev 4: Type 0x12 #0, Core EMU, Clock 894886, Rate 111860, Volume 0x40\n    Cores: EMU MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_opl_envelope.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/opl/test_opl_envelope.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_qsound_basic.vgm",
+      "wav": "tests/golden_master/references/qsound/test_qsound_basic.wav",
+      "ok": true,
+      "size_bytes": 2381468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 595350, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/qsound/test_qsound_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 13.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_qsound_echo.vgm",
+      "wav": "tests/golden_master/references/qsound/test_qsound_echo.wav",
+      "ok": true,
+      "size_bytes": 2028668,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 507150, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_echo.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/qsound/test_qsound_echo.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_qsound_phase.vgm",
+      "wav": "tests/golden_master/references/qsound/test_qsound_phase.wav",
+      "ok": true,
+      "size_bytes": 1543568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 385875, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_phase.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/qsound/test_qsound_phase.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_segapcm_basic.vgm",
+      "wav": "tests/golden_master/references/segapcm/test_segapcm_basic.wav",
+      "ok": true,
+      "size_bytes": 2513768,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 628425, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/segapcm/test_segapcm_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 14.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_segapcm_pitch_sweep.vgm",
+      "wav": "tests/golden_master/references/segapcm/test_segapcm_pitch_sweep.wav",
+      "ok": true,
+      "size_bytes": 2469668,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 617400, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_pitch_sweep.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/segapcm/test_segapcm_pitch_sweep.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 14.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2151_algorithms.vgm",
+      "wav": "tests/golden_master/references/ym2151/test_ym2151_algorithms.wav",
+      "ok": true,
+      "size_bytes": 2116868,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 529200, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_algorithms.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2151/test_ym2151_algorithms.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2151_envelope.vgm",
+      "wav": "tests/golden_master/references/ym2151/test_ym2151_envelope.wav",
+      "ok": true,
+      "size_bytes": 1764068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 441000, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_envelope.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2151/test_ym2151_envelope.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2151_lfo.vgm",
+      "wav": "tests/golden_master/references/ym2151/test_ym2151_lfo.wav",
+      "ok": true,
+      "size_bytes": 1278968,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 319725, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_lfo.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2151/test_ym2151_lfo.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 07.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2151_pitch_bend.vgm",
+      "wav": "tests/golden_master/references/ym2151/test_ym2151_pitch_bend.wav",
+      "ok": true,
+      "size_bytes": 2249168,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 562275, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_pitch_bend.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2151/test_ym2151_pitch_bend.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2203_fm.vgm",
+      "wav": "tests/golden_master/references/ym2203/test_ym2203_fm.wav",
+      "ok": true,
+      "size_bytes": 1940468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 485100, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x05 #0, Core MAME, Clock 3993600, Rate 10400, Volume 0x58\n    Cores: MAME GENS\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_fm.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2203/test_ym2203_fm.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2203_mixed.vgm",
+      "wav": "tests/golden_master/references/ym2203/test_ym2203_mixed.wav",
+      "ok": true,
+      "size_bytes": 2778368,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 694575, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x05 #0, Core MAME, Clock 3993600, Rate 10400, Volume 0x58\n    Cores: MAME GENS\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_mixed.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2203/test_ym2203_mixed.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 15.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2203_ssg.vgm",
+      "wav": "tests/golden_master/references/ym2203/test_ym2203_ssg.wav",
+      "ok": true,
+      "size_bytes": 1587668,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 396900, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x05 #0, Core MAME, Clock 3993600, Rate 10400, Volume 0x58\n    Cores: MAME GENS\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_ssg.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2203/test_ym2203_ssg.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 09.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2608_adpcm.vgm",
+      "wav": "tests/golden_master/references/ym2608/test_ym2608_adpcm.wav",
+      "ok": true,
+      "size_bytes": 573368,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 143325, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_adpcm.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2608/test_ym2608_adpcm.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 03.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2608_fm.vgm",
+      "wav": "tests/golden_master/references/ym2608/test_ym2608_fm.wav",
+      "ok": true,
+      "size_bytes": 1719968,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 429975, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x06 #0, Core MAME, Clock 7987200, Rate 110933, Volume 0x80\n    Cores: MAME\n  Dev 4: Type 0x12 #0, Core EMU, Clock 3993600, Rate 499200, Volume 0x40\n    Cores: EMU MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_fm.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2608/test_ym2608_fm.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 09.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/test_ym2608_ssg.vgm",
+      "wav": "tests/golden_master/references/ym2608/test_ym2608_ssg.wav",
+      "ok": true,
+      "size_bytes": 1234868,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 308700, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x06 #0, Core MAME, Clock 7987200, Rate 110933, Volume 0x80\n    Cores: MAME\n  Dev 4: Type 0x12 #0, Core EMU, Clock 3993600, Rate 499200, Volume 0x40\n    Cores: EMU MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_ssg.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ym2608/test_ym2608_ssg.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 07.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_ay8910_envelope.vgm",
+      "wav": "tests/golden_master/references/tier2/ay8910/test_ay8910_envelope.wav",
+      "ok": true,
+      "size_bytes": 1411268,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 352800, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_envelope.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/ay8910/test_ay8910_envelope.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_ay8910_wavetable.vgm",
+      "wav": "tests/golden_master/references/tier2/ay8910/test_ay8910_wavetable.wav",
+      "ok": true,
+      "size_bytes": 1764068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 441000, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_wavetable.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/ay8910/test_ay8910_wavetable.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_c140_basic.vgm",
+      "wav": "tests/golden_master/references/tier2/c140/test_c140_basic.wav",
+      "ok": true,
+      "size_bytes": 2249168,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 562275, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x27 #0, Core CTR, Clock 0, Rate 0, Volume 0x20\n    Cores: CTR\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/c140/test_c140_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_c140_loop.vgm",
+      "wav": "tests/golden_master/references/tier2/c140/test_c140_loop.wav",
+      "ok": true,
+      "size_bytes": 926168,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 231525, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x27 #0, Core CTR, Clock 0, Rate 0, Volume 0x20\n    Cores: CTR\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_loop.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/c140/test_c140_loop.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_c352_basic.vgm",
+      "wav": "tests/golden_master/references/tier2/c352/test_c352_basic.wav",
+      "ok": true,
+      "size_bytes": 2205068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 551250, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x2B #0, Core MAME, Clock 24192000, Rate 24192000, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/c352/test_c352_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_c352_filter.vgm",
+      "wav": "tests/golden_master/references/tier2/c352/test_c352_filter.wav",
+      "ok": true,
+      "size_bytes": 2469668,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 617400, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x2B #0, Core MAME, Clock 24192000, Rate 24192000, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_filter.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/c352/test_c352_filter.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 14.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_huc6280_wavetable.vgm",
+      "wav": "tests/golden_master/references/tier2/huc6280/test_huc6280_wavetable.wav",
+      "ok": true,
+      "size_bytes": 2028668,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 507150, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x26 #0, Core MAME, Clock 3579545, Rate 6991, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_huc6280_wavetable.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/huc6280/test_huc6280_wavetable.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_k053260_basic.vgm",
+      "wav": "tests/golden_master/references/tier2/k053260/test_k053260_basic.wav",
+      "ok": true,
+      "size_bytes": 1808168,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 452025, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x28 #0, Core MAME, Clock 3579545, Rate 894886, Volume 0x140\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k053260_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/k053260/test_k053260_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_k054539_basic.vgm",
+      "wav": "tests/golden_master/references/tier2/k054539/test_k054539_basic.wav",
+      "ok": true,
+      "size_bytes": 2160968,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 540225, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x29 #0, Core LAOO, Clock 18432000, Rate 1152000, Volume 0x80\n    Cores: LAOO\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k054539_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/k054539/test_k054539_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_konami_pcm_pitch.vgm",
+      "wav": "tests/golden_master/references/tier2/k053260/test_konami_pcm_pitch.wav",
+      "ok": true,
+      "size_bytes": 2425568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 606375, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x29 #0, Core LAOO, Clock 18432000, Rate 1152000, Volume 0x80\n    Cores: LAOO\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_konami_pcm_pitch.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/k053260/test_konami_pcm_pitch.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 13.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_rf5c164_basic.vgm",
+      "wav": "tests/golden_master/references/tier2/rf5c164/test_rf5c164_basic.wav",
+      "ok": true,
+      "size_bytes": 2160968,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 540225, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x1E #0, Core MAME, Clock 12500000, Rate 12500000, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/rf5c164/test_rf5c164_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_rf5c164_pitch.vgm",
+      "wav": "tests/golden_master/references/tier2/rf5c164/test_rf5c164_pitch.wav",
+      "ok": true,
+      "size_bytes": 2425568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 606375, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x1E #0, Core MAME, Clock 12500000, Rate 12500000, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_pitch.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/rf5c164/test_rf5c164_pitch.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 13.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_y8950_adpcm.vgm",
+      "wav": "tests/golden_master/references/tier2/y8950/test_y8950_adpcm.wav",
+      "ok": true,
+      "size_bytes": 1455368,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 363825, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0A #0, Core MAME, Clock 3579545, Rate 49715, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_adpcm.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/y8950/test_y8950_adpcm.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.250\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_y8950_opl.vgm",
+      "wav": "tests/golden_master/references/tier2/y8950/test_y8950_opl.wav",
+      "ok": true,
+      "size_bytes": 2205068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 551250, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0A #0, Core MAME, Clock 3579545, Rate 49715, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_opl.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/y8950/test_y8950_opl.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 12.500\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_ym2413_custom.vgm",
+      "wav": "tests/golden_master/references/tier2/ym2413/test_ym2413_custom.wav",
+      "ok": true,
+      "size_bytes": 1543568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 385875, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_custom.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/ym2413/test_ym2413_custom.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_ym2413_patches.vgm",
+      "wav": "tests/golden_master/references/tier2/ym2413/test_ym2413_patches.wav",
+      "ok": true,
+      "size_bytes": 1940468,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 485100, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_patches.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/ym2413/test_ym2413_patches.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/phase2/test_ym2413_rhythm.vgm",
+      "wav": "tests/golden_master/references/tier2/ym2413/test_ym2413_rhythm.wav",
+      "ok": true,
+      "size_bytes": 2072768,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 518175, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_rhythm.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier2/ym2413/test_ym2413_rhythm.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 11.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/tier3/test_dmg_noise.vgm",
+      "wav": "tests/golden_master/references/tier3/dmg/test_dmg_noise.wav",
+      "ok": true,
+      "size_bytes": 882068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 220500, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x20\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x80\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x40\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x40\n    Cores: MAME NUKE\n  Dev 4: Type 0x13 #0, Core MAME, Clock 4194304, Rate 65536, Volume 0x30\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_dmg_noise.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/dmg/test_dmg_noise.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/tier3/test_dmg_pulse.vgm",
+      "wav": "tests/golden_master/references/tier3/dmg/test_dmg_pulse.wav",
+      "ok": true,
+      "size_bytes": 1411268,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 352800, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_dmg_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/dmg/test_dmg_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 08.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/tier3/test_dmg_wave.vgm",
+      "wav": "tests/golden_master/references/tier3/dmg/test_dmg_wave.wav",
+      "ok": true,
+      "size_bytes": 882068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 220500, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x20\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x80\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x40\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x40\n    Cores: MAME NUKE\n  Dev 4: Type 0x13 #0, Core MAME, Clock 4194304, Rate 65536, Volume 0x30\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_dmg_wave.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/dmg/test_dmg_wave.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/tier3/test_k051649_wavetable.vgm",
+      "wav": "tests/golden_master/references/tier3/k051649/test_k051649_wavetable.wav",
+      "ok": true,
+      "size_bytes": 2425568,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 606375, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x19 #0, Core MAME, Clock 1789772, Rate 111860, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_k051649_wavetable.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/k051649/test_k051649_wavetable.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 13.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/tier3/test_vrc6_pulse.vgm",
+      "wav": "tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav",
+      "ok": true,
+      "size_bytes": 1896368,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 474075, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670454, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_vrc6_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.750\n[----------]"
+    }
+  ]
+}

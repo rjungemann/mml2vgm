@@ -1,0 +1,31 @@
+#CHIP DMG
+#CLOCK 4194304
+
+; DMG (Game Boy) APU - Wave Channel (CH3) Test
+;
+; CH3 is a programmable wave channel using a 32-nibble wavetable.
+; Tracks 0 and 1 are silent (consume pulse channels 0 and 1),
+; so track 2 lands on the wave channel (ch index 2).
+
+#TRACK 0
+
+TEMPO 120
+
+; Pulse 1 silent (channel allocation placeholder)
+r1
+
+#TRACK 1
+
+; Pulse 2 silent (channel allocation placeholder)
+r1
+
+#TRACK 2
+
+; Wave channel melody
+c4 d4 e4 f4
+
+g4 a4 b4 c5
+
+r2
+
+#END

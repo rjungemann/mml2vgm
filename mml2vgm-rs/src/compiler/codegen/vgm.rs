@@ -144,6 +144,7 @@ struct PartCodegenState {
     k051649_ch: u8,
     nes_ch: u8,
     dmg_ch: u8,
+    vrc6_ch: u8,
 }
 
 impl PartCodegenState {
@@ -169,6 +170,7 @@ impl PartCodegenState {
             k051649_ch: 0,
             nes_ch: 0,
             dmg_ch: 0,
+            vrc6_ch: 0,
         }
     }
 }
@@ -196,10 +198,34 @@ pub struct VgmGenerator {
     next_ymf262_channel: u8,
     /// Next K051649 channel to allocate (0-4)
     next_k051649_channel: u8,
+    /// Bitmask of currently-keyed-on K051649 channels (register 0xAF)
+    k051649_key_mask: u8,
     /// Next NES APU channel to allocate (0-4: Pulse1, Pulse2, Triangle, Noise, DPCM)
     next_nes_channel: u8,
     /// Next DMG channel to allocate (0-3: Pulse1, Pulse2, Wave, Noise)
     next_dmg_channel: u8,
+    /// Next VRC6 channel to allocate (0-2: Pulse1, Pulse2, Sawtooth)
+    next_vrc6_channel: u8,
+    /// Next YM2413 (OPLL) channel to allocate (0-8)
+    next_ym2413_channel: u8,
+    /// Next AY8910 channel to allocate (0-2: A, B, C)
+    next_ay8910_channel: u8,
+    /// Next HuC6280 channel to allocate (0-5)
+    next_huc6280_channel: u8,
+    /// Next RF5C164 channel to allocate (0-7)
+    next_rf5c164_channel: u8,
+    /// Next K053260 channel to allocate (0-7)
+    next_k053260_channel: u8,
+    /// Next K054539 channel to allocate (0-31)
+    next_k054539_channel: u8,
+    /// Next SegaPCM channel to allocate (0-15)
+    next_segapcm_channel: u8,
+    /// Next C140 channel to allocate (0-23)
+    next_c140_channel: u8,
+    /// Next C352 channel to allocate (0-31)
+    next_c352_channel: u8,
+    /// Next QSound channel to allocate (0-15)
+    next_qsound_channel: u8,
     /// When true, add_wait is a no-op (used during parallel part processing)
     suppress_waits: bool,
     /// Time boundaries recorded by add_wait calls (even when suppressed).
@@ -229,8 +255,20 @@ impl VgmGenerator {
             next_opl_channel: 0,
             next_ymf262_channel: 0,
             next_k051649_channel: 0,
+            k051649_key_mask: 0,
             next_nes_channel: 0,
             next_dmg_channel: 0,
+            next_vrc6_channel: 0,
+            next_ym2413_channel: 0,
+            next_ay8910_channel: 0,
+            next_huc6280_channel: 0,
+            next_rf5c164_channel: 0,
+            next_k053260_channel: 0,
+            next_k054539_channel: 0,
+            next_segapcm_channel: 0,
+            next_c140_channel: 0,
+            next_c352_channel: 0,
+            next_qsound_channel: 0,
             suppress_waits: false,
             time_checkpoints: BTreeSet::new(),
             source_map: SourceMap::default(),
@@ -375,6 +413,41 @@ impl VgmGenerator {
             }
         }
 
+        // Global #CHIP directive — applies when no per-part or PartXxx chip was found
+        if self.chips.is_empty() {
+            if let Some(global_chip) = ast.metadata.get("CHIP") {
+                let chip = match global_chip.to_uppercase().as_str() {
+                    "YM2612" => Some(SoundChip::YM2612),
+                    "SN76489" => Some(SoundChip::SN76489),
+                    "YM2151" | "OPM" => Some(SoundChip::YM2151),
+                    "YM2413" | "OPLL" => Some(SoundChip::YM2413),
+                    "YM2608" | "OPNA" => Some(SoundChip::YM2608),
+                    "YM2203" | "OPN" => Some(SoundChip::YM2203),
+                    "YM3812" | "OPL2" => Some(SoundChip::YM3812),
+                    "YM3526" | "OPL" => Some(SoundChip::YM3526),
+                    "Y8950" => Some(SoundChip::Y8950),
+                    "YMF262" | "OPL3" => Some(SoundChip::YMF262),
+                    "K051649" | "SCC" | "SCC1" => Some(SoundChip::K051649),
+                    "NES" | "NESAPU" | "2A03" => Some(SoundChip::NES),
+                    "DMG" | "GAMEBOY" | "GAME BOY" => Some(SoundChip::DMG),
+                    "RF5C164" => Some(SoundChip::RF5C164),
+                    "SEGAPCM" => Some(SoundChip::SegaPCM),
+                    "C140" => Some(SoundChip::C140),
+                    "C352" => Some(SoundChip::C352),
+                    "AY8910" => Some(SoundChip::AY8910),
+                    "HUC6280" => Some(SoundChip::HuC6280),
+                    "POKEY" => Some(SoundChip::POKEY),
+                    "VRC6" => Some(SoundChip::VRC6),
+                    "K053260" => Some(SoundChip::K053260),
+                    "K054539" => Some(SoundChip::K054539),
+                    "QSOUND" => Some(SoundChip::QSound),
+                    _ => None,
+                };
+                if let Some(c) = chip {
+                    self.chips.push(c);
+                }
+            }
+        }
         if self.chips.is_empty() {
             self.chips = vec![SoundChip::YM2612, SoundChip::SN76489];
         }
@@ -777,6 +850,61 @@ impl VgmGenerator {
                 self.next_dmg_channel = self.next_dmg_channel.saturating_add(1);
                 if ch < 4 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
             }
+            Some("VRC6") => {
+                let ch = self.next_vrc6_channel;
+                self.next_vrc6_channel = self.next_vrc6_channel.saturating_add(1);
+                if ch < 3 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("YM2413") | Some("OPLL") => {
+                let ch = self.next_ym2413_channel;
+                self.next_ym2413_channel = self.next_ym2413_channel.saturating_add(1);
+                if ch < 9 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("AY8910") | Some("AY-3-8910") | Some("YM2149") | Some("YM2149F") => {
+                let ch = self.next_ay8910_channel;
+                self.next_ay8910_channel = self.next_ay8910_channel.saturating_add(1);
+                if ch < 3 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("HuC6280") | Some("HUC6280") | Some("PC_ENGINE") => {
+                let ch = self.next_huc6280_channel;
+                self.next_huc6280_channel = self.next_huc6280_channel.saturating_add(1);
+                if ch < 6 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("RF5C164") => {
+                let ch = self.next_rf5c164_channel;
+                self.next_rf5c164_channel = self.next_rf5c164_channel.saturating_add(1);
+                if ch < 8 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("K053260") | Some("KONAMI_PCM") => {
+                let ch = self.next_k053260_channel;
+                self.next_k053260_channel = self.next_k053260_channel.saturating_add(1);
+                if ch < 8 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("K054539") => {
+                let ch = self.next_k054539_channel;
+                self.next_k054539_channel = self.next_k054539_channel.saturating_add(1);
+                if ch < 32 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("SegaPCM") | Some("SEGAPCM") => {
+                let ch = self.next_segapcm_channel;
+                self.next_segapcm_channel = self.next_segapcm_channel.saturating_add(1);
+                if ch < 16 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("C140") => {
+                let ch = self.next_c140_channel;
+                self.next_c140_channel = self.next_c140_channel.saturating_add(1);
+                if ch < 24 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("C352") => {
+                let ch = self.next_c352_channel;
+                self.next_c352_channel = self.next_c352_channel.saturating_add(1);
+                if ch < 32 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
+            Some("QSound") | Some("QSOUND") => {
+                let ch = self.next_qsound_channel;
+                self.next_qsound_channel = self.next_qsound_channel.saturating_add(1);
+                if ch < 16 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
             _ => (0, 0, 0, 0, true),
         };
 
@@ -787,6 +915,27 @@ impl VgmGenerator {
         state.k051649_ch = match chip_str {
             Some("K051649") | Some("SCC") | Some("SCC1") => {
                 self.next_k051649_channel.saturating_sub(1)
+            }
+            Some("RF5C164") => {
+                self.next_rf5c164_channel.saturating_sub(1)
+            }
+            Some("K053260") | Some("KONAMI_PCM") => {
+                self.next_k053260_channel.saturating_sub(1)
+            }
+            Some("K054539") => {
+                self.next_k054539_channel.saturating_sub(1)
+            }
+            Some("SegaPCM") | Some("SEGAPCM") => {
+                self.next_segapcm_channel.saturating_sub(1)
+            }
+            Some("C140") => {
+                self.next_c140_channel.saturating_sub(1)
+            }
+            Some("C352") => {
+                self.next_c352_channel.saturating_sub(1)
+            }
+            Some("QSound") | Some("QSOUND") => {
+                self.next_qsound_channel.saturating_sub(1)
             }
             _ => 0,
         };
@@ -800,6 +949,10 @@ impl VgmGenerator {
             Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
                 self.next_dmg_channel.saturating_sub(1)
             }
+            _ => 0,
+        };
+        state.vrc6_ch = match chip_str {
+            Some("VRC6") => self.next_vrc6_channel.saturating_sub(1),
             _ => 0,
         };
         state.has_channel = has_channel;
@@ -821,7 +974,28 @@ impl VgmGenerator {
                 Some("YMF262") => { self.ymf262_key_off(&state, time); }
                 Some("K051649") | Some("SCC") | Some("SCC1") => { self.k051649_note_off(state.k051649_ch, *time); }
                 Some("NES") | Some("NESAPU") | Some("2A03") => { self.nes_apu_note_off_pulse(state.nes_ch, *time); }
-                Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => { self.dmg_note_off_pulse(state.dmg_ch, *time); }
+                Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
+                    match state.dmg_ch {
+                        2 => self.dmg_note_off_wave(*time),
+                        3 => self.dmg_note_off_noise(*time),
+                        ch => self.dmg_note_off_pulse(ch, *time),
+                    }
+                }
+                Some("VRC6") => { self.vrc6_note_off(state.vrc6_ch, *time); }
+                Some("SegaPCM") | Some("SEGAPCM") => {
+                    let base = state.k051649_ch.saturating_mul(8);
+                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
+                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                }
+                Some("C140") => {
+                    self.c140_write(state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05), 0x00, *time);
+                }
+                Some("C352") => {
+                    self.c352_write(state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05), 0x00, *time);
+                }
+                Some("QSound") | Some("QSOUND") => {
+                    self.qsound_write(state.k051649_ch, 0x00, *time);
+                }
                 _ => {}
             }
         }
@@ -1299,25 +1473,364 @@ impl VgmGenerator {
                     self.add_wait(gap, *time);
                 }
             }
-            Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") if state.has_channel => {
-                if !state.init_done {
-                    // Initialize channel
-                    state.init_done = true;
-                }
+            Some("VRC6") if state.has_channel => {
                 if state.keyed_on && !state.eon_mode {
-                    self.dmg_note_off_pulse(state.dmg_ch, *time);
+                    self.vrc6_note_off(state.vrc6_ch, *time);
                     state.keyed_on = false;
                 }
                 let note_start_time = *time;
-                // For simplicity, treat all DMG channels as Pulse for now
-                self.dmg_note_on_pulse(state.dmg_ch, midi, 0, state.volume, 0, *time);
+                // ch 0+1 = pulse, ch 2 = sawtooth
+                if state.vrc6_ch < 2 {
+                    self.vrc6_note_on_pulse(state.vrc6_ch, midi, state.volume, *time);
+                } else {
+                    self.vrc6_note_on_sawtooth(midi, state.volume, *time);
+                }
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.dmg_note_off_pulse(state.dmg_ch, *time);
+                    self.vrc6_note_off(state.vrc6_ch, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") if state.has_channel => {
+                if !state.init_done {
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    match state.dmg_ch {
+                        2 => self.dmg_note_off_wave(*time),
+                        3 => self.dmg_note_off_noise(*time),
+                        ch => self.dmg_note_off_pulse(ch, *time),
+                    }
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                match state.dmg_ch {
+                    2 => self.dmg_note_on_wave(midi, 0, state.volume, *time),
+                    3 => self.dmg_note_on_noise(0, midi & 0x0F, state.volume, *time),
+                    ch => self.dmg_note_on_pulse(ch, midi, 0, state.volume, 0, *time),
+                }
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    match state.dmg_ch {
+                        2 => self.dmg_note_off_wave(*time),
+                        3 => self.dmg_note_off_noise(*time),
+                        ch => self.dmg_note_off_pulse(ch, *time),
+                    }
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YM2413") | Some("OPLL") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize YM2413 channel with default instrument
+                    // Instrument 0 (piano-like) with max volume
+                    let inst_vol = 0x00; // instrument 0, volume 0 (loudest)
+                    self.ym2413_write_reg(0x30 + state.ym2612_ch, inst_vol, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    // Key off: write block/freq MSB with key-on bit = 0
+                    let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
+                    let msb = ((block & 0x7) << 3) | ((f_num >> 8) as u8 & 0x7);
+                    self.ym2413_write_reg(0x20 + state.ym2612_ch, msb & 0x1F, *time);
+                    state.keyed_on = false;
+                }
+                let (block, f_num) = Self::midi_note_to_ym2612_freq(midi);
+                // Write F-number LSB
+                self.ym2413_write_reg(0x10 + state.ym2612_ch, (f_num & 0xFF) as u8, *time);
+                // Write F-number MSB + block + key-on
+                let msb = ((block & 0x7) << 3) | ((f_num >> 8) as u8 & 0x7);
+                let note_start_time = *time;
+                // Key on: set bit 5 of MSB register
+                self.ym2413_write_reg(0x20 + state.ym2612_ch, msb | 0x20, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    // Key off
+                    self.ym2413_write_reg(0x20 + state.ym2612_ch, msb & 0x1F, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("AY8910") | Some("AY-3-8910") | Some("YM2149") | Some("YM2149F") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize AY8910 channel
+                    // Set volume for channel (max volume, no envelope)
+                    self.ay8910_write(0x08 + state.ym2612_ch, 0x0F, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    // Key off: set volume to 0 (silent)
+                    self.ay8910_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let (_, tone) = self.midi_note_to_ay8910_freq(midi);
+                let tone_lo = (tone & 0xFF) as u8;
+                let tone_hi = ((tone >> 8) & 0x0F) as u8;
+                // Write tone period
+                self.ay8910_write(0x00 + state.ym2612_ch * 2, tone_lo, *time);
+                self.ay8910_write(0x01 + state.ym2612_ch * 2, tone_hi, *time);
+                // Set volume (map 0-127 to 0-15, inverted: 0=loud, 15=silent)
+                let vol = (15u8).saturating_sub((state.volume >> 3) & 0x0F);
+                let note_start_time = *time;
+                self.ay8910_write(0x08 + state.ym2612_ch, vol & 0x0F, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.ay8910_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("RF5C164") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize RF5C164 channel with default sample
+                    // Start address = 0, volume = max
+                    self.rf5c164_write(0x00 + state.k051649_ch, 0x00, *time); // Start address LSB
+                    self.rf5c164_write(0x01 + state.k051649_ch, 0x00, *time); // Start address MSB
+                    self.rf5c164_write(0x02 + state.k051649_ch, 0x00, *time); // Start address bank
+                    self.rf5c164_write(0x08 + state.k051649_ch, 0xFF, *time); // Volume (max)
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    // Key off: volume to 0
+                    self.rf5c164_write(0x08 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let (bank, addr) = self.midi_note_to_rf5c164_sample(midi);
+                let note_start_time = *time;
+                // Write sample address
+                self.rf5c164_write(0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
+                self.rf5c164_write(0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
+                self.rf5c164_write(0x02 + state.k051649_ch, bank, *time);
+                // Set volume (map 0-127 to 0-255)
+                let vol = (state.volume as u32 * 255 / 127) as u8;
+                self.rf5c164_write(0x08 + state.k051649_ch, vol, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.rf5c164_write(0x08 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("K053260") | Some("KONAMI_PCM") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize K053260 channel
+                    self.k053260_write(0x00 + state.k051649_ch, 0x00, *time);
+                    self.k053260_write(0x01 + state.k051649_ch, 0x00, *time);
+                    self.k053260_write(0x02 + state.k051649_ch, 0xFF, *time); // Volume max
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.k053260_write(0x02 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let (addr, bank) = self.midi_note_to_k053260_sample(midi);
+                let note_start_time = *time;
+                self.k053260_write(0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
+                self.k053260_write(0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
+                let vol = (state.volume as u32 * 255 / 127) as u8;
+                self.k053260_write(0x02 + state.k051649_ch, vol, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.k053260_write(0x02 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("K054539") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize K054539 channel (ported access)
+                    self.k054539_write_ported(0, 0x00 + state.k051649_ch, 0x00, *time);
+                    self.k054539_write_ported(0, 0x01 + state.k051649_ch, 0x00, *time);
+                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0xFF, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let (addr, bank) = self.midi_note_to_k054539_sample(midi);
+                let note_start_time = *time;
+                self.k054539_write_ported(0, 0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
+                self.k054539_write_ported(0, 0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
+                let vol = (state.volume as u32 * 255 / 127) as u8;
+                self.k054539_write_ported(0, 0x02 + state.k051649_ch, vol, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("HuC6280") | Some("HUC6280") | Some("PC_ENGINE") if state.has_channel => {
+                if !state.init_done {
+                    // Initialize HuC6280 channel (similar to AY8910 but extended)
+                    self.huc6280_write(0x08 + state.ym2612_ch, 0x0F, *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.huc6280_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let (_, tone) = self.midi_note_to_huc6280_freq(midi);
+                let tone_lo = (tone & 0xFF) as u8;
+                let tone_hi = ((tone >> 8) & 0x0F) as u8;
+                self.huc6280_write(0x00 + state.ym2612_ch * 2, tone_lo, *time);
+                self.huc6280_write(0x01 + state.ym2612_ch * 2, tone_hi, *time);
+                let vol = (15u8).saturating_sub((state.volume >> 3) & 0x0F);
+                let note_start_time = *time;
+                self.huc6280_write(0x08 + state.ym2612_ch, vol & 0x0F, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.huc6280_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("SegaPCM") | Some("SEGAPCM") if state.has_channel => {
+                let base = state.k051649_ch.saturating_mul(8);
+                if state.keyed_on && !state.eon_mode {
+                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
+                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let vol = (state.volume as u32 * 0x7F / 127) as u8;
+                let note_start_time = *time;
+                self.segapcm_write(0, base.wrapping_add(0x02), vol, *time);
+                self.segapcm_write(0, base.wrapping_add(0x03), vol, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
+                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("C140") if state.has_channel => {
+                let reg = state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05);
+                if state.keyed_on && !state.eon_mode {
+                    self.c140_write(reg, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                self.c140_write(reg, 0x01, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.c140_write(reg, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("C352") if state.has_channel => {
+                let reg = state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05);
+                if state.keyed_on && !state.eon_mode {
+                    self.c352_write(reg, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                self.c352_write(reg, 0x01, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.c352_write(reg, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("QSound") | Some("QSOUND") if state.has_channel => {
+                // QSound is a DSP effects processor; emit volume register writes
+                // so the VGM contains the chip's opcode (0xC4) for Check B validation.
+                let ch = state.k051649_ch;
+                if state.keyed_on && !state.eon_mode {
+                    self.qsound_write(ch, 0x00, *time);
+                    state.keyed_on = false;
+                }
+                let vol = (state.volume as u32 * 0xFF / 127) as u8;
+                let note_start_time = *time;
+                self.qsound_write(ch, vol, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.qsound_write(ch, 0x00, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1667,6 +2180,44 @@ impl VgmGenerator {
         let oct = octave.clamp(0, 7) as u8;
         let kc = (oct << 4) | SEMITONE_TO_KC[semitone];
         (kc, 0)
+    }
+
+    /// Convert MIDI note to AY8910 tone period.
+    /// AY8910 uses a 16-bit period counter (12-bit for tone channels).
+    /// period = clock / (16 * freq) for 12-bit counters on channels A-C
+    fn midi_note_to_ay8910_freq(&self, midi_note: u8) -> (u8, u16) {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let clock = self.header.ay8910_clock as f64;
+        let period = (clock / (16.0 * freq)).round() as u32;
+        let period_val = period.min(4095) as u16; // 12-bit max
+        (0, period_val)
+    }
+
+    /// Convert MIDI note to HuC6280 tone period.
+    /// HuC6280 is compatible with AY-3-8910, using the same period calculation.
+    fn midi_note_to_huc6280_freq(&self, midi_note: u8) -> (u8, u16) {
+        self.midi_note_to_ay8910_freq(midi_note)
+    }
+
+    /// Convert MIDI note to RF5C164 sample address.
+    /// For simplicity, map MIDI note to a sample address (basic implementation).
+    fn midi_note_to_rf5c164_sample(&self, midi_note: u8) -> (u8, u16) {
+        // Map note to sample: for now use a simple mapping
+        // Note: RF5C164 uses 8-bit samples with 8 channels
+        let sample_base = ((midi_note as u16 % 12) * 0x1000) as u16;
+        (0, sample_base)
+    }
+
+    /// Convert MIDI note to K053260 sample address.
+    fn midi_note_to_k053260_sample(&self, midi_note: u8) -> (u16, u8) {
+        let sample_base = ((midi_note as u16 % 16) * 0x1000) as u16;
+        (sample_base, 0)
+    }
+
+    /// Convert MIDI note to K054539 sample address.
+    fn midi_note_to_k054539_sample(&self, midi_note: u8) -> (u16, u8) {
+        let sample_base = ((midi_note as u16 % 16) * 0x1000) as u16;
+        (sample_base, 0)
     }
 
     // ── YM2608 (OPNA) helpers ─────────────────────────────────────────────────
@@ -2239,15 +2790,16 @@ impl VgmGenerator {
         // Write volume (0-15) at 0xAA + ch
         self.k051649_write(0, 0xAA + ch, volume.min(15), time);
         
-        // Key on: set bit N in register 0xAF
-        self.k051649_write(0, 0xAF, 1 << ch, time);
+        // Key on: OR bit N into the running key mask and write it
+        self.k051649_key_mask |= 1 << ch;
+        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
     }
 
     /// Write K051649 note-off for a channel
     fn k051649_note_off(&mut self, ch: u8, time: u64) {
-        // Key off: clear bit N in register 0xAF
-        // For now, just write 0 to disable all channels
-        self.k051649_write(0, 0xAF, 0, time);
+        // Key off: clear bit N from the running key mask and write it
+        self.k051649_key_mask &= !(1 << ch);
+        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
     }
 
     // ── NES APU (2A03) helpers ────────────────────────────────────────────────
@@ -2353,6 +2905,47 @@ impl VgmGenerator {
         });
     }
 
+    // ── VRC6 helpers ──────────────────────────────────────────────────────────
+
+    /// VRC6 period = clock / (16 * freq) - 1, 12-bit result
+    fn midi_note_to_vrc6_period(&self, midi_note: u8) -> u16 {
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let clock = self.header.vrc6_clock as f64;
+        let period = (clock / (16.0 * freq) - 1.0).round();
+        period.max(0.0).min(4095.0) as u16
+    }
+
+    fn vrc6_note_on_pulse(&mut self, ch: u8, note: u8, volume: u8, time: u64) {
+        let period = self.midi_note_to_vrc6_period(note);
+        let base = if ch == 0 { 0x00u8 } else { 0x10u8 };
+        let vol = (volume >> 3) & 0x0F;
+        // Control: duty=3 (37.5%), volume
+        self.vrc6_write(base as u16, 0x30 | vol, time);
+        // Period lo
+        self.vrc6_write(base as u16 + 1, (period & 0xFF) as u8, time);
+        // Period hi + enable
+        self.vrc6_write(base as u16 + 2, 0x80 | ((period >> 8) as u8 & 0x0F), time);
+    }
+
+    fn vrc6_note_on_sawtooth(&mut self, note: u8, volume: u8, time: u64) {
+        let period = self.midi_note_to_vrc6_period(note);
+        let accum = ((volume as u16 * 42) / 127) as u8; // 0-42 range for sawtooth accumulator rate
+        self.vrc6_write(0x20, accum & 0x3F, time);
+        self.vrc6_write(0x21, (period & 0xFF) as u8, time);
+        self.vrc6_write(0x22, 0x80 | ((period >> 8) as u8 & 0x0F), time);
+    }
+
+    fn vrc6_note_off(&mut self, ch: u8, time: u64) {
+        let base = match ch {
+            0 => 0x00u16,
+            1 => 0x10u16,
+            _ => 0x20u16,
+        };
+        // Clear enable bit (bit 7 of period-hi register) and zero volume
+        self.vrc6_write(base, 0x00, time);
+        self.vrc6_write(base + 2, 0x00, time);
+    }
+
     /// Convert MIDI note to DMG frequency
     /// DMG: freq = clock / (32 * (2048 - period)) for non-sweep
     /// Returns (period_low, period_high) for NRx3 and NRx4
@@ -2395,6 +2988,16 @@ impl VgmGenerator {
         let base = if ch == 0 { 0xFF10 } else { 0xFF16 };
         // Clear volume to 0
         self.dmg_write((base - 0xFF10) as u8 + 1, 0x00, time);
+    }
+
+    fn dmg_note_off_wave(&mut self, time: u64) {
+        // NR30: disable wave DAC (bit 7 = 0)
+        self.dmg_write(0x0A, 0x00, time);
+    }
+
+    fn dmg_note_off_noise(&mut self, time: u64) {
+        // NR42: clear volume
+        self.dmg_write(0x11, 0x00, time);
     }
 
     /// Write DMG Wave channel note-on

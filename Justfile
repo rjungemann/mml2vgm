@@ -238,6 +238,10 @@ test-parity-compare:
 # Full parity pass (assumes reference already exists)
 test-parity: test-parity-generate-current test-parity-compare
 
+# Run golden master regression tests (compile all GWIs, check register writes + WAV correlation)
+test-golden:
+    python3 tools/validation/run_golden_master_tests.py
+
 # ============ UTILITY COMMANDS ============
 
 # Format all code

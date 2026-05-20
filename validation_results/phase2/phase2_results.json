@@ -1,0 +1,332 @@
+{
+  "timestamp": "2026-05-09T01:00:03.226889",
+  "summary": {
+    "phase": "phase2",
+    "total_tests": 18,
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0,
+    "total_vgm_size_bytes": 8708,
+    "binary_validated": 17,
+    "total_register_writes": 868
+  },
+  "chip_stats": {
+    "YM2413": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "size": 1326
+    },
+    "Y8950": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 967
+    },
+    "RF5C164": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 1171
+    },
+    "C140": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 804
+    },
+    "C352": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 897
+    },
+    "K053260": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 1012
+    },
+    "K054539": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 1139
+    },
+    "AY8910": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "size": 886
+    },
+    "HuC6280": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "size": 506
+    }
+  },
+  "results": [
+    {
+      "test": "test_ym2413_patches.gwi",
+      "chip": "YM2413",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:01.970740",
+      "stats": {
+        "parts": 1,
+        "commands": 37,
+        "duration": "485100"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_patches.vgm",
+      "vgm_size_bytes": 443
+    },
+    {
+      "test": "test_ym2413_custom.gwi",
+      "chip": "YM2413",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:01.978665",
+      "stats": {
+        "parts": 1,
+        "commands": 31,
+        "duration": "385875"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_custom.vgm",
+      "vgm_size_bytes": 416
+    },
+    {
+      "test": "test_ym2413_rhythm.gwi",
+      "chip": "YM2413",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:01.987430",
+      "stats": {
+        "parts": 1,
+        "commands": 43,
+        "duration": "518175"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ym2413_rhythm.vgm",
+      "vgm_size_bytes": 467
+    },
+    {
+      "test": "test_y8950_opl.gwi",
+      "chip": "Y8950",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:01.995862",
+      "stats": {
+        "parts": 1,
+        "commands": 60,
+        "duration": "551250"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_opl.vgm",
+      "vgm_size_bytes": 521
+    },
+    {
+      "test": "test_y8950_adpcm.gwi",
+      "chip": "Y8950",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.005278",
+      "stats": {
+        "parts": 1,
+        "commands": 42,
+        "duration": "363825"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_y8950_adpcm.vgm",
+      "vgm_size_bytes": 446
+    },
+    {
+      "test": "test_rf5c164_basic.gwi",
+      "chip": "RF5C164",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.014770",
+      "stats": {
+        "parts": 1,
+        "commands": 2,
+        "duration": "540225"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_basic.vgm",
+      "vgm_size_bytes": 593
+    },
+    {
+      "test": "test_rf5c164_pitch.gwi",
+      "chip": "RF5C164",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.023694",
+      "stats": {
+        "parts": 1,
+        "commands": 3,
+        "duration": "606375"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_rf5c164_pitch.vgm",
+      "vgm_size_bytes": 578
+    },
+    {
+      "test": "test_c140_basic.gwi",
+      "chip": "C140",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.032407",
+      "stats": {
+        "parts": 1,
+        "commands": 54,
+        "duration": "562275"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_basic.vgm",
+      "vgm_size_bytes": 455
+    },
+    {
+      "test": "test_c140_loop.gwi",
+      "chip": "C140",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.039748",
+      "stats": {
+        "parts": 1,
+        "commands": 19,
+        "duration": "231525"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c140_loop.vgm",
+      "vgm_size_bytes": 349
+    },
+    {
+      "test": "test_c352_basic.gwi",
+      "chip": "C352",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.046656",
+      "stats": {
+        "parts": 1,
+        "commands": 51,
+        "duration": "551250"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_basic.vgm",
+      "vgm_size_bytes": 446
+    },
+    {
+      "test": "test_c352_filter.gwi",
+      "chip": "C352",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.054865",
+      "stats": {
+        "parts": 1,
+        "commands": 52,
+        "duration": "617400"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_c352_filter.vgm",
+      "vgm_size_bytes": 451
+    },
+    {
+      "test": "test_k053260_basic.gwi",
+      "chip": "K053260",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.062665",
+      "stats": {
+        "parts": 1,
+        "commands": 51,
+        "duration": "452025"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k053260_basic.vgm",
+      "vgm_size_bytes": 482
+    },
+    {
+      "test": "test_konami_pcm_pitch.gwi",
+      "chip": "K053260",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.071677",
+      "stats": {
+        "parts": 1,
+        "commands": 63,
+        "duration": "606375"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_konami_pcm_pitch.vgm",
+      "vgm_size_bytes": 530
+    },
+    {
+      "test": "test_k054539_basic.gwi",
+      "chip": "K054539",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.079184",
+      "stats": {
+        "parts": 1,
+        "commands": 67,
+        "duration": "540225"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_k054539_basic.vgm",
+      "vgm_size_bytes": 609
+    },
+    {
+      "test": "test_konami_pcm_pitch.gwi",
+      "chip": "K054539",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.087426",
+      "stats": {
+        "parts": 1,
+        "commands": 63,
+        "duration": "606375"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_konami_pcm_pitch.vgm",
+      "vgm_size_bytes": 530
+    },
+    {
+      "test": "test_ay8910_envelope.gwi",
+      "chip": "AY8910",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.094960",
+      "stats": {
+        "parts": 1,
+        "commands": 33,
+        "duration": "352800"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_envelope.vgm",
+      "vgm_size_bytes": 422
+    },
+    {
+      "test": "test_ay8910_wavetable.gwi",
+      "chip": "AY8910",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.103237",
+      "stats": {
+        "parts": 1,
+        "commands": 45,
+        "duration": "441000"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_ay8910_wavetable.vgm",
+      "vgm_size_bytes": 464
+    },
+    {
+      "test": "test_huc6280_wavetable.gwi",
+      "chip": "HuC6280",
+      "status": "PASS",
+      "reason": "Compilation successful",
+      "timestamp": "2026-05-09T01:00:02.110637",
+      "stats": {
+        "parts": 1,
+        "commands": 57,
+        "duration": "507150"
+      },
+      "output_vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/phase2/test_huc6280_wavetable.vgm",
+      "vgm_size_bytes": 506
+    }
+  ]
+}

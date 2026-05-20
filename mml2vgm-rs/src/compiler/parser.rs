@@ -148,17 +148,20 @@ impl Parser {
                                 while let Some(Token::Whitespace(_)) = self.current_token() {
                                     self.advance();
                                 }
-                                // Get the chip name (can be identifier or multiple tokens for names like C140, C352)
-                                if let Some(Token::Identifier(chip_name)) = self.current_token() {
-                                    let chip_value = chip_name.clone();
-                                    self.advance();
-                                    // Handle multi-token chip names like C140, C352
+                                // Get the chip name. Note: 'C', 'A', 'B' etc. are tokenized as
+                                // Token::Note by the lexer, so C140/C352 arrive as Note('C')+Number(140).
+                                let chip_prefix: Option<String> = match self.current_token() {
+                                    Some(Token::Identifier(id)) => { let v = id.clone(); self.advance(); Some(v) }
+                                    Some(Token::Note(letter)) => { let v = letter.to_string(); self.advance(); Some(v) }
+                                    _ => None,
+                                };
+                                if let Some(prefix) = chip_prefix {
                                     if let Some(Token::Number(num)) = self.current_token() {
-                                        let combined = format!("{}{}", chip_value, num);
+                                        let combined = format!("{}{}", prefix, num);
                                         ast.metadata.insert("CHIP".to_string(), combined);
                                         self.advance();
                                     } else {
-                                        ast.metadata.insert("CHIP".to_string(), chip_value);
+                                        ast.metadata.insert("CHIP".to_string(), prefix);
                                     }
                                 } else if let Some(Token::Number(num)) = self.current_token() {
                                     ast.metadata.insert("CHIP".to_string(), num.to_string());

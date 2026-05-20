@@ -1,0 +1,29 @@
+#CHIP VRC6
+#CLOCK 1789772
+
+; VRC6 (Konami NES expansion) - Pulse and Sawtooth Test
+;
+; VRC6 adds 2 pulse channels and 1 sawtooth channel to the NES APU.
+; This tests all three channels: pulse1, pulse2, and sawtooth.
+
+#TRACK 0
+
+TEMPO 120
+
+; Pulse 1: melody
+c4 d4 e4 f4
+
+g4 a4 b4 c5
+
+; Pulse 2: harmony
+e4 f4 g4 a4
+
+; Sawtooth: bass line
+c3 . g3 . e3 .
+
+; All three together (brief)
+c4 & e4 & c3
+
+r2
+
+#END

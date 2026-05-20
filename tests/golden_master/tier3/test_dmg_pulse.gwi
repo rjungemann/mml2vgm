@@ -1,0 +1,26 @@
+#CHIP DMG
+#CLOCK 4194304
+
+; DMG (Game Boy) APU - Pulse Channels Test
+;
+; Tests CH1 and CH2 (square wave pulse channels).
+; Each channel is independently addressable with note-on/off.
+
+#TRACK 0
+
+TEMPO 120
+
+; CH1 pulse: simple melody
+c4 d4 e4 f4
+
+g4 a4 b4 c5
+
+; CH2 pulse: harmony a third below
+e4 f4 g4 a4
+
+; Both channels together
+c4 & e4
+
+r2
+
+#END
