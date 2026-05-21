@@ -71,9 +71,21 @@ just egui-dev
 
 Requires: Rust 1.70+
 
-### Option 3: Rust CLI (Development)
+### Option 3: Homebrew (macOS / Linux)
 
-For command-line compilation:
+Install the CLI directly from the tap:
+
+```bash
+brew tap rjungemann/maltese https://github.com/rjungemann/maltese
+brew install rjungemann/maltese/mml2vgm-rs --HEAD
+mml2vgm-rs --help
+```
+
+Shell completions and the man page are installed automatically.
+
+### Option 4: Rust CLI (from source)
+
+Build from source for the latest changes:
 
 ```bash
 cd mml2vgm-rs
@@ -205,8 +217,16 @@ Every chip produces audio output; all 43 golden master tests pass.
 | **DMG** | Game Boy APU | 2 pulse + wave + noise | Game Boy |
 | **POKEY** | | 4 tone | Atari 8-bit |
 
+### Codegen Complete — Audio Stub
+| Chip | Common Name | Channels | Systems |
+|------|------------|----------|---------|
+| **YMF271** (OPX) | OPL4-FM | 48 FM (12 groups × 4 slots) + 12 PCM | Taito F3 arcade |
+
+Full MML parser (`Vf`/`Vp`/`Vs` parts, `X4`/`X3`/`X2`/`X1` instruments), VGM
+opcode `0xD1` codegen, and frequency/register helpers are complete. Audio output
+is silent pending the libvgm C FFI wrapper.
+
 ### Declared-Only (no audio output)
-- **YMF271** (OPL4) — register tracking only
 - **MIDI** / **CONDUCTOR** — timing/routing only
 
 See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for chip implementation status and overall project state.
@@ -272,17 +292,22 @@ See [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for chip implementation status a
 
 | Document | Description |
 |----------|-------------|
-| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Project status and component index |
-| [User_Manual.md](docs/User_Manual.md) | End-user guide for the CLI |
-| [MML_Commands.md](docs/MML_Commands.md) | MML command reference |
-| [Browser_IDE_Implementation.md](docs/Browser_IDE_Implementation.md) | Web IDE architecture and feature status |
-| [Browser_IDE_Limitations.md](docs/Browser_IDE_Limitations.md) | Known browser-IDE limitations |
-| [Rust_CLI_Design.md](docs/Rust_CLI_Design.md) | Rust CLI design reference |
-| [Console_Chips_Design.md](docs/Console_Chips_Design.md) | Per-chip register and MML reference |
-| [External_Driver_Support.md](docs/External_Driver_Support.md) | Multi-format MML driver implementation |
-| [Cloudflare_Pages_Deployment.md](docs/Cloudflare_Pages_Deployment.md) | Deploying to Cloudflare Pages |
-| [Development.md](docs/Development.md) | Development setup |
-| [ZGM_Specification.md](docs/ZGM_Specification.md) | ZGM format specification |
+| [PROJECT_STATUS.md](docs/dev/PROJECT_STATUS.md) | Project status and component index |
+| [User_Manual.md](docs/user/User_Manual.md) | End-user guide for the CLI |
+| [MML_Commands.md](docs/user/MML_Commands.md) | MML command reference |
+| [tutorial/](docs/user/tutorial/) | Step-by-step tutorial series (13 pages) |
+| [Browser_IDE_Implementation.md](docs/dev/Browser_IDE_Implementation.md) | Web IDE architecture and feature status |
+| [Browser_IDE_Limitations.md](docs/dev/Browser_IDE_Limitations.md) | Known browser-IDE limitations |
+| [Rust_CLI_Design.md](docs/dev/Rust_CLI_Design.md) | Rust CLI design reference |
+| [Console_Chips_Design.md](docs/design/Console_Chips_Design.md) | Per-chip register and MML reference |
+| [External_Driver_Support.md](docs/design/External_Driver_Support.md) | Multi-format MML driver implementation |
+| [Cloudflare_Pages_Deployment.md](docs/dev/Cloudflare_Pages_Deployment.md) | Deploying to Cloudflare Pages |
+| [Development.md](docs/dev/Development.md) | Development setup |
+| [ZGM_Specification.md](docs/design/ZGM_Specification.md) | ZGM format specification |
+| [mml2vgm-rs/README.md](mml2vgm-rs/README.md) | CLI install, flags, and usage examples |
+| [mml2vgm-rs/INSTALL.md](mml2vgm-rs/INSTALL.md) | Shell completions, man page, Homebrew |
+| [editors/vscode/](editors/vscode/) | VS Code syntax extension for `.gwi` files |
+| [editors/vim/](editors/vim/) | Vim / Neovim syntax and filetype detection |
 
 ---
 

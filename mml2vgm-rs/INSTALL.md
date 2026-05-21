@@ -2,6 +2,17 @@
 
 ## Installation
 
+### Homebrew (macOS / Linux)
+
+Add the tap and install the HEAD formula (builds from the latest `main` branch):
+
+```bash
+brew tap rjungemann/maltese https://github.com/rjungemann/maltese
+brew install rjungemann/maltese/mml2vgm-rs --HEAD
+```
+
+The formula automatically installs shell completions and the man page.
+
 ### From Source
 
 ```bash

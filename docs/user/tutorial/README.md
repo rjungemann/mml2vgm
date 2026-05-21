@@ -24,6 +24,7 @@ or jump to any page if you already know the basics.
 | 10 | [Multi-chip Songs](10_multi_chip_songs.md) | Combining multiple chips in one song |
 | 11 | [Tips and Tricks](11_tips_and_tricks.md) | Practical patterns, aliases, includes, workflow |
 | 12 | [Resources](12_resources.md) | Further reading, VGM players, community links |
+| 13 | [A Full FM Song](13_fm_full_song.md) | Melody, bass, and drums on YM2612 + SN76489 |
 
 ---
 
@@ -40,6 +41,7 @@ Working `.gwi` files for each tutorial page are in
 | [`04_psg_demo.gwi`](../tutorial-examples/04_psg_demo.gwi) | Page 7 — PSG Channels |
 | [`05_multi_chip.gwi`](../tutorial-examples/05_multi_chip.gwi) | Page 10 — Multi-chip Songs |
 | [`06_envelopes.gwi`](../tutorial-examples/06_envelopes.gwi) | Page 9 — Envelopes and Arpeggios |
+| [`07_fm_full_song.gwi`](../tutorial-examples/07_fm_full_song.gwi) | Page 13 — A Full FM Song |
 
 ---
 

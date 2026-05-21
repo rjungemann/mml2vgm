@@ -1,0 +1,33 @@
+{
+  "name": "mml2vgm-syntax",
+  "displayName": "mml2vgm MML",
+  "description": "Syntax highlighting for mml2vgm .gwi and .mml score files",
+  "version": "0.1.0",
+  "publisher": "mml2vgm-team",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjungemann/maltese"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mml2vgm",
+        "aliases": ["mml2vgm MML", "GWI", "MML"],
+        "extensions": [".gwi", ".muc", ".mdl", ".mus"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mml2vgm",
+        "scopeName": "source.mml2vgm",
+        "path": "./syntaxes/mml2vgm.tmLanguage.json"
+      }
+    ]
+  }
+}

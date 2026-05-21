@@ -1,0 +1,148 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "mml2vgm",
+  "scopeName": "source.mml2vgm",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#song-info-block" },
+    { "include": "#instrument-header" },
+    { "include": "#instrument-row" },
+    { "include": "#part-declaration" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.semicolon.mml2vgm",
+      "match": ";.*$"
+    },
+
+    "song-info-block": {
+      "name": "meta.block.song-info.mml2vgm",
+      "begin": "'\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.song-info.begin.mml2vgm" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.song-info.end.mml2vgm" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "name": "keyword.other.song-info-key.mml2vgm",
+          "match": "\\b(TitleName|Composer|NoteAuthor|SystemName|Format|ClockCount|Octave-Rev|Loop[A-Za-z0-9]*|Part[A-Za-z0-9]+)\\b"
+        },
+        {
+          "name": "string.unquoted.song-info-value.mml2vgm",
+          "match": "(?<==)\\s*[^;\\n]+"
+        },
+        {
+          "name": "keyword.operator.assignment.mml2vgm",
+          "match": "="
+        }
+      ]
+    },
+
+    "instrument-header": {
+      "name": "meta.instrument.header.mml2vgm",
+      "match": "('[@]\\s+)(X[1-4]|[MFR])\\s+(\\d+)(?:\\s+(\"[^\"]*\"))?",
+      "captures": {
+        "1": { "name": "punctuation.definition.instrument.mml2vgm" },
+        "2": { "name": "storage.type.instrument-mode.mml2vgm" },
+        "3": { "name": "constant.numeric.instrument-number.mml2vgm" },
+        "4": { "name": "string.quoted.double.instrument-name.mml2vgm" }
+      }
+    },
+
+    "instrument-row": {
+      "name": "meta.instrument.parameters.mml2vgm",
+      "match": "('[@])(\\s+[0-9][0-9,\\s]+)",
+      "captures": {
+        "1": { "name": "punctuation.definition.instrument-row.mml2vgm" },
+        "2": { "name": "constant.numeric.instrument-params.mml2vgm" }
+      }
+    },
+
+    "part-declaration": {
+      "name": "meta.part.mml2vgm",
+      "begin": "'([A-Za-z][A-Za-z0-9]*)",
+      "end": "$",
+      "beginCaptures": {
+        "0": { "name": "entity.name.part.mml2vgm" },
+        "1": { "name": "entity.name.part.identifier.mml2vgm" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#sequencing-commands" },
+        { "include": "#notes" },
+        { "include": "#repeat-block" }
+      ]
+    },
+
+    "sequencing-commands": {
+      "patterns": [
+        {
+          "name": "keyword.control.tempo.mml2vgm",
+          "match": "[Tt]\\d+"
+        },
+        {
+          "name": "keyword.control.instrument-select.mml2vgm",
+          "match": "@\\d+"
+        },
+        {
+          "name": "keyword.control.volume.mml2vgm",
+          "match": "[Vv]\\d+"
+        },
+        {
+          "name": "keyword.control.length.mml2vgm",
+          "match": "[Ll]\\d+"
+        },
+        {
+          "name": "keyword.control.octave-set.mml2vgm",
+          "match": "[Oo]\\d+"
+        },
+        {
+          "name": "keyword.control.octave-shift.mml2vgm",
+          "match": "[<>]"
+        },
+        {
+          "name": "keyword.control.gate.mml2vgm",
+          "match": "[Qq]\\d+"
+        },
+        {
+          "name": "keyword.control.pitch-bend.mml2vgm",
+          "match": "[Pp][+-]?\\d+"
+        },
+        {
+          "name": "keyword.control.detune.mml2vgm",
+          "match": "[Dd][+-]?\\d+"
+        }
+      ]
+    },
+
+    "notes": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.rest.mml2vgm",
+          "match": "[Rr]\\d*\\.?"
+        },
+        {
+          "name": "entity.name.tag.note.mml2vgm",
+          "match": "[a-gA-G][+\\-#]?\\d*\\.?"
+        }
+      ]
+    },
+
+    "repeat-block": {
+      "name": "meta.repeat.mml2vgm",
+      "begin": "\\[",
+      "end": "\\]\\d*",
+      "beginCaptures": { "0": { "name": "punctuation.section.repeat.begin.mml2vgm" } },
+      "endCaptures": { "0": { "name": "punctuation.section.repeat.end.mml2vgm" } },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#sequencing-commands" },
+        { "include": "#notes" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,91 @@
+'{
+
+    TitleName   = FM Groove Demo
+    Composer    = Tutorial
+    SystemName  = Sega Genesis
+    Format      = VGM
+    ClockCount  = 192
+    Octave-Rev  = FALSE
+
+    PartYM2612  = A
+    PartSN76489 = B
+
+}
+
+; ============================================================
+; Instrument definitions
+; ============================================================
+
+; --- Instrument 001: Lead brass ---
+; ALG 4 (two 2-op chains, two carriers), FB 3
+; Bright attack, medium decay — good for single-note leads
+'@ M 001
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,014,002,007,003,024,001,002,003,000,000   ; OP1: modulator
+'@ 031,016,004,007,004,000,001,001,000,000,000   ; OP2: carrier
+'@ 031,010,002,010,002,020,001,004,001,000,000   ; OP3: modulator
+'@ 031,012,002,007,003,000,001,001,000,000,000   ; OP4: carrier
+   AL  FB
+'@ 004,003
+
+; --- Instrument 002: FM bass ---
+; ALG 0 (all-serial, one carrier), FB 4
+; Deep, punchy bass — works well in low octaves
+'@ M 002
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,020,000,015,001,028,001,001,000,000,000   ; OP1
+'@ 031,018,000,015,003,020,001,001,000,000,000   ; OP2
+'@ 031,016,000,015,002,010,001,001,000,000,000   ; OP3
+'@ 031,014,000,012,002,000,001,001,000,000,000   ; OP4 (sole carrier)
+   AL  FB
+'@ 000,004
+
+; --- Instrument 003: FM kick drum ---
+; ALG 7 (all carriers), FB 7, instant decay
+; F-type so v does not rescale TL; play at o1 for thump
+'@ F 003
+   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG
+'@ 031,031,000,015,015,000,003,000,007,000,000
+'@ 031,031,000,015,015,000,003,000,000,000,000
+'@ 031,031,000,015,015,000,003,000,000,000,000
+'@ 031,031,000,015,015,000,003,001,000,000,000
+   AL  FB
+'@ 007,007
+
+; ============================================================
+; Parts
+; ============================================================
+
+; --- Melody: channel A1 ---
+; 2-bar riff in A minor, repeated 4×
+; Q7 = 7/8 gate for slight articulation
+'A1 t120
+'A1 @1 v100 l8 Q7 o4
+'A1 [e d e g a4 r4 a g e d c4 r4]4
+
+; --- Bass: channel A2 ---
+; Root-fifth groove, quarter notes, repeated 8× (8 bars)
+'A2 t120
+'A2 @2 v100 l4 o2
+'A2 [a e a e]8
+
+; --- FM kick: channel A3 ---
+; Beats 1 and 3, fast FM envelope handles the sound shape
+'A3 t120
+'A3 @3 l4 o1
+'A3 [c r c r]8
+
+; --- Hi-hat: SN76489 tone channel B1 ---
+; High-octave square wave for a bright hat feel
+; v8 keeps it from overpowering the FM mix
+'B1 t120
+'B1 v8 l8 o5
+'B1 [c c c c c c c c]8
+
+; --- Snare: SN76489 noise channel B4 ---
+; Beats 2 and 4 of every bar
+'B4 t120
+'B4 v13 l4
+'B4 [r c r c]8
+
+r1
