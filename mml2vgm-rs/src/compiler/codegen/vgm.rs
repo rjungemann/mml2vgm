@@ -29,11 +29,11 @@ pub enum VgmCommandType {
     Ymf262WritePort1 = 0x5F,
     // PCM chips
     Rf5c164RegWrite = 0xB1,
-    C140Write = 0x7F,
-    C352Write = 0x8E,
+    C140RegWrite = 0xD4,
+    C352RegWrite = 0xE1,
     // PSG/Arcade chips
     Ay8910Write = 0xA0,
-    SegaPcmWrite = 0xA4,
+    SegaPcmMemWrite = 0xC0,
     // Console chips
     DmgWrite = 0xB3,
     NesApuWrite = 0xB4,
@@ -216,6 +216,18 @@ pub struct VgmGenerator {
     next_rf5c164_channel: u8,
     /// Whether the RF5C164 sine-wave data block has been emitted
     rf5c164_data_block_written: bool,
+    /// Whether the K053260 ROM data block has been emitted
+    k053260_data_block_written: bool,
+    /// Whether the K054539 ROM data block has been emitted
+    k054539_data_block_written: bool,
+    /// Whether the SegaPCM ROM data block has been emitted
+    segapcm_data_block_written: bool,
+    /// Whether the C140 ROM data block has been emitted
+    c140_data_block_written: bool,
+    /// Whether the C352 ROM data block has been emitted
+    c352_data_block_written: bool,
+    /// Whether the QSound ROM data block has been emitted
+    qsound_data_block_written: bool,
     /// Next K053260 channel to allocate (0-7)
     next_k053260_channel: u8,
     /// Next K054539 channel to allocate (0-31)
@@ -266,6 +278,12 @@ impl VgmGenerator {
             next_huc6280_channel: 0,
             next_rf5c164_channel: 0,
             rf5c164_data_block_written: false,
+            k053260_data_block_written: false,
+            k054539_data_block_written: false,
+            segapcm_data_block_written: false,
+            c140_data_block_written: false,
+            c352_data_block_written: false,
+            qsound_data_block_written: false,
             next_k053260_channel: 0,
             next_k054539_channel: 0,
             next_segapcm_channel: 0,
@@ -1050,18 +1068,29 @@ impl VgmGenerator {
                 }
                 Some("VRC6") => { self.vrc6_note_off(state.vrc6_ch, *time); }
                 Some("SegaPCM") | Some("SEGAPCM") => {
-                    let base = state.k051649_ch.saturating_mul(8);
-                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
-                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                    let base = (state.k051649_ch as u16) * 8;
+                    self.segapcm_mem_write(base + 0x86, 0x01, *time);
                 }
                 Some("C140") => {
-                    self.c140_write(state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05), 0x00, *time);
+                    let base = (state.k051649_ch as u16) * 0x10;
+                    self.c140_reg_write(base + 0x05, 0x00, *time);
                 }
                 Some("C352") => {
-                    self.c352_write(state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05), 0x00, *time);
+                    let ch = state.k051649_ch as u16;
+                    let base = ch * 8;
+                    self.c352_reg_write(base + 3, 0x2000u16, *time);
+                    self.c352_reg_write(0x202, 0, *time);
                 }
                 Some("QSound") | Some("QSOUND") => {
-                    self.qsound_write(state.k051649_ch, 0x00, *time);
+                    let vol_reg = (state.k051649_ch as u16) * 8 + 6;
+                    self.qsound_reg_write(vol_reg as u8, 0, *time);
+                }
+                Some("K053260") | Some("KONAMI_PCM") => {
+                    self.k053260_write(0x28, 0x00, *time);
+                }
+                Some("K054539") => {
+                    let base = (state.k051649_ch as u16) * 0x20;
+                    self.k054539_reg_write(base + 0x03, 0x40, *time);
                 }
                 _ => {}
             }
@@ -1764,30 +1793,55 @@ impl VgmGenerator {
                 }
             }
             Some("K053260") | Some("KONAMI_PCM") if state.has_channel => {
-                if !state.init_done {
-                    // Initialize K053260 channel
-                    self.k053260_write(0x00 + state.k051649_ch, 0x00, *time);
-                    self.k053260_write(0x01 + state.k051649_ch, 0x00, *time);
-                    self.k053260_write(0x02 + state.k051649_ch, 0xFF, *time); // Volume max
-                    state.init_done = true;
+                let ch = state.k051649_ch;
+                // Emit ROM data block (type 0x8E) and global init once
+                if !self.k053260_data_block_written {
+                    // 257 bytes: 1 dummy byte at ROM[0], then 256 unsigned-biased sine
+                    // K053260 treats ROM bytes as unsigned: 0x80=silence, 0xFF=+max, 0x00=-max
+                    let mut rom: Vec<u8> = vec![0x80u8]; // dummy byte = silence
+                    for i in 0..256usize {
+                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                        let s = (angle.sin() * 127.0).round() as i8;
+                        rom.push(s.wrapping_add(-128i8) as u8); // shift: 0→0x80, +127→0xFF, -127→0x01
+                    }
+                    self.emit_rom_data_block(0x8E, &rom, *time);
+                    // Enable sound output (bit 1 = output enable)
+                    self.k053260_write(0x2f, 0x02, *time);
+                    // Set center pan for all 4 voices (pan=4=45deg; 0x2C: voices 0&1, 0x2D: voices 2&3)
+                    self.k053260_write(0x2C, (4 << 3) | 4, *time); // voices 0 and 1: center
+                    self.k053260_write(0x2D, (4 << 3) | 4, *time); // voices 2 and 3: center
+                    self.k053260_data_block_written = true;
                 }
                 if state.keyed_on && !state.eon_mode {
-                    self.k053260_write(0x02 + state.k051649_ch, 0x00, *time);
+                    self.k053260_write(0x28, 0x00, *time);
                     state.keyed_on = false;
                 }
-                let (addr, bank) = self.midi_note_to_k053260_sample(midi);
+                // output_rate = clock/64; ROM advances at clock/(4096-pitch) bytes/sec
+                // For 256-byte loop at freq: 4096-pitch = clock/(256*freq)
+                let clock = if self.header.k053260_clock > 0 { self.header.k053260_clock } else { 8_000_000 };
+                let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let pitch_raw = 4096.0 - clock as f64 / (256.0 * freq);
+                let pitch = pitch_raw.round().clamp(0.0, 4095.0) as u16;
+                let base = 0x08u8 + ch * 8;
+                let vol = ((state.volume as u32 * 127 / 127) as u8).max(1);
                 let note_start_time = *time;
-                self.k053260_write(0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
-                self.k053260_write(0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
-                let vol = (state.volume as u32 * 255 / 127) as u8;
-                self.k053260_write(0x02 + state.k051649_ch, vol, *time);
+                self.k053260_write(base + 0, (pitch & 0xFF) as u8, *time);
+                self.k053260_write(base + 1, ((pitch >> 8) & 0x0F) as u8, *time);
+                self.k053260_write(base + 2, 0x00, *time); // length_lo = 256 (0x100) lo byte
+                self.k053260_write(base + 3, 0x01, *time); // length_hi = 256 (0x100) hi byte
+                self.k053260_write(base + 4, 0x00, *time); // start_lo = 0
+                self.k053260_write(base + 5, 0x00, *time); // start_mid = 0
+                self.k053260_write(base + 6, 0x00, *time); // start_hi = 0
+                self.k053260_write(base + 7, vol, *time);  // volume
+                self.k053260_write(0x2a, 1u8 << ch, *time); // enable loop for this channel
+                self.k053260_write(0x28, 1u8 << ch, *time); // key-on (rising edge)
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.k053260_write(0x02 + state.k051649_ch, 0x00, *time);
+                    self.k053260_write(0x28, 0x00, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1796,30 +1850,59 @@ impl VgmGenerator {
                 }
             }
             Some("K054539") if state.has_channel => {
-                if !state.init_done {
-                    // Initialize K054539 channel (ported access)
-                    self.k054539_write_ported(0, 0x00 + state.k051649_ch, 0x00, *time);
-                    self.k054539_write_ported(0, 0x01 + state.k051649_ch, 0x00, *time);
-                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0xFF, *time);
-                    state.init_done = true;
+                let ch = state.k051649_ch as u16;
+                // Emit ROM data block (type 0x8C) once; 256 signed sine samples (avoid 0x80)
+                if !self.k054539_data_block_written {
+                    let mut rom: Vec<u8> = Vec::with_capacity(256);
+                    for i in 0..256usize {
+                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                        let b = (angle.sin() * 126.0).round() as i8 as u8;
+                        // Remap: avoid 0x80 (stop marker) — use 0x81 for min negative
+                        rom.push(if b == 0x80 { 0x81 } else { b });
+                    }
+                    self.emit_rom_data_block(0x8C, &rom, *time);
+                    // Enable PCM output (bit 0 = PCM enable)
+                    self.k054539_reg_write(0x22F, 0x01, *time);
+                    self.k054539_data_block_written = true;
                 }
                 if state.keyed_on && !state.eon_mode {
-                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0x00, *time);
+                    // Key off: max attenuation
+                    self.k054539_reg_write(ch * 0x20 + 0x03, 0x40, *time);
                     state.keyed_on = false;
                 }
-                let (addr, bank) = self.midi_note_to_k054539_sample(midi);
+                // Delta (24-bit frequency): rate = freq * 65536 / output_rate
+                // output_rate = clock / 384
+                let clock = if self.header.k054539_clock > 0 { self.header.k054539_clock } else { 16_000_000 };
+                let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let output_rate = clock as f64 / 384.0;
+                let delta_f = freq * 256.0 * 65536.0 / output_rate;
+                let delta = delta_f.round().clamp(1.0, 0xFF_FFFF as f64) as u32;
+                // K054539: vol=0 is max, vol=0x40 is -36dB (inverted from usual)
+                let vol = ((127 - state.volume as u32) * 0x3F / 127) as u8;
+                let base = ch * 0x20;
                 let note_start_time = *time;
-                self.k054539_write_ported(0, 0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
-                self.k054539_write_ported(0, 0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
-                let vol = (state.volume as u32 * 255 / 127) as u8;
-                self.k054539_write_ported(0, 0x02 + state.k051649_ch, vol, *time);
+                self.k054539_reg_write(base + 0x00, (delta & 0xFF) as u8, *time);
+                self.k054539_reg_write(base + 0x01, ((delta >> 8) & 0xFF) as u8, *time);
+                self.k054539_reg_write(base + 0x02, ((delta >> 16) & 0xFF) as u8, *time);
+                self.k054539_reg_write(base + 0x03, vol, *time); // volume
+                self.k054539_reg_write(base + 0x08, 0x00, *time); // loop_lo
+                self.k054539_reg_write(base + 0x09, 0x00, *time); // loop_mid
+                self.k054539_reg_write(base + 0x0A, 0x00, *time); // loop_hi
+                self.k054539_reg_write(base + 0x0C, 0x00, *time); // start_lo
+                self.k054539_reg_write(base + 0x0D, 0x00, *time); // start_mid
+                self.k054539_reg_write(base + 0x0E, 0x00, *time); // start_hi
+                // Mode: 8-bit PCM, forward; enable loop-via-0x80-marker
+                self.k054539_reg_write(0x200 + ch * 2, 0x00, *time);
+                self.k054539_reg_write(0x200 + ch * 2 + 1, 0x00, *time);
+                // Key on
+                self.k054539_reg_write(0x214, 1u8 << (ch as u8 & 7), *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.k054539_write_ported(0, 0x02 + state.k051649_ch, 0x00, *time);
+                    self.k054539_reg_write(base + 0x03, 0x40, *time); // max attenuation = key off
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1867,24 +1950,48 @@ impl VgmGenerator {
                 }
             }
             Some("SegaPCM") | Some("SEGAPCM") if state.has_channel => {
-                let base = state.k051649_ch.saturating_mul(8);
+                let ch = state.k051649_ch as u16;
+                // Emit ROM data block (type 0x80) once; 256 biased-unsigned sine samples
+                // SegaPCM: sample = rom_byte - 0x80 (signed), so 0x80=silence, 0xFF=+127, 0x01=-127
+                if !self.segapcm_data_block_written {
+                    let rom: Vec<u8> = (0..256usize).map(|i| {
+                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                        let s = (angle.sin() * 127.0).round() as i8 as u8;
+                        s.wrapping_add(0x80)
+                    }).collect();
+                    self.emit_rom_data_block(0x80, &rom, *time);
+                    self.segapcm_data_block_written = true;
+                }
+                let base = ch * 8;
                 if state.keyed_on && !state.eon_mode {
-                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
-                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                    // Disable channel: ctrl bit0 = 1
+                    self.segapcm_mem_write(base + 0x86, 0x01, *time);
                     state.keyed_on = false;
                 }
-                let vol = (state.volume as u32 * 0x7F / 127) as u8;
+                // Frequency delta (8-bit): delta = freq * 65536 / output_rate
+                // output_rate = clock / 128
+                let clock = if self.header.segapcm_clock > 0 { self.header.segapcm_clock } else { 7_670_454 };
+                let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let output_rate = clock as f64 / 128.0;
+                let delta = (freq * 65536.0 / output_rate).round().clamp(1.0, 255.0) as u8;
+                let vol = ((state.volume as u32 * 0x7F / 127) as u8).max(1);
                 let note_start_time = *time;
-                self.segapcm_write(0, base.wrapping_add(0x02), vol, *time);
-                self.segapcm_write(0, base.wrapping_add(0x03), vol, *time);
+                self.segapcm_mem_write(base + 0x02, vol, *time);   // volL
+                self.segapcm_mem_write(base + 0x03, vol, *time);   // volR
+                self.segapcm_mem_write(base + 0x07, delta, *time); // delta (pitch)
+                self.segapcm_mem_write(base + 0x04, 0x00, *time);  // loop_lo
+                self.segapcm_mem_write(base + 0x05, 0x00, *time);  // loop_hi
+                self.segapcm_mem_write(base + 0x06, 0x00, *time);  // end_page (loop at 0x10000)
+                self.segapcm_mem_write(base + 0x84, 0x00, *time);  // start_lo
+                self.segapcm_mem_write(base + 0x85, 0x00, *time);  // start_hi
+                self.segapcm_mem_write(base + 0x86, 0x00, *time);  // ctrl=0 (enable + loop)
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.segapcm_write(0, base.wrapping_add(0x02), 0x00, *time);
-                    self.segapcm_write(0, base.wrapping_add(0x03), 0x00, *time);
+                    self.segapcm_mem_write(base + 0x86, 0x01, *time); // disable
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1893,20 +2000,53 @@ impl VgmGenerator {
                 }
             }
             Some("C140") if state.has_channel => {
-                let reg = state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05);
+                let ch = state.k051649_ch as u16;
+                // Emit ROM data block (type 0x8D) once; 8 signed 8-bit sine samples.
+                // N=8 keeps freq_reg = freq*8*65536/output_rate well within 16-bit range.
+                if !self.c140_data_block_written {
+                    let rom: Vec<u8> = (0..8usize).map(|i| {
+                        let angle = std::f64::consts::TAU * i as f64 / 8.0;
+                        (angle.sin() * 127.0).round() as i8 as u8
+                    }).collect();
+                    self.emit_rom_data_block(0x8D, &rom, *time);
+                    self.c140_data_block_written = true;
+                }
+                let base = ch * 0x10;
                 if state.keyed_on && !state.eon_mode {
-                    self.c140_write(reg, 0x00, *time);
+                    // Key off: write mode = 0 (clear keyon bit)
+                    self.c140_reg_write(base + 0x05, 0x00, *time);
                     state.keyed_on = false;
                 }
+                // Frequency register: delta = freq * N * 65536 / output_rate
+                // N=8 samples, output_rate = clock/288
+                let clock = if self.header.c140_clock > 0 { self.header.c140_clock } else { 6_000_000 };
+                let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let output_rate = clock as f64 / 288.0;
+                let freq_reg = (freq * 8.0 * 65536.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let vol = ((state.volume as u32 * 255 / 127) as u8).max(1);
                 let note_start_time = *time;
-                self.c140_write(reg, 0x01, *time);
+                // Write non-keyon registers first
+                self.c140_reg_write(base + 0x00, vol, *time);             // volume_right
+                self.c140_reg_write(base + 0x01, vol, *time);             // volume_left
+                self.c140_reg_write(base + 0x02, (freq_reg >> 8) as u8, *time); // frequency_msb
+                self.c140_reg_write(base + 0x03, (freq_reg & 0xFF) as u8, *time); // frequency_lsb
+                self.c140_reg_write(base + 0x04, 0x00, *time);            // bank = 0
+                self.c140_reg_write(base + 0x06, 0x00, *time);            // start_msb = 0
+                self.c140_reg_write(base + 0x07, 0x00, *time);            // start_lsb = 0
+                self.c140_reg_write(base + 0x08, 0x00, *time);            // end_msb = 0
+                self.c140_reg_write(base + 0x09, 0x07, *time);            // end_lsb = 7 (8-sample loop: 0..7)
+                self.c140_reg_write(base + 0x0A, 0x00, *time);            // loop_msb = 0
+                self.c140_reg_write(base + 0x0B, 0x00, *time);            // loop_lsb = 0
+                // Key on: mode = 0x80 (keyon) | 0x10 (loop)
+                self.c140_reg_write(base + 0x05, 0x90, *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.c140_write(reg, 0x00, *time);
+                    // Key off: write mode = 0
+                    self.c140_reg_write(base + 0x05, 0x00, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1915,20 +2055,51 @@ impl VgmGenerator {
                 }
             }
             Some("C352") if state.has_channel => {
-                let reg = state.k051649_ch.saturating_mul(0x10).wrapping_add(0x05);
+                let ch = state.k051649_ch as u16;
+                // Emit ROM data block (type 0x92) once; 256 signed 8-bit sine samples
+                if !self.c352_data_block_written {
+                    let rom: Vec<u8> = (0..256usize).map(|i| {
+                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                        (angle.sin() * 127.0).round() as i8 as u8
+                    }).collect();
+                    self.emit_rom_data_block(0x92, &rom, *time);
+                    self.c352_data_block_written = true;
+                }
+                let base = ch * 8;
                 if state.keyed_on && !state.eon_mode {
-                    self.c352_write(reg, 0x00, *time);
+                    // Key off: set KEYOFF flag, then trigger
+                    self.c352_reg_write(base + 3, 0x2000u16, *time); // C352_FLG_KEYOFF
+                    self.c352_reg_write(0x202, 0, *time); // execute
                     state.keyed_on = false;
                 }
+                // Frequency: counter advances by freq per output sample
+                // Fetch fires when counter >= 65536, rate = freq/65536 per sample
+                // N=64 samples at freq f: freq = f * 64 * 65536 / output_rate
+                // output_rate = clock / 288
+                let clock = if self.header.c352_clock > 0 { self.header.c352_clock } else { 16_000_000 };
+                let freq_hz = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let output_rate = clock as f64 / 288.0;
+                let freq_reg = (freq_hz * 64.0 * 65536.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let vol = ((state.volume as u32 * 0xFF00 / 127) as u16).max(0x0100);
                 let note_start_time = *time;
-                self.c352_write(reg, 0x01, *time);
+                self.c352_reg_write(base + 0, vol, *time);     // vol_f
+                self.c352_reg_write(base + 1, vol, *time);     // vol_r
+                self.c352_reg_write(base + 2, freq_reg, *time); // freq
+                self.c352_reg_write(base + 4, 0, *time);       // wave_bank = 0
+                self.c352_reg_write(base + 5, 0, *time);       // wave_start = 0
+                self.c352_reg_write(base + 6, 63, *time);      // wave_end = 63 (for 64 samples)
+                self.c352_reg_write(base + 7, 0, *time);       // wave_loop = 0
+                // Flags: KEYON (0x8000) | LOOP (0x0002)
+                self.c352_reg_write(base + 3, 0x4002u16, *time);
+                self.c352_reg_write(0x202, 0, *time); // execute keyons
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.c352_write(reg, 0x00, *time);
+                    self.c352_reg_write(base + 3, 0x2000u16, *time); // KEYOFF
+                    self.c352_reg_write(0x202, 0, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -1937,23 +2108,46 @@ impl VgmGenerator {
                 }
             }
             Some("QSound") | Some("QSOUND") if state.has_channel => {
-                // QSound is a DSP effects processor; emit volume register writes
-                // so the VGM contains the chip's opcode (0xC4) for Check B validation.
-                let ch = state.k051649_ch;
+                let ch = state.k051649_ch as u8;
+                // Emit ROM data block (type 0x8F) once; 256 signed 8-bit sine samples
+                if !self.qsound_data_block_written {
+                    let rom: Vec<u8> = (0..256usize).map(|i| {
+                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                        (angle.sin() * 127.0).round() as i8 as u8
+                    }).collect();
+                    self.emit_rom_data_block(0x8F, &rom, *time);
+                    self.qsound_data_block_written = true;
+                }
                 if state.keyed_on && !state.eon_mode {
-                    self.qsound_write(ch, 0x00, *time);
+                    // Key off: set volume to 0
+                    self.qsound_reg_write(((ch as u16) * 8 + 6) as u8, 0, *time);
                     state.keyed_on = false;
                 }
-                let vol = (state.volume as u32 * 0xFF / 127) as u8;
+                // Rate (4.12 fixed-point): rate = freq * 256 * 4096 / output_rate
+                // output_rate = clock / 2 / 1248
+                let clock = if self.header.qsound_clock > 0 { self.header.qsound_clock } else { 24_576_000 };
+                let freq_hz = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let output_rate = clock as f64 / 2.0 / 1248.0;
+                let rate = (freq_hz * 256.0 * 4096.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let vol = ((state.volume as u32 * 0x3FFF / 127) as u16).max(0x0100);
                 let note_start_time = *time;
-                self.qsound_write(ch, vol, *time);
+                let addr_reg = (ch as u16) * 8 + 1;
+                let rate_reg = (ch as u16) * 8 + 2;
+                let loop_reg = (ch as u16) * 8 + 4;
+                let end_reg  = (ch as u16) * 8 + 5;
+                let vol_reg  = (ch as u16) * 8 + 6;
+                self.qsound_reg_write(addr_reg as u8, 0, *time);      // start addr = 0
+                self.qsound_reg_write(rate_reg as u8, rate, *time);   // rate
+                self.qsound_reg_write(loop_reg as u8, 256, *time);    // loop_len = 256
+                self.qsound_reg_write(end_reg  as u8, 256, *time);    // end_addr = 256
+                self.qsound_reg_write(vol_reg  as u8, vol, *time);    // volume
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.qsound_write(ch, 0x00, *time);
+                    self.qsound_reg_write(vol_reg as u8, 0, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -2777,6 +2971,8 @@ impl VgmGenerator {
         // 0x34: VGM data offset (relative from 0x34); data at 0x100 → rel = 0xCC
         let data_offset_rel = self.header.data_offset.saturating_sub(0x34);
         hdr[0x34..0x38].copy_from_slice(&data_offset_rel.to_le_bytes());
+        // 0x38: SegaPCM clock (VGM 1.51+)
+        hdr[0x38..0x3C].copy_from_slice(&self.header.segapcm_clock.to_le_bytes());
         // Extended chip clocks (VGM 1.51+) — offsets match VGM spec exactly.
         // 0x40: RF5C68 (unused, left 0)
         // 0x44: YM2203
@@ -2826,8 +3022,12 @@ impl VgmGenerator {
         // 0xB4: QSound clock
         hdr[0xB4..0xB8].copy_from_slice(&self.header.qsound_clock.to_le_bytes());
         // Extended chip clocks (VGM 1.70+)
-        // 0xD8: C352 clock
-        hdr[0xD8..0xDC].copy_from_slice(&self.header.c352_clock.to_le_bytes());
+        // 0xD6: C352 clock divider — real_clock = vgm_clock * 72 / divider; 72 = passthrough
+        if self.header.c352_clock > 0 {
+            hdr[0xD6] = 72;
+        }
+        // 0xDC: C352 clock
+        hdr[0xDC..0xE0].copy_from_slice(&self.header.c352_clock.to_le_bytes());
         output.extend_from_slice(&hdr);
         Ok(())
     }
@@ -3271,19 +3471,47 @@ impl VgmGenerator {
         });
     }
 
-    /// Write SegaPCM bank/address
+    /// Write SegaPCM RAM byte (VGM opcode 0xC0)
+    fn segapcm_mem_write(&mut self, ofs: u16, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::SegaPcmMemWrite,
+            data: vec![(ofs & 0xFF) as u8, (ofs >> 8) as u8, data],
+            time,
+        });
+    }
+
+    /// Write SegaPCM RAM byte (legacy 3-param form: bank*256 + addr = offset)
     fn segapcm_write(&mut self, bank: u8, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write_ported(VgmCommandType::SegaPcmWrite, bank, addr, data, time);
+        let ofs = ((bank as u16) << 8) | (addr as u16);
+        self.segapcm_mem_write(ofs, data, time);
     }
 
-    /// Write C140 (Namco arcade) register
+    /// Write C140 register (VGM opcode 0xD4: 16-bit addr, 8-bit data)
+    fn c140_reg_write(&mut self, addr: u16, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::C140RegWrite,
+            data: vec![(addr >> 8) as u8, (addr & 0xFF) as u8, data],
+            time,
+        });
+    }
+
+    /// Write C140 register (legacy 8-bit addr form)
     fn c140_write(&mut self, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write(VgmCommandType::C140Write, addr, data, time);
+        self.c140_reg_write(addr as u16, data, time);
     }
 
-    /// Write C352 (Namco System 21/22) register
+    /// Write C352 register (VGM opcode 0xE1: 16-bit addr, 16-bit data)
+    fn c352_reg_write(&mut self, addr: u16, data: u16, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::C352RegWrite,
+            data: vec![(addr >> 8) as u8, (addr & 0xFF) as u8, (data >> 8) as u8, (data & 0xFF) as u8],
+            time,
+        });
+    }
+
+    /// Write C352 register (legacy 8-bit addr, 8-bit data form)
     fn c352_write(&mut self, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write(VgmCommandType::C352Write, addr, data, time);
+        self.c352_reg_write(addr as u16, data as u16, time);
     }
 
     /// Write K053260 (Konami arcade PCM) register
@@ -3291,9 +3519,50 @@ impl VgmGenerator {
         self.generic_chip_write(VgmCommandType::K053260Write, addr, data, time);
     }
 
-    /// Write K054539 (Konami arcade PCM) register with port
-    fn k054539_write_ported(&mut self, port: u8, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write_ported(VgmCommandType::K054539Write, port, addr, data, time);
+    /// Write K054539 register (VGM opcode 0xD3: 16-bit addr, 8-bit data)
+    fn k054539_reg_write(&mut self, addr: u16, data: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::K054539Write,
+            data: vec![(addr >> 8) as u8, (addr & 0xFF) as u8, data],
+            time,
+        });
+    }
+
+    /// Write K054539 register (legacy ported form)
+    fn k054539_write_ported(&mut self, _port: u8, addr: u8, data: u8, time: u64) {
+        self.k054539_reg_write(addr as u16, data, time);
+    }
+
+    /// Write QSound register (VGM opcode 0xC4: [data_msb, data_lsb, reg_addr])
+    fn qsound_reg_write(&mut self, reg: u8, data: u16, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::QSoundWrite,
+            data: vec![(data >> 8) as u8, (data & 0xFF) as u8, reg],
+            time,
+        });
+    }
+
+    /// Write QSound register (legacy 8-bit data form)
+    fn qsound_write(&mut self, addr: u8, data: u8, time: u64) {
+        self.qsound_reg_write(addr, data as u16, time);
+    }
+
+    /// Emit a generic ROM data block (0x67 0x66 type body_len total_size rom_offset data)
+    fn emit_rom_data_block(&mut self, block_type: u8, rom_data: &[u8], time: u64) {
+        let data_len = rom_data.len() as u32;
+        let body_len = 8u32 + data_len; // total_size(4) + offset(4) + data
+        let mut data = Vec::with_capacity(2 + 4 + 4 + 4 + rom_data.len());
+        data.push(0x66);
+        data.push(block_type);
+        data.extend_from_slice(&body_len.to_le_bytes());
+        data.extend_from_slice(&data_len.to_le_bytes()); // total ROM size
+        data.extend_from_slice(&0u32.to_le_bytes());     // ROM write offset = 0
+        data.extend_from_slice(rom_data);
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::DataBlock,
+            data,
+            time,
+        });
     }
 
     /// Write POKEY (Atari 8-bit) register
@@ -3305,11 +3574,6 @@ impl VgmGenerator {
     fn vrc6_write(&mut self, addr: u16, data: u8, time: u64) {
         // VRC6 addresses are 16-bit but VGM only uses lower byte typically
         self.generic_chip_write(VgmCommandType::Vrc6Write, (addr & 0xFF) as u8, data, time);
-    }
-
-    /// Write QSound (Capcom CPS) register
-    fn qsound_write(&mut self, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write(VgmCommandType::QSoundWrite, addr, data, time);
     }
 
     // ── Phase 9: Chip-Specific Command Handlers ────────────────────────────

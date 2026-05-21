@@ -204,11 +204,11 @@ pub struct VgmHeader {
     pub pokey_clock: u32,
     /// QSound clock rate (VGM header offset 0xB4)
     pub qsound_clock: u32,
-    /// C352 clock rate (VGM header offset 0xD8)
+    /// C352 clock rate (VGM header offset 0xDC)
     pub c352_clock: u32,
     /// VRC6 clock rate (VGM header extension)
     pub vrc6_clock: u32,
-    /// SegaPCM clock rate (unused in current header layout)
+    /// SegaPCM clock rate (VGM header offset 0x38)
     pub segapcm_clock: u32,
     /// YM2610 clock rate (unused in current header layout)
     pub ym2610_clock: u32,

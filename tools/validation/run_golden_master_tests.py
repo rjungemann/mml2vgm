@@ -83,13 +83,13 @@ STEM_TO_OPCODES: dict[str, list[int]] = {
     "test_opl2_":      [0x5A],        # YM3812
     "test_opl_":       [0x5A],        # YM3812 (test_opl_envelope uses YM3812, not YM3526)
     "test_nes_":       [0xB4],
-    "test_segapcm_":   [0xA4],
+    "test_segapcm_":   [0xC0],        # SegaPCM RAM write (Cmd_SegaPCM_Mem)
     "test_qsound_":    [0xC4],
     "test_ym2413_":    [0x51],
     "test_y8950_":     [0x5C],
     "test_rf5c164_":   [0xB1],        # register write opcode
-    "test_c140_":      [0x7F],        # non-standard opcode (see plan §5)
-    "test_c352_":      [0x8E],        # non-standard opcode (see plan §5)
+    "test_c140_":      [0xD4],        # C140 register write (Cmd_Ofs16_Data8)
+    "test_c352_":      [0xE1],        # C352 register write (Cmd_Ofs16_Data16)
     "test_k053260_":   [0xBA],
     "test_konami_pcm_":[0xBA],
     "test_k054539_":   [0xD3],
@@ -103,16 +103,7 @@ STEM_TO_OPCODES: dict[str, list[int]] = {
 # Stems whose audio output is unreliable with the current toolchain.
 # Either: PCM chip with no sample data, or non-standard VGM opcode that
 # libvgm misinterprets as waits.
-SKIP_AUDIO_PREFIXES = {
-    "test_segapcm_",    # PCM, no sample data
-    "test_qsound_",     # PCM, no sample data
-    "test_c140_",       # non-standard opcode 0x7F
-    "test_c352_",       # non-standard opcode 0x8E
-    "test_k053260_",    # PCM, no sample data
-    "test_konami_pcm_", # PCM, no sample data
-    "test_k054539_",    # PCM, no sample data
-    "test_y8950_adpcm", # ADPCM, no sample data
-}
+SKIP_AUDIO_PREFIXES: set[str] = set()
 
 def is_skip_audio(stem: str) -> bool:
     return any(stem.startswith(p) or stem == p for p in SKIP_AUDIO_PREFIXES)
@@ -132,15 +123,11 @@ _CMD_SIZE: dict[int, int] = {
     **{op: 3 for op in range(0x51, 0x60)},  # FM chips
     0x61: 3,                          # wait n samples
     0x62: 1, 0x63: 1, 0x65: 1, 0x66: 1,
-    **{op: 1 for op in range(0x70, 0x7F)},  # short waits 0x70-0x7E
-    0x7F: 3,                              # C140Write (non-standard; standard: wait 16 samples)
-    **{op: 1 for op in range(0x80, 0x8E)},  # YM2612 PCM+wait 0x80-0x8D
-    0x8E: 3,                              # C352Write (non-standard; standard: PCM+14-sample wait)
-    0x8F: 1,                              # YM2612 PCM + 15-sample wait
+    **{op: 1 for op in range(0x70, 0x80)},  # short waits 0x70-0x7F
+    **{op: 1 for op in range(0x80, 0x90)},  # YM2612 PCM+wait 0x80-0x8F
     **{op: 3 for op in range(0xA0, 0xC0)},  # AY8910 and similar
-    0xA4: 4,                                    # SegaPCM: bank+addr+data (ported write)
-    **{op: 4 for op in range(0xC0, 0xD6)},  # 4-byte chip writes
-    0xC4: 3,                                    # QSound: addr+data (simple write)
+    **{op: 4 for op in range(0xC0, 0xD6)},  # 4-byte chip writes (incl. 0xC0=SegaPCM, 0xD4=C140)
+    0xC4: 4,                                    # QSound: [data_msb, data_lsb, reg_addr]
     **{op: 5 for op in range(0xE0, 0xE4)},  # seek
 }
 
