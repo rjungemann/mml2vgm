@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-21T02:43:27.333910+00:00",
+  "generated_at": "2026-05-21T06:20:01.069907+00:00",
   "vgm2wav": "/Users/rjungemann/Projects/libvgm/build/bin/vgm2wav",
   "sample_rate": 44100,
   "loops": 1,
@@ -307,7 +307,7 @@
       "wav": "tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav",
       "ok": true,
       "size_bytes": 1896368,
-      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 474075, Loop at -1, devices: 4\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_vrc6_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.750\n[----------]"
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 474075, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x16 #0, Core VRC6, Clock 1789772, Rate 111860, Volume 0x8F\n    Cores: VRC6\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_vrc6_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.750\n[----------]"
     }
   ]
 }

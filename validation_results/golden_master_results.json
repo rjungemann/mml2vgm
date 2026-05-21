@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-21T02:44:45.250065+00:00",
+  "generated_at": "2026-05-21T06:49:32.598351+00:00",
   "threshold": 0.95,
   "total": 43,
   "passed": 43,
@@ -913,16 +913,16 @@
       "gwi": "tests/golden_master/tier2/test_rf5c164_basic.gwi",
       "stem": "test_rf5c164_basic",
       "ref_wav": "tests/golden_master/references/tier2/rf5c164/test_rf5c164_basic.wav",
-      "skip_audio": true,
+      "skip_audio": false,
       "compile": {
         "ok": true,
         "error": ""
       },
       "check_b": {
         "ok": true,
-        "write_count": 84,
+        "write_count": 177,
         "opcodes": [
-          "0x68"
+          "0xB1"
         ]
       },
       "render": {
@@ -931,10 +931,10 @@
       },
       "check_a": {
         "ok": true,
-        "correlation": null,
-        "silent": null,
+        "correlation": 1.0,
+        "silent": false,
         "error": null,
-        "skipped": true
+        "skipped": false
       },
       "status": "PASS"
     },
@@ -942,16 +942,16 @@
       "gwi": "tests/golden_master/tier2/test_rf5c164_pitch.gwi",
       "stem": "test_rf5c164_pitch",
       "ref_wav": "tests/golden_master/references/tier2/rf5c164/test_rf5c164_pitch.wav",
-      "skip_audio": true,
+      "skip_audio": false,
       "compile": {
         "ok": true,
         "error": ""
       },
       "check_b": {
         "ok": true,
-        "write_count": 79,
+        "write_count": 166,
         "opcodes": [
-          "0x68"
+          "0xB1"
         ]
       },
       "render": {
@@ -960,10 +960,10 @@
       },
       "check_a": {
         "ok": true,
-        "correlation": null,
-        "silent": null,
+        "correlation": 1.0,
+        "silent": false,
         "error": null,
-        "skipped": true
+        "skipped": false
       },
       "status": "PASS"
     },
@@ -1251,7 +1251,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },

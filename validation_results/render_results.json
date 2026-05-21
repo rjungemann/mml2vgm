@@ -1,0 +1,159 @@
+{
+  "timestamp": "2026-05-20T23:45:51.817440",
+  "summary": {
+    "passed": 0,
+    "failed": 21,
+    "skipped": 0,
+    "total": 21
+  },
+  "results": [
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_noise.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_nes_noise.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_noise.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:40.351777"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_pulse.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_nes_pulse.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_pulse.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:40.924249"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_triangle.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_nes_triangle.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_nes_triangle.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:41.466420"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl2_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_opl2_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl2_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:42.007549"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl3_4op.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_opl3_4op.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl3_4op.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:42.710659"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl_envelope.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_opl_envelope.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_opl_envelope.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:43.263765"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_qsound_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:43.808569"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_echo.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_qsound_echo.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_echo.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:44.351095"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_phase.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_qsound_phase.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_qsound_phase.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:44.965869"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_basic.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_segapcm_basic.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_basic.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:45.517436"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_pitch_sweep.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_segapcm_pitch_sweep.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_segapcm_pitch_sweep.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:46.060170"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_algorithms.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2151_algorithms.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_algorithms.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:46.607295"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_envelope.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2151_envelope.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_envelope.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:47.245362"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_lfo.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2151_lfo.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_lfo.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:47.806359"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_pitch_bend.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2151_pitch_bend.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2151_pitch_bend.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:48.351611"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_fm.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2203_fm.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_fm.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:48.891042"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_mixed.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2203_mixed.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_mixed.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:49.507813"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_ssg.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2203_ssg.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2203_ssg.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:50.059650"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_adpcm.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2608_adpcm.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_adpcm.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:50.609602"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_fm.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2608_fm.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_fm.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:51.237513"
+    },
+    {
+      "vgm": "/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_ssg.vgm",
+      "wav": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio/test_ym2608_ssg.wav",
+      "status": "FAIL",
+      "reason": "MAME rendering failed: \n\"/Users/rjungemann/Projects/mml2vgm/validation_results/test_ym2608_ssg.vgm\" approximately matches the following\nsupported software items (best match first):\n\n\n",
+      "timestamp": "2026-05-20T23:45:51.816420"
+    }
+  ],
+  "wav_directory": "/Users/rjungemann/Projects/mml2vgm/validation_results/rendered_audio"
+}

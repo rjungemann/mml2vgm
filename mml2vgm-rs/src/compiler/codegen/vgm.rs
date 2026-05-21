@@ -28,7 +28,7 @@ pub enum VgmCommandType {
     Ymf262WritePort0 = 0x5E,
     Ymf262WritePort1 = 0x5F,
     // PCM chips
-    Rf5c164Write = 0x68,
+    Rf5c164RegWrite = 0xB1,
     C140Write = 0x7F,
     C352Write = 0x8E,
     // PSG/Arcade chips
@@ -214,6 +214,8 @@ pub struct VgmGenerator {
     next_huc6280_channel: u8,
     /// Next RF5C164 channel to allocate (0-7)
     next_rf5c164_channel: u8,
+    /// Whether the RF5C164 sine-wave data block has been emitted
+    rf5c164_data_block_written: bool,
     /// Next K053260 channel to allocate (0-7)
     next_k053260_channel: u8,
     /// Next K054539 channel to allocate (0-31)
@@ -263,6 +265,7 @@ impl VgmGenerator {
             next_ay8910_channel: 0,
             next_huc6280_channel: 0,
             next_rf5c164_channel: 0,
+            rf5c164_data_block_written: false,
             next_k053260_channel: 0,
             next_k054539_channel: 0,
             next_segapcm_channel: 0,
@@ -1707,36 +1710,52 @@ impl VgmGenerator {
                 }
             }
             Some("RF5C164") if state.has_channel => {
-                if !state.init_done {
-                    // Initialize RF5C164 channel with default sample
-                    // Start address = 0, volume = max
-                    self.rf5c164_write(0x00 + state.k051649_ch, 0x00, *time); // Start address LSB
-                    self.rf5c164_write(0x01 + state.k051649_ch, 0x00, *time); // Start address MSB
-                    self.rf5c164_write(0x02 + state.k051649_ch, 0x00, *time); // Start address bank
-                    self.rf5c164_write(0x08 + state.k051649_ch, 0xFF, *time); // Volume (max)
-                    state.init_done = true;
+                let ch = state.k051649_ch;
+                // Emit sine-wave data block and enable chip once per VGM
+                if !self.rf5c164_data_block_written {
+                    self.rf5c164_emit_sine_data_block(*time);
+                    // Enable chip output, select wbank 0
+                    self.rf5c164_write(0x07, 0x80, *time);
+                    self.rf5c164_data_block_written = true;
                 }
                 if state.keyed_on && !state.eon_mode {
-                    // Key off: volume to 0
-                    self.rf5c164_write(0x08 + state.k051649_ch, 0x00, *time);
+                    // Silence this channel: select it then set env to 0
+                    self.rf5c164_write(0x07, 0x80 | 0x40 | ch, *time);
+                    self.rf5c164_write(0x00, 0x00, *time);
                     state.keyed_on = false;
                 }
-                let (bank, addr) = self.midi_note_to_rf5c164_sample(midi);
+                // Compute playback step for the requested MIDI note.
+                // step = freq * 255 * 2048 / clock  (255 = usable samples before the 0xFF marker)
+                let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
+                let clock = if self.header.rf5c164_clock > 0 { self.header.rf5c164_clock } else { 7670453 };
+                let step = ((freq * 255.0 * 2048.0 / clock as f64).round() as u16).max(1);
                 let note_start_time = *time;
-                // Write sample address
-                self.rf5c164_write(0x00 + state.k051649_ch, (addr & 0xFF) as u8, *time);
-                self.rf5c164_write(0x01 + state.k051649_ch, ((addr >> 8) & 0xFF) as u8, *time);
-                self.rf5c164_write(0x02 + state.k051649_ch, bank, *time);
-                // Set volume (map 0-127 to 0-255)
+                // Select channel for per-channel register writes
+                self.rf5c164_write(0x07, 0x80 | 0x40 | ch, *time);
+                // Envelope (volume)
                 let vol = (state.volume as u32 * 255 / 127) as u8;
-                self.rf5c164_write(0x08 + state.k051649_ch, vol, *time);
+                self.rf5c164_write(0x00, vol.max(1), *time);
+                // Pan: both sides full (low nibble = right × 15, high nibble = left × 15)
+                self.rf5c164_write(0x01, 0xFF, *time);
+                // Frequency delta
+                self.rf5c164_write(0x02, (step & 0xFF) as u8, *time);
+                self.rf5c164_write(0x03, ((step >> 8) & 0xFF) as u8, *time);
+                // Loop start = 0
+                self.rf5c164_write(0x04, 0x00, *time);
+                self.rf5c164_write(0x05, 0x00, *time);
+                // Start address = 0 (bank 0, byte 0)
+                self.rf5c164_write(0x06, 0x00, *time);
+                // Key on: bit N = 0 means channel N is active
+                self.rf5c164_write(0x08, !(1u8 << ch), *time);
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.rf5c164_write(0x08 + state.k051649_ch, 0x00, *time);
+                    // Key off: silence the channel
+                    self.rf5c164_write(0x07, 0x80 | 0x40 | ch, *time);
+                    self.rf5c164_write(0x00, 0x00, *time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -2788,6 +2807,8 @@ impl VgmGenerator {
         hdr[0x80..0x84].copy_from_slice(&self.header.dmg_clock.to_le_bytes());
         // 0x84: NES APU clock
         hdr[0x84..0x88].copy_from_slice(&self.header.nes_apu_clock.to_le_bytes());
+        // 0x8C: uPD7759 clock slot — repurposed for VRC6 in this fork
+        hdr[0x8C..0x90].copy_from_slice(&self.header.vrc6_clock.to_le_bytes());
         // 0x94: OKIM6295 / K051649 flags
         hdr[0x94..0x98].copy_from_slice(&self.header.k051649_flags.to_le_bytes());
         // 0x9C: K051649 / K052539 clock rate
@@ -3209,9 +3230,45 @@ impl VgmGenerator {
         self.generic_chip_write(VgmCommandType::HuC6280Write, addr, data, time);
     }
 
-    /// Write RF5C164 (Sega CD) register
+    /// Write RF5C164 (Sega CD) register (VGM opcode 0xB1)
     fn rf5c164_write(&mut self, addr: u8, data: u8, time: u64) {
-        self.generic_chip_write(VgmCommandType::Rf5c164Write, addr, data, time);
+        self.generic_chip_write(VgmCommandType::Rf5c164RegWrite, addr, data, time);
+    }
+
+    /// Emit a VGM 0x67 data block (type 0xC1 = RF5C164 RAM) containing a
+    /// 255-sample single-cycle sine wave followed by a 0xFF loop marker.
+    /// The block is written at RF5C164 RAM offset 0x0000 (bank 0, byte 0).
+    fn rf5c164_emit_sine_data_block(&mut self, time: u64) {
+        const SAMPLES: usize = 255;
+        let mut sine: Vec<u8> = Vec::with_capacity(SAMPLES + 1);
+        for i in 0..SAMPLES {
+            let angle = std::f64::consts::TAU * i as f64 / SAMPLES as f64;
+            let v = angle.sin();
+            // RF5C164 format: bit7=1 → positive, bit7=0 → negative; magnitude in bits6:0
+            // 0xFF is special (end-of-sample marker), so cap positive at 0xFE (126).
+            let byte = if v >= 0.0 {
+                0x80 | ((v * 126.0).round() as u8).min(126)
+            } else {
+                ((-v * 127.0).round() as u8).min(127)
+            };
+            sine.push(byte);
+        }
+        sine.push(0xFF); // loop marker: jump back to loopst
+
+        let body_len = (2u32 + sine.len() as u32).to_le_bytes(); // 2-byte offset + sample data
+        let mut data: Vec<u8> = Vec::with_capacity(2 + 4 + 2 + sine.len());
+        data.push(0x66); // compatibility byte
+        data.push(0xC1); // block type: RF5C164 RAM
+        data.extend_from_slice(&body_len);
+        data.push(0x00); // memory offset lo
+        data.push(0x00); // memory offset hi
+        data.extend_from_slice(&sine);
+
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::DataBlock,
+            data,
+            time,
+        });
     }
 
     /// Write SegaPCM bank/address

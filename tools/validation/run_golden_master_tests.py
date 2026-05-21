@@ -87,7 +87,7 @@ STEM_TO_OPCODES: dict[str, list[int]] = {
     "test_qsound_":    [0xC4],
     "test_ym2413_":    [0x51],
     "test_y8950_":     [0x5C],
-    "test_rf5c164_":   [0x68],        # non-standard opcode (see plan §5)
+    "test_rf5c164_":   [0xB1],        # register write opcode
     "test_c140_":      [0x7F],        # non-standard opcode (see plan §5)
     "test_c352_":      [0x8E],        # non-standard opcode (see plan §5)
     "test_k053260_":   [0xBA],
@@ -106,7 +106,6 @@ STEM_TO_OPCODES: dict[str, list[int]] = {
 SKIP_AUDIO_PREFIXES = {
     "test_segapcm_",    # PCM, no sample data
     "test_qsound_",     # PCM, no sample data
-    "test_rf5c164_",    # non-standard opcode 0x68
     "test_c140_",       # non-standard opcode 0x7F
     "test_c352_",       # non-standard opcode 0x8E
     "test_k053260_",    # PCM, no sample data
