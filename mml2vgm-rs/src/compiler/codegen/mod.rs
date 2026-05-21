@@ -163,19 +163,19 @@ pub struct VgmHeader {
     pub ym2151_clock: u32,
     /// Data offset
     pub data_offset: u32,
-    /// YM2203 clock rate (VGM header offset 0x40)
+    /// YM2203 clock rate (VGM header offset 0x44)
     pub ym2203_clock: u32,
-    /// YM2608 clock rate (VGM header offset 0x44)
+    /// YM2608 clock rate (VGM header offset 0x48)
     pub ym2608_clock: u32,
-    /// YM2610/YM2610B clock rate (VGM header offset 0x48)
+    /// YM2610/YM2610B clock rate (VGM header offset 0x4C)
     pub ym2610b_clock: u32,
-    /// YM3812 clock rate (VGM header offset 0x4C)
+    /// YM3812 clock rate (VGM header offset 0x50)
     pub ym3812_clock: u32,
-    /// YM3526 clock rate (VGM header offset 0x50)
+    /// YM3526 clock rate (VGM header offset 0x54)
     pub ym3526_clock: u32,
-    /// Y8950 clock rate (VGM header offset 0x54)
+    /// Y8950 clock rate (VGM header offset 0x58)
     pub y8950_clock: u32,
-    /// YMF262 clock rate (VGM header offset 0x58)
+    /// YMF262 clock rate (VGM header offset 0x5C)
     pub ymf262_clock: u32,
     /// DMG (Game Boy APU) clock rate (VGM header offset 0x80)
     pub dmg_clock: u32,
@@ -186,36 +186,36 @@ pub struct VgmHeader {
     pub k051649_flags: u32,
     /// K051649/K052539 clock rate (VGM header offset 0x9C)
     pub k051649_clock: u32,
-    /// YM2610 clock rate (VGM header offset 0xA4)
-    pub ym2610_clock: u32,
-    /// SegaPCM clock rate (VGM header offset 0xAC)
-    pub segapcm_clock: u32,
-    /// RF5C164 clock rate (VGM header offset 0xB0)
-    pub rf5c164_clock: u32,
-    /// YM2413 clock rate (duplicate, VGM header offset 0xB8)
-    pub ym2413_clock_ext: u32,
-    /// YM2610B clock rate (duplicate, VGM header offset 0xBC)
-    pub ym2610b_clock_ext: u32,
-    /// YMF271 clock rate (VGM header offset 0xD0)
+    /// YMF271 clock rate (VGM header offset 0x64)
     pub ymf271_clock: u32,
-    /// AY8910 clock rate (VGM header offset 0xD4)
+    /// RF5C164 clock rate (VGM header offset 0x6C)
+    pub rf5c164_clock: u32,
+    /// AY8910 clock rate (VGM header offset 0x74)
     pub ay8910_clock: u32,
-    /// HuC6280 clock rate (VGM header offset 0xD8)
-    pub huc6280_clock: u32,
-    /// C140 clock rate (VGM header offset 0xDC)
-    pub c140_clock: u32,
-    /// K053260 clock rate (VGM header offset 0xE0)
-    pub k053260_clock: u32,
-    /// K054539 clock rate (VGM header offset 0xE4)
+    /// K054539 clock rate (VGM header offset 0xA0)
     pub k054539_clock: u32,
-    /// QSound clock rate (VGM header offset 0xE8)
-    pub qsound_clock: u32,
-    /// C352 clock rate (VGM header offset 0xEC)
-    pub c352_clock: u32,
-    /// POKEY clock rate (VGM header offset 0xF0)
+    /// HuC6280 clock rate (VGM header offset 0xA4)
+    pub huc6280_clock: u32,
+    /// C140 clock rate (VGM header offset 0xA8)
+    pub c140_clock: u32,
+    /// K053260 clock rate (VGM header offset 0xAC)
+    pub k053260_clock: u32,
+    /// Pokey clock rate (VGM header offset 0xB0)
     pub pokey_clock: u32,
-    /// VRC6 clock rate (VGM header offset 0xF4)
+    /// QSound clock rate (VGM header offset 0xB4)
+    pub qsound_clock: u32,
+    /// C352 clock rate (VGM header offset 0xD8)
+    pub c352_clock: u32,
+    /// VRC6 clock rate (VGM header extension)
     pub vrc6_clock: u32,
+    /// SegaPCM clock rate (unused in current header layout)
+    pub segapcm_clock: u32,
+    /// YM2610 clock rate (unused in current header layout)
+    pub ym2610_clock: u32,
+    /// YM2413 extended clock (unused)
+    pub ym2413_clock_ext: u32,
+    /// YM2610B extended clock (unused)
+    pub ym2610b_clock_ext: u32,
 }
 
 impl Default for VgmHeader {

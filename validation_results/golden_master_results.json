@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-20T23:22:05.542936+00:00",
+  "generated_at": "2026-05-21T02:44:45.250065+00:00",
   "threshold": 0.95,
   "total": 43,
   "passed": 43,
@@ -104,7 +104,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 54,
+        "write_count": 55,
         "opcodes": [
           "0x5A"
         ]
@@ -116,7 +116,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -133,7 +133,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 36,
+        "write_count": 53,
         "opcodes": [
           "0x5E",
           "0x5F"
@@ -146,7 +146,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -163,7 +163,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 39,
+        "write_count": 40,
         "opcodes": [
           "0x5A"
         ]
@@ -175,7 +175,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -453,7 +453,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 65,
+        "write_count": 90,
         "opcodes": [
           "0x55"
         ]
@@ -465,7 +465,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -482,7 +482,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 93,
+        "write_count": 118,
         "opcodes": [
           "0x55"
         ]
@@ -494,7 +494,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -511,7 +511,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 45,
+        "write_count": 70,
         "opcodes": [
           "0x55"
         ]
@@ -523,7 +523,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -540,7 +540,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 46,
+        "write_count": 71,
         "opcodes": [
           "0x56",
           "0x57"
@@ -553,7 +553,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -570,7 +570,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 82,
+        "write_count": 107,
         "opcodes": [
           "0x56",
           "0x57"
@@ -583,7 +583,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -600,7 +600,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 54,
+        "write_count": 79,
         "opcodes": [
           "0x56",
           "0x57"
@@ -613,7 +613,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -630,7 +630,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 33,
+        "write_count": 37,
         "opcodes": [
           "0xA0"
         ]
@@ -642,7 +642,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -659,7 +659,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 45,
+        "write_count": 49,
         "opcodes": [
           "0xA0"
         ]
@@ -671,7 +671,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -804,7 +804,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 57,
+        "write_count": 298,
         "opcodes": [
           "0xB9"
         ]
@@ -816,7 +816,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -978,7 +978,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 42,
+        "write_count": 43,
         "opcodes": [
           "0x5C"
         ]
@@ -1007,7 +1007,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 60,
+        "write_count": 61,
         "opcodes": [
           "0x5C"
         ]
@@ -1019,7 +1019,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -1048,7 +1048,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -1077,7 +1077,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -1106,7 +1106,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -1164,7 +1164,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },
@@ -1181,7 +1181,7 @@
       },
       "check_b": {
         "ok": true,
-        "write_count": 67,
+        "write_count": 83,
         "opcodes": [
           "0xB3"
         ]
@@ -1222,7 +1222,7 @@
       "check_a": {
         "ok": true,
         "correlation": 1.0,
-        "silent": true,
+        "silent": false,
         "error": null,
         "skipped": false
       },

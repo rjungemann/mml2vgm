@@ -151,6 +151,7 @@ ci:
     just wasm-build-release
     just egui-build-release
     just egui-smoke
+    just test-golden
     echo "All checks passed!"
 
 # ============ GOLDEN MASTER PARITY COMMANDS ============
@@ -241,6 +242,10 @@ test-parity: test-parity-generate-current test-parity-compare
 # Run golden master regression tests (compile all GWIs, check register writes + WAV correlation)
 test-golden:
     python3 tools/validation/run_golden_master_tests.py
+
+# Check that no golden master reference WAV files are silent (all-zero samples)
+test-silence:
+    node scripts/detect_silence.mjs tests/golden_master/references
 
 # ============ UTILITY COMMANDS ============
 

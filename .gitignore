@@ -222,6 +222,10 @@ FakesAssemblies/
 **/target/
 .playwright-mcp/
 
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Visual Studio 6 workspace options file
 *.opt
 

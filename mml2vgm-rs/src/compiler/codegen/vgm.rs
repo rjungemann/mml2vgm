@@ -531,6 +531,42 @@ impl VgmGenerator {
                 _ => {}
             }
         }
+
+        // Apply #CLOCK override from GWI metadata to the primary chip's header field.
+        // When a single chip is present, #CLOCK unambiguously targets it.
+        if let Some(clock_str) = ast.metadata.get("CLOCK") {
+            if let Ok(clock_val) = clock_str.parse::<u32>() {
+                if self.chips.len() == 1 {
+                    match self.chips[0] {
+                        SoundChip::SN76489 | SoundChip::SN76489X2 => self.header.sn76489_clock = clock_val,
+                        SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2 => self.header.ym2612_clock = clock_val,
+                        SoundChip::YM2151 => self.header.ym2151_clock = clock_val,
+                        SoundChip::YM2413 => self.header.ym2413_clock = clock_val,
+                        SoundChip::YM2608 => self.header.ym2608_clock = clock_val,
+                        SoundChip::YM2203 => self.header.ym2203_clock = clock_val,
+                        SoundChip::YM3812 => self.header.ym3812_clock = clock_val,
+                        SoundChip::YM3526 => self.header.ym3526_clock = clock_val,
+                        SoundChip::Y8950 => self.header.y8950_clock = clock_val,
+                        SoundChip::YMF262 => self.header.ymf262_clock = clock_val,
+                        SoundChip::K051649 => self.header.k051649_clock = clock_val,
+                        SoundChip::NES => self.header.nes_apu_clock = clock_val,
+                        SoundChip::DMG => self.header.dmg_clock = clock_val,
+                        SoundChip::RF5C164 => self.header.rf5c164_clock = clock_val,
+                        SoundChip::SegaPCM => self.header.segapcm_clock = clock_val,
+                        SoundChip::C140 => self.header.c140_clock = clock_val,
+                        SoundChip::C352 => self.header.c352_clock = clock_val,
+                        SoundChip::AY8910 => self.header.ay8910_clock = clock_val,
+                        SoundChip::HuC6280 => self.header.huc6280_clock = clock_val,
+                        SoundChip::POKEY => self.header.pokey_clock = clock_val,
+                        SoundChip::VRC6 => self.header.vrc6_clock = clock_val,
+                        SoundChip::K053260 => self.header.k053260_clock = clock_val,
+                        SoundChip::K054539 => self.header.k054539_clock = clock_val,
+                        SoundChip::QSound => self.header.qsound_clock = clock_val,
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 
     /// Write the standard YM2612 power-on reset sequence expected by every VGM.
@@ -697,7 +733,8 @@ impl VgmGenerator {
             .any(|n| effective_chip_map.get(n).map(|s| s == "K051649").unwrap_or(false));
         if has_k051649 {
             // K051649: silence all channels (clear key-on register)
-            self.k051649_write(0, 0xAF, 0, 0);
+            // pp=3 = key on/off, aa=ignored, dd=5-bit mask (0 = all off)
+            self.k051649_write(3, 0x00, 0, 0);
             // Initialize waveforms to default (sine-like)
             let default_wave: [i8; 32] = [
                 0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
@@ -720,6 +757,33 @@ impl VgmGenerator {
             .any(|n| effective_chip_map.get(n).map(|s| s == "DMG").unwrap_or(false));
         if has_dmg {
             self.dmg_global_init();
+        }
+
+        let has_ay8910 = part_names.iter().any(|n| {
+            effective_chip_map.get(n).map(|s| matches!(s.as_str(), "AY8910" | "AY-3-8910" | "YM2149" | "YM2149F")).unwrap_or(false)
+        });
+        if has_ay8910 {
+            // Enable tone channels A/B/C, disable noise (reg 0x07: bits 0-2=tone enable, 3-5=noise disable)
+            self.ay8910_write(0x07, 0x38, 0);
+            for ch in 0u8..3 {
+                self.ay8910_write(0x08 + ch, 0x00, 0); // channel volumes = 0
+            }
+        }
+
+        let has_huc6280 = part_names.iter().any(|n| {
+            effective_chip_map.get(n).map(|s| matches!(s.as_str(), "HuC6280" | "HUC6280" | "PC_ENGINE")).unwrap_or(false)
+        });
+        if has_huc6280 {
+            self.huc6280_write(0x01, 0xFF, 0); // main amplitude: max L/R
+            for ch in 0u8..6 {
+                self.huc6280_write(0x00, ch, 0); // select channel
+                self.huc6280_write(0x04, 0x00, 0); // disable (resets write pointer to 0)
+                self.huc6280_write(0x05, 0xFF, 0); // channel balance: max L/R
+                // Load sawtooth waveform: 32 samples, values 0-31
+                for s in 0u8..32 {
+                    self.huc6280_write(0x06, s, 0);
+                }
+            }
         }
 
         // Process global settings (tempo, etc.) — these don't emit chip writes
@@ -1219,6 +1283,20 @@ impl VgmGenerator {
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
                     if let Some(ref p) = params {
                         self.ym2608_write_op_params(state.ym2612_port, state.ym2612_ch, p, *time);
+                    } else {
+                        // No instrument: minimal patch so TL doesn't stay at 0x7F (muted).
+                        // ALG=7 (all 4 ops are carriers), MUL=1, AR=31, TL=0, fast release.
+                        let port = state.ym2612_port;
+                        for &op_mul in &[0u8, 2, 1, 3] {
+                            let op_off = state.ym2612_ch + op_mul * 4;
+                            self.ym2608_write_reg(port, 0x30 + op_off, 0x01, *time); // DT=0, MUL=1
+                            self.ym2608_write_reg(port, 0x40 + op_off, 0x00, *time); // TL=0 (loudest)
+                            self.ym2608_write_reg(port, 0x50 + op_off, 0x1F, *time); // KS=0, AR=31
+                            self.ym2608_write_reg(port, 0x60 + op_off, 0x00, *time); // AM=0, DR=0
+                            self.ym2608_write_reg(port, 0x70 + op_off, 0x00, *time); // SR=0
+                            self.ym2608_write_reg(port, 0x80 + op_off, 0x01, *time); // SL=0, RR=1
+                        }
+                        self.ym2608_write_reg(port, 0xB0 + state.ym2612_ch, 0x07, *time); // FB=0, ALG=7
                     }
                     state.init_done = true;
                 }
@@ -1250,6 +1328,19 @@ impl VgmGenerator {
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
                     if let Some(ref p) = params {
                         self.ym2203_write_op_params(state.ym2612_ch, p, *time);
+                    } else {
+                        // No instrument: write a minimal patch so TL doesn't stay at 0x7F (muted).
+                        // ALG=7 (all 4 ops are carriers), MUL=1, AR=31, TL=0, fast release.
+                        for &op_mul in &[0u8, 2, 1, 3] {
+                            let op_off = state.ym2612_ch + op_mul * 4;
+                            self.ym2203_write_reg(0x30 + op_off, 0x01, *time); // DT=0, MUL=1
+                            self.ym2203_write_reg(0x40 + op_off, 0x00, *time); // TL=0 (loudest)
+                            self.ym2203_write_reg(0x50 + op_off, 0x1F, *time); // KS=0, AR=31
+                            self.ym2203_write_reg(0x60 + op_off, 0x00, *time); // AM=0, DR=0
+                            self.ym2203_write_reg(0x70 + op_off, 0x00, *time); // SR=0
+                            self.ym2203_write_reg(0x80 + op_off, 0x01, *time); // SL=0, RR=1
+                        }
+                        self.ym2203_write_reg(0xB0 + state.ym2612_ch, 0x07, *time); // FB=0, ALG=7
                     }
                     state.init_done = true;
                 }
@@ -1501,6 +1592,12 @@ impl VgmGenerator {
             }
             Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") if state.has_channel => {
                 if !state.init_done {
+                    if state.dmg_ch == 2 {
+                        // Load a sawtooth waveform into wave RAM (registers 0x20-0x2F)
+                        let wave: [u8; 32] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
+                                              0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+                        self.dmg_set_wave_table(&wave, *time);
+                    }
                     state.init_done = true;
                 }
                 if state.keyed_on && !state.eon_mode {
@@ -1537,9 +1634,9 @@ impl VgmGenerator {
             }
             Some("YM2413") | Some("OPLL") if state.has_channel => {
                 if !state.init_done {
-                    // Initialize YM2413 channel with default instrument
-                    // Instrument 0 (piano-like) with max volume
-                    let inst_vol = 0x00; // instrument 0, volume 0 (loudest)
+                    // Instrument 1 (built-in piano), volume 0 (loudest).
+                    // Instrument 0 is the custom slot whose registers default to 0 (AR=0 → silence).
+                    let inst_vol = 0x10; // instrument 1, volume 0
                     self.ym2413_write_reg(0x30 + state.ym2612_ch, inst_vol, *time);
                     state.init_done = true;
                 }
@@ -1591,8 +1688,8 @@ impl VgmGenerator {
                 // Write tone period
                 self.ay8910_write(0x00 + state.ym2612_ch * 2, tone_lo, *time);
                 self.ay8910_write(0x01 + state.ym2612_ch * 2, tone_hi, *time);
-                // Set volume (map 0-127 to 0-15, inverted: 0=loud, 15=silent)
-                let vol = (15u8).saturating_sub((state.volume >> 3) & 0x0F);
+                // Set volume (map 0-127 to 0-15; AY8910 reg 0x08: 15=loud, 0=silent)
+                let vol = (state.volume as u16 * 15 / 127) as u8;
                 let note_start_time = *time;
                 self.ay8910_write(0x08 + state.ym2612_ch, vol & 0x0F, *time);
                 state.keyed_on = true;
@@ -1712,30 +1809,37 @@ impl VgmGenerator {
                 }
             }
             Some("HuC6280") | Some("HUC6280") | Some("PC_ENGINE") if state.has_channel => {
+                // HuC6280 uses indirect channel addressing: write reg 0x00 to select channel,
+                // then regs 0x02/0x03 for frequency and 0x04 for enable+volume.
                 if !state.init_done {
-                    // Initialize HuC6280 channel (similar to AY8910 but extended)
-                    self.huc6280_write(0x08 + state.ym2612_ch, 0x0F, *time);
+                    self.huc6280_write(0x00, state.ym2612_ch, *time);
+                    self.huc6280_write(0x04, 0x00, *time); // disabled
+                    self.huc6280_write(0x05, 0xFF, *time); // balance max L/R
                     state.init_done = true;
                 }
                 if state.keyed_on && !state.eon_mode {
-                    self.huc6280_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    self.huc6280_write(0x00, state.ym2612_ch, *time);
+                    self.huc6280_write(0x04, 0x00, *time); // disable channel
                     state.keyed_on = false;
                 }
                 let (_, tone) = self.midi_note_to_huc6280_freq(midi);
                 let tone_lo = (tone & 0xFF) as u8;
                 let tone_hi = ((tone >> 8) & 0x0F) as u8;
-                self.huc6280_write(0x00 + state.ym2612_ch * 2, tone_lo, *time);
-                self.huc6280_write(0x01 + state.ym2612_ch * 2, tone_hi, *time);
-                let vol = (15u8).saturating_sub((state.volume >> 3) & 0x0F);
+                // Volume: reg 0x04 bits 4-0 = 0-31 (31=loudest); bit 7 = channel enable
+                let vol = (state.volume as u16 * 31 / 127) as u8;
                 let note_start_time = *time;
-                self.huc6280_write(0x08 + state.ym2612_ch, vol & 0x0F, *time);
+                self.huc6280_write(0x00, state.ym2612_ch, *time); // select channel
+                self.huc6280_write(0x02, tone_lo, *time);          // frequency low
+                self.huc6280_write(0x03, tone_hi, *time);          // frequency high
+                self.huc6280_write(0x04, 0x80 | vol, *time);       // enable + volume
                 state.keyed_on = true;
                 let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
-                    self.huc6280_write(0x08 + state.ym2612_ch, 0x00, *time);
+                    self.huc6280_write(0x00, state.ym2612_ch, *time);
+                    self.huc6280_write(0x04, 0x00, *time); // disable
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -2194,9 +2298,13 @@ impl VgmGenerator {
     }
 
     /// Convert MIDI note to HuC6280 tone period.
-    /// HuC6280 is compatible with AY-3-8910, using the same period calculation.
+    /// HuC6280 period = clock / (32 * freq), 12-bit value.
     fn midi_note_to_huc6280_freq(&self, midi_note: u8) -> (u8, u16) {
-        self.midi_note_to_ay8910_freq(midi_note)
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let clock = self.header.huc6280_clock as f64;
+        let period = (clock / (32.0 * freq)).round() as u32;
+        let period_val = period.min(4095) as u16;
+        (0, period_val)
     }
 
     /// Convert MIDI note to RF5C164 sample address.
@@ -2428,6 +2536,8 @@ impl VgmGenerator {
             0x5A => VgmCommandType::Ym3812Write,
             0x5B => VgmCommandType::Ym3526Write,
             0x5C => VgmCommandType::Y8950Write,
+            0x5E => VgmCommandType::Ymf262WritePort0,
+            0x5F => VgmCommandType::Ymf262WritePort1,
             _ => VgmCommandType::Ym3812Write, // fallback
         };
         self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
@@ -2435,6 +2545,8 @@ impl VgmGenerator {
 
     fn opl_global_init(&mut self, opcode: u8) {
         let t = 0u64;
+        // Enable waveform select (required for OPL2/OPL; must come before any operator writes)
+        self.opl_write_raw(opcode, 0x01, 0x20, t);
         // Key off all 9 channels (write B0-B8 with bit 5 = 0)
         for ch in 0u8..9 {
             self.opl_write_raw(opcode, 0xB0 + ch, 0x00, t);
@@ -2493,7 +2605,9 @@ impl VgmGenerator {
 
     fn ymf262_global_init(&mut self) {
         let t = 0u64;
-        // Enable OPL3 mode
+        // Enable waveform select (port 0, reg 0x01, bit 5)
+        self.ymf262_write_reg(0, 0x01, 0x20, t);
+        // Enable OPL3 mode (port 1, reg 0x05, bit 0)
         self.ymf262_write_reg(1, 0x05, 0x01, t);
         // Key off all 18 channels
         for ch in 0u8..9 {
@@ -2644,22 +2758,32 @@ impl VgmGenerator {
         // 0x34: VGM data offset (relative from 0x34); data at 0x100 → rel = 0xCC
         let data_offset_rel = self.header.data_offset.saturating_sub(0x34);
         hdr[0x34..0x38].copy_from_slice(&data_offset_rel.to_le_bytes());
-        // Extended chip clocks (VGM 1.51+)
-        // 0x40: YM2203
-        hdr[0x40..0x44].copy_from_slice(&self.header.ym2203_clock.to_le_bytes());
-        // 0x44: YM2608
-        hdr[0x44..0x48].copy_from_slice(&self.header.ym2608_clock.to_le_bytes());
-        // 0x48: YM2610B
-        hdr[0x48..0x4C].copy_from_slice(&self.header.ym2610b_clock.to_le_bytes());
-        // 0x4C: YM3812
-        hdr[0x4C..0x50].copy_from_slice(&self.header.ym3812_clock.to_le_bytes());
-        // 0x50: YM3526
-        hdr[0x50..0x54].copy_from_slice(&self.header.ym3526_clock.to_le_bytes());
-        // 0x54: Y8950
-        hdr[0x54..0x58].copy_from_slice(&self.header.y8950_clock.to_le_bytes());
-        // 0x58: YMF262
-        hdr[0x58..0x5C].copy_from_slice(&self.header.ymf262_clock.to_le_bytes());
-        // Extended chip clocks (VGM 1.71)
+        // Extended chip clocks (VGM 1.51+) — offsets match VGM spec exactly.
+        // 0x40: RF5C68 (unused, left 0)
+        // 0x44: YM2203
+        hdr[0x44..0x48].copy_from_slice(&self.header.ym2203_clock.to_le_bytes());
+        // 0x48: YM2608
+        hdr[0x48..0x4C].copy_from_slice(&self.header.ym2608_clock.to_le_bytes());
+        // 0x4C: YM2610/YM2610B
+        hdr[0x4C..0x50].copy_from_slice(&self.header.ym2610b_clock.to_le_bytes());
+        // 0x50: YM3812 (OPL2)
+        hdr[0x50..0x54].copy_from_slice(&self.header.ym3812_clock.to_le_bytes());
+        // 0x54: YM3526 (OPL)
+        hdr[0x54..0x58].copy_from_slice(&self.header.ym3526_clock.to_le_bytes());
+        // 0x58: Y8950
+        hdr[0x58..0x5C].copy_from_slice(&self.header.y8950_clock.to_le_bytes());
+        // 0x5C: YMF262 (OPL3)
+        hdr[0x5C..0x60].copy_from_slice(&self.header.ymf262_clock.to_le_bytes());
+        // 0x60: YMF278B (unused, left 0)
+        // 0x64: YMF271
+        hdr[0x64..0x68].copy_from_slice(&self.header.ymf271_clock.to_le_bytes());
+        // 0x68: YMZ280B (unused, left 0)
+        // 0x6C: RF5C164
+        hdr[0x6C..0x70].copy_from_slice(&self.header.rf5c164_clock.to_le_bytes());
+        // 0x70: PWM (unused, left 0)
+        // 0x74: AY8910
+        hdr[0x74..0x78].copy_from_slice(&self.header.ay8910_clock.to_le_bytes());
+        // Extended chip clocks (VGM 1.60+)
         // 0x80: DMG (Game Boy APU) clock
         hdr[0x80..0x84].copy_from_slice(&self.header.dmg_clock.to_le_bytes());
         // 0x84: NES APU clock
@@ -2668,36 +2792,21 @@ impl VgmGenerator {
         hdr[0x94..0x98].copy_from_slice(&self.header.k051649_flags.to_le_bytes());
         // 0x9C: K051649 / K052539 clock rate
         hdr[0x9C..0xA0].copy_from_slice(&self.header.k051649_clock.to_le_bytes());
-        // 0xA4: YM2610 clock
-        hdr[0xA4..0xA8].copy_from_slice(&self.header.ym2610_clock.to_le_bytes());
-        // 0xAC: SegaPCM clock
-        hdr[0xAC..0xB0].copy_from_slice(&self.header.segapcm_clock.to_le_bytes());
-        // 0xB0: RF5C164 clock
-        hdr[0xB0..0xB4].copy_from_slice(&self.header.rf5c164_clock.to_le_bytes());
-        // 0xB8: YM2413 clock (extended)
-        hdr[0xB8..0xBC].copy_from_slice(&self.header.ym2413_clock_ext.to_le_bytes());
-        // 0xBC: YM2610B clock (extended)
-        hdr[0xBC..0xC0].copy_from_slice(&self.header.ym2610b_clock_ext.to_le_bytes());
-        // 0xD0: YMF271 clock
-        hdr[0xD0..0xD4].copy_from_slice(&self.header.ymf271_clock.to_le_bytes());
-        // 0xD4: AY8910 clock
-        hdr[0xD4..0xD8].copy_from_slice(&self.header.ay8910_clock.to_le_bytes());
-        // 0xD8: HuC6280 clock
-        hdr[0xD8..0xDC].copy_from_slice(&self.header.huc6280_clock.to_le_bytes());
-        // 0xDC: C140 clock
-        hdr[0xDC..0xE0].copy_from_slice(&self.header.c140_clock.to_le_bytes());
-        // 0xE0: K053260 clock
-        hdr[0xE0..0xE4].copy_from_slice(&self.header.k053260_clock.to_le_bytes());
-        // 0xE4: K054539 clock
-        hdr[0xE4..0xE8].copy_from_slice(&self.header.k054539_clock.to_le_bytes());
-        // 0xE8: QSound clock
-        hdr[0xE8..0xEC].copy_from_slice(&self.header.qsound_clock.to_le_bytes());
-        // 0xEC: C352 clock
-        hdr[0xEC..0xF0].copy_from_slice(&self.header.c352_clock.to_le_bytes());
-        // 0xF0: POKEY clock
-        hdr[0xF0..0xF4].copy_from_slice(&self.header.pokey_clock.to_le_bytes());
-        // 0xF4: VRC6 clock
-        hdr[0xF4..0xF8].copy_from_slice(&self.header.vrc6_clock.to_le_bytes());
+        // 0xA0: K054539 clock
+        hdr[0xA0..0xA4].copy_from_slice(&self.header.k054539_clock.to_le_bytes());
+        // 0xA4: HuC6280 clock
+        hdr[0xA4..0xA8].copy_from_slice(&self.header.huc6280_clock.to_le_bytes());
+        // 0xA8: C140 clock
+        hdr[0xA8..0xAC].copy_from_slice(&self.header.c140_clock.to_le_bytes());
+        // 0xAC: K053260 clock
+        hdr[0xAC..0xB0].copy_from_slice(&self.header.k053260_clock.to_le_bytes());
+        // 0xB0: Pokey clock
+        hdr[0xB0..0xB4].copy_from_slice(&self.header.pokey_clock.to_le_bytes());
+        // 0xB4: QSound clock
+        hdr[0xB4..0xB8].copy_from_slice(&self.header.qsound_clock.to_le_bytes());
+        // Extended chip clocks (VGM 1.70+)
+        // 0xD8: C352 clock
+        hdr[0xD8..0xDC].copy_from_slice(&self.header.c352_clock.to_le_bytes());
         output.extend_from_slice(&hdr);
         Ok(())
     }
@@ -2781,25 +2890,20 @@ impl VgmGenerator {
     fn k051649_note_on(&mut self, ch: u8, note: u8, octave: u8, volume: u8, time: u64) {
         let clock = self.header.k051649_clock;
         let (freq_lo, freq_hi) = self.midi_note_to_k051649_freq(note, clock);
-        
-        // Write frequency divider ( registers 0xA0+ch*2 = lo, 0xA1+ch*2 = hi)
-        let base = 0xA0 + ch * 2;
-        self.k051649_write(0, base, freq_lo, time);
-        self.k051649_write(0, base + 1, freq_hi, time);
-        
-        // Write volume (0-15) at 0xAA + ch
-        self.k051649_write(0, 0xAA + ch, volume.min(15), time);
-        
-        // Key on: OR bit N into the running key mask and write it
+        // pp=1: frequency write; aa = ch*2 (lo byte), ch*2+1 (hi byte)
+        self.k051649_write(1, ch * 2, freq_lo, time);
+        self.k051649_write(1, ch * 2 + 1, freq_hi, time);
+        // pp=2: volume write; aa = ch (0-4), dd = volume (0-15)
+        self.k051649_write(2, ch, volume.min(15), time);
+        // pp=3: key on/off; aa = unused, dd = 5-bit channel mask
         self.k051649_key_mask |= 1 << ch;
-        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
+        self.k051649_write(3, 0x00, self.k051649_key_mask, time);
     }
 
     /// Write K051649 note-off for a channel
     fn k051649_note_off(&mut self, ch: u8, time: u64) {
-        // Key off: clear bit N from the running key mask and write it
         self.k051649_key_mask &= !(1 << ch);
-        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
+        self.k051649_write(3, 0x00, self.k051649_key_mask, time);
     }
 
     // ── NES APU (2A03) helpers ────────────────────────────────────────────────
@@ -2961,33 +3065,31 @@ impl VgmGenerator {
     /// Write DMG Pulse channel note-on
     fn dmg_note_on_pulse(&mut self, ch: u8, note: u8, octave: u8, volume: u8, duty: u8, time: u64) {
         let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
-        let base = if ch == 0 { 0xFF10 } else { 0xFF16 };
-        
-        // NRx1: Sweep (ch 0 only) + Duty + Sound length
+        let duty_len  = ((duty & 0x3) << 6) | 0x3F;
+        let vol_env   = ((volume & 0xF) << 4) | 0x0F;
+        // NRx4: bits 2:0 = period high, bit 7 = trigger
+        let freq_hi_trig = (freq_hi & 0x07) | 0x80;
         if ch == 0 {
-            // For now, disable sweep
-            self.dmg_write((base - 0xFF10) as u8 + 0, 0x00, time);
+            // CH1 register map: NR10=0x00 NR11=0x01 NR12=0x02 NR13=0x03 NR14=0x04
+            self.dmg_write(0x00, 0x00,          time); // NR10: sweep off
+            self.dmg_write(0x01, duty_len,       time); // NR11: duty + length
+            self.dmg_write(0x02, vol_env,        time); // NR12: volume + envelope
+            self.dmg_write(0x03, freq_lo,        time); // NR13: frequency lo
+            self.dmg_write(0x04, freq_hi_trig,   time); // NR14: frequency hi + trigger
+        } else {
+            // CH2 register map: NR21=0x06 NR22=0x07 NR23=0x08 NR24=0x09
+            self.dmg_write(0x06, duty_len,       time); // NR21: duty + length
+            self.dmg_write(0x07, vol_env,        time); // NR22: volume + envelope
+            self.dmg_write(0x08, freq_lo,        time); // NR23: frequency lo
+            self.dmg_write(0x09, freq_hi_trig,   time); // NR24: frequency hi + trigger
         }
-        
-        // NRx1: Duty + Sound length (bits 6-7 = duty, bits 0-5 = length)
-        self.dmg_write((base - 0xFF10) as u8 + 0, ((duty & 0x3) << 6) | 0x3F, time);
-        
-        // NRx2: Initial volume + envelope
-        let vol_env = ((volume & 0xF) << 4) | 0x0F; // Max volume, envelope down
-        self.dmg_write((base - 0xFF10) as u8 + 1, vol_env, time);
-        
-        // NRx3: Frequency low
-        self.dmg_write((base - 0xFF10) as u8 + 2, freq_lo, time);
-        
-        // NRx4: Frequency high + trigger (bit 7 = trigger)
-        self.dmg_write((base - 0xFF10) as u8 + 3, ((freq_hi & 0x07) << 4) | 0x80, time);
     }
 
     /// Write DMG Pulse channel note-off
     fn dmg_note_off_pulse(&mut self, ch: u8, time: u64) {
-        let base = if ch == 0 { 0xFF10 } else { 0xFF16 };
-        // Clear volume to 0
-        self.dmg_write((base - 0xFF10) as u8 + 1, 0x00, time);
+        // Clear NRx2 (volume/envelope) to silence the channel
+        let reg = if ch == 0 { 0x02 } else { 0x07 };
+        self.dmg_write(reg, 0x00, time);
     }
 
     fn dmg_note_off_wave(&mut self, time: u64) {
@@ -3003,22 +3105,22 @@ impl VgmGenerator {
     /// Write DMG Wave channel note-on
     fn dmg_note_on_wave(&mut self, note: u8, octave: u8, volume: u8, time: u64) {
         let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
-        
+
         // NR30: Wave enable (bit 7)
         self.dmg_write(0x0A, 0x80, time);
-        
-        // NR31: Sound length
-        self.dmg_write(0x0B, 0xFF, time);
-        
-        // NR32: Volume (bits 5-6) + Select (bits 0-4)
-        let vol_select = ((volume & 0x3) << 5) | 0x1F;
-        self.dmg_write(0x0C, vol_select, time);
-        
+
+        // NR31: Sound length (0 = max)
+        self.dmg_write(0x0B, 0x00, time);
+
+        // NR32: Output level — bits 6:5: 00=mute, 01=100%, 10=50%, 11=25%
+        let level: u8 = if volume == 0 { 0 } else { 1 }; // 100% when audible
+        self.dmg_write(0x0C, level << 5, time);
+
         // NR33: Frequency low
         self.dmg_write(0x0D, freq_lo, time);
-        
-        // NR34: Frequency high + trigger
-        self.dmg_write(0x0E, ((freq_hi & 0x07) << 4) | 0x80, time);
+
+        // NR34: bits 2:0 = period high, bit 7 = trigger
+        self.dmg_write(0x0E, (freq_hi & 0x07) | 0x80, time);
     }
 
     /// Write DMG Noise channel note-on
