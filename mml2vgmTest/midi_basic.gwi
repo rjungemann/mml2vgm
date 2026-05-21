@@ -1,8 +1,0 @@
-{
-Title=MIDI Basic Test
-Composer=Test
-ClockCount=192
-}
-
-'A1 @ch0 @p0 l4 o4
-c4 d4 e4 f4 g4 f4 e4 d4 c2

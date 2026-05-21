@@ -4,6 +4,8 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 
+This project takes heavy inspiration from [mml2vgm](https://github.com/kuma4649/mml2vgm). As such, it is released under the same license.
+
 ---
 
 ## 📋 Overview

@@ -221,6 +221,10 @@ FakesAssemblies/
 # Rust and test artifacts
 **/target/
 .playwright-mcp/
+validation_results/
+test_sf2_golden_long.wav
+__pycache__/
+**/__pycache__/
 
 # macOS
 .DS_Store

@@ -1,8 +1,0 @@
-{
-Title=MIDI Pitch Bend Test
-Composer=Test
-ClockCount=192
-}
-
-'A1 @ch0 @p0 l4 o4
-c4 @b+100 d4 @b-50 e4 @b0 f4

@@ -158,7 +158,7 @@ ci:
 #
 # Compares the Rust compiler's VGM output against the reference C# compiler.
 # The Rust compiler now handles the C# MML format (Phases 3–3c complete).
-# See docs/Golden_Master_Comparison_Plan.md for full status.
+# See docs/archive/Golden_Master_Comparison_Plan.md for full status.
 #
 # One-time setup for the C# reference compiler:
 #   git worktree prune

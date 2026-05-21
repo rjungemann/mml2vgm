@@ -1,8 +1,0 @@
-{
-Title=MIDI Drums Test
-Composer=Test
-ClockCount=192
-}
-
-'D1 @ch9 @p112 l4 o4
-#Dkick #Dsnare #Dhh #Doh
