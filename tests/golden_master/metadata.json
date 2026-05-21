@@ -696,15 +696,104 @@
       "overall_status": "pending"
     }
   },
+  "ymf271": {
+    "chip_name": "YMF271 (OPX / OPL4-FM)",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "taito_f3",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "frequency_error_hz": "<2",
+      "harmonic_variance_db": "<3",
+      "phase_coherence": ">0.90",
+      "correlation": ">0.95"
+    },
+    "tests": {
+      "fm_4op": {
+        "test_file": "ymf271/test_ymf271_fm_4op.gwi",
+        "description": "4-operator FM patch (X4 mode), ascending scale on group 0",
+        "rom_source": "taito_f3_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "correlation": null,
+          "frequency_error_hz": null,
+          "phase_coherence": null
+        },
+        "passed": null,
+        "notes": "Uses Vf01 part; 15 params × 4 operators + algorithm row"
+      },
+      "fm_2op": {
+        "test_file": "ymf271/test_ymf271_fm_2op.gwi",
+        "description": "2-operator FM patch (X2 mode), ascending arpeggio on group 1",
+        "rom_source": "taito_f3_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "correlation": null,
+          "frequency_error_hz": null,
+          "phase_coherence": null
+        },
+        "passed": null,
+        "notes": "Uses Vf02 part; 15 params × 2 operators + algorithm row"
+      },
+      "pcm_basic": {
+        "test_file": "ymf271/test_ymf271_pcm_basic.gwi",
+        "description": "PCM channel register sequencing via Vp part",
+        "rom_source": "pending",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "register_accuracy_percent": null,
+          "timing_variance_samples": null
+        },
+        "passed": null,
+        "notes": "Validates register write order; sample data not included"
+      },
+      "mixed": {
+        "test_file": "ymf271/test_ymf271_mixed.gwi",
+        "description": "Simultaneous 4-op FM (Vf01) and PCM (Vp) playback",
+        "rom_source": "taito_f3_game.bin",
+        "rom_section": "pending",
+        "vgm_size_bytes": 0,
+        "sample_rate_hz": 44100,
+        "generated_date": null,
+        "validation_status": "pending",
+        "metrics": {
+          "correlation": null,
+          "cross_channel_interference": null,
+          "register_accuracy_percent": null
+        },
+        "passed": null,
+        "notes": "Verifies FM and PCM parts do not clobber each other's group/slot state"
+      }
+    },
+    "summary": {
+      "total_tests": 4,
+      "passed": 0,
+      "failed": 0,
+      "pending": 4,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
   "summary": {
-    "total_chips": 16,
-    "total_tests": 38,
-    "tier1_chips": 7,
-    "tier1_tests": 21,
+    "total_chips": 17,
+    "total_tests": 42,
+    "tier1_chips": 8,
+    "tier1_tests": 25,
     "tier2_chips": 9,
     "tier2_tests": 17,
     "tests_passed": 0,
-    "tests_pending": 38,
+    "tests_pending": 42,
     "tests_failed": 0,
     "overall_pass_rate_percent": 0,
     "phase_1_status": "infrastructure_complete",

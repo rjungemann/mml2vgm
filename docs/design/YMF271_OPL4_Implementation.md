@@ -1,7 +1,8 @@
 # YMF271 (OPL4 / OPX) Implementation Plan
 
-> **Status:** Not started (planned)
+> **Status:** Phases 1–5 complete (stub implementation; libvgm FFI pending)
 > **Created:** 2026-05-21
+> **Last updated:** 2026-05-21
 
 ---
 
@@ -43,11 +44,11 @@ already solved; the work is wiring it to the `SoundChipEmulator` trait.
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 1: Vendor + FFI wrapper | ⬜ Not started | Bring in ymf271.c and build the Rust adapter |
-| 2: VGM codegen | ⬜ Not started | Emit opcode 0xD1 writes from the compiler |
-| 3: MML parser | ⬜ Not started | `Vf`/`Vp` parts, OPX instrument definitions |
-| 4: Compiler codegen | ⬜ Not started | Translate OPX instruments to register writes |
-| 5: Golden master tests | ⬜ Not started | Test files + reference WAVs |
+| 1: Chip emulator module | ✅ Complete (stub) | `chips/ymf271.rs` — pure-Rust stub; libvgm FFI pending (libvgm not present in container) |
+| 2: VGM codegen | ✅ Complete | `VgmCommandType::Ymf271Write = 0xD1`; emit helpers; clock header wiring |
+| 3: MML parser | ✅ Complete | `Vf01–Vf48`, `Vp`, `Vs01–Vs48` part recognition; `X4`/`X3`/`X2`/`X1` instrument parsing |
+| 4: Compiler codegen | ✅ Complete | `ymf271_init_group`, `ymf271_note_on/off`, slot/group allocation, freq formula |
+| 5: Golden master tests | ✅ Complete | 4 `.gwi` test files + `metadata.json` entry; reference WAVs pending libvgm |
 
 ---
 

@@ -3,7 +3,7 @@
 //! This module generates VGM (Video Game Music) format files from MML AST.
 
 use super::{CodeGenerator, OutputFormat, VgmHeader, NoteEvent, SourceMap};
-use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift};
+use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift, OpxInstrument};
 use crate::compiler::sample_resolver::SampleResolver;
 use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
 use std::collections::{BTreeSet, HashMap};
@@ -42,6 +42,7 @@ pub enum VgmCommandType {
     K053260Write = 0xBA,
     PokeyWrite = 0xBB,
     QSoundWrite = 0xC4,
+    Ymf271Write = 0xD1,
     K051649Write = 0xD2,
     K054539Write = 0xD3,
     // Timing/control
@@ -145,6 +146,8 @@ struct PartCodegenState {
     nes_ch: u8,
     dmg_ch: u8,
     vrc6_ch: u8,
+    /// YMF271 group index (0-11)
+    ymf271_group: u8,
 }
 
 impl PartCodegenState {
@@ -171,6 +174,7 @@ impl PartCodegenState {
             nes_ch: 0,
             dmg_ch: 0,
             vrc6_ch: 0,
+            ymf271_group: 0,
         }
     }
 }
@@ -240,6 +244,10 @@ pub struct VgmGenerator {
     next_c352_channel: u8,
     /// Next QSound channel to allocate (0-15)
     next_qsound_channel: u8,
+    /// Next YMF271 group to allocate (0-11; 12 groups of 4 slots each)
+    next_ymf271_group: u8,
+    /// OPX instrument parameters indexed by instrument number
+    opx_instruments: HashMap<u32, OpxInstrument>,
     /// When true, add_wait is a no-op (used during parallel part processing)
     suppress_waits: bool,
     /// Time boundaries recorded by add_wait calls (even when suppressed).
@@ -290,6 +298,8 @@ impl VgmGenerator {
             next_c140_channel: 0,
             next_c352_channel: 0,
             next_qsound_channel: 0,
+            next_ymf271_group: 0,
+            opx_instruments: HashMap::new(),
             suppress_waits: false,
             time_checkpoints: BTreeSet::new(),
             source_map: SourceMap::default(),
@@ -302,6 +312,10 @@ impl VgmGenerator {
         // Store FM instrument parameters from the AST
         for (num, inst) in &ast.fm_instruments {
             generator.fm_instruments.insert(*num, inst.parameters.clone());
+        }
+        // Store OPX instrument definitions
+        for (num, inst) in &ast.opx_instruments {
+            generator.opx_instruments.insert(*num, inst.clone());
         }
         generator.convert_ast_to_commands(ast)?;
         generator.build_gd3_tag(ast);
@@ -375,6 +389,7 @@ impl VgmGenerator {
                     "YM3526" | "OPL" => SoundChip::YM3526,
                     "Y8950" => SoundChip::Y8950,
                     "YMF262" | "OPL3" => SoundChip::YMF262,
+                    "YMF271" | "OPX" | "YMF271_PCM" => SoundChip::YMF271,
                     "K051649" | "SCC" | "SCC1" => SoundChip::K051649,
                     "NES" | "NESAPU" | "2A03" => SoundChip::NES,
                     "DMG" | "GAMEBOY" | "GAME BOY" => SoundChip::DMG,
@@ -414,6 +429,7 @@ impl VgmGenerator {
                 "PARTY8950" => SoundChip::Y8950,
                 "PARTYM3812" | "PARTOPL2" => SoundChip::YM3812,
                 "PARTYMF262" | "PARTOPL3" => SoundChip::YMF262,
+                "PARTYMF271" | "PARTOPX" => SoundChip::YMF271,
                 // Batch 3: Console PSG/FM
                 "PARTYM2413" | "PARTOPLL" => SoundChip::YM2413,
                 "PARTHUC6280" => SoundChip::HuC6280,
@@ -448,6 +464,7 @@ impl VgmGenerator {
                     "YM3526" | "OPL" => Some(SoundChip::YM3526),
                     "Y8950" => Some(SoundChip::Y8950),
                     "YMF262" | "OPL3" => Some(SoundChip::YMF262),
+                    "YMF271" | "OPX" => Some(SoundChip::YMF271),
                     "K051649" | "SCC" | "SCC1" => Some(SoundChip::K051649),
                     "NES" | "NESAPU" | "2A03" => Some(SoundChip::NES),
                     "DMG" | "GAMEBOY" | "GAME BOY" => Some(SoundChip::DMG),
@@ -504,6 +521,9 @@ impl VgmGenerator {
                 }
                 SoundChip::YMF262 => {
                     self.header.ymf262_clock = chip.clock_rate();
+                }
+                SoundChip::YMF271 => {
+                    self.header.ymf271_clock = chip.clock_rate();
                 }
                 SoundChip::K051649 => {
                     self.header.k051649_clock = chip.clock_rate();
@@ -569,6 +589,7 @@ impl VgmGenerator {
                         SoundChip::YM3526 => self.header.ym3526_clock = clock_val,
                         SoundChip::Y8950 => self.header.y8950_clock = clock_val,
                         SoundChip::YMF262 => self.header.ymf262_clock = clock_val,
+                        SoundChip::YMF271 => self.header.ymf271_clock = clock_val,
                         SoundChip::K051649 => self.header.k051649_clock = clock_val,
                         SoundChip::NES => self.header.nes_apu_clock = clock_val,
                         SoundChip::DMG => self.header.dmg_clock = clock_val,
@@ -746,6 +767,14 @@ impl VgmGenerator {
             .any(|n| effective_chip_map.get(n).map(|s| s == "YMF262").unwrap_or(false));
         if has_ymf262 {
             self.ymf262_global_init();
+        }
+
+        // Emit YMF271 global init (48-slot OPX)
+        let has_ymf271 = part_names.iter().any(|n| {
+            effective_chip_map.get(n).map(|s| s == "YMF271" || s == "YMF271_PCM").unwrap_or(false)
+        });
+        if has_ymf271 {
+            self.ymf271_global_init();
         }
 
         // Emit console chip global inits
@@ -990,6 +1019,11 @@ impl VgmGenerator {
                 self.next_qsound_channel = self.next_qsound_channel.saturating_add(1);
                 if ch < 16 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
             }
+            Some("YMF271") | Some("YMF271_PCM") => {
+                let grp = self.next_ymf271_group;
+                self.next_ymf271_group = self.next_ymf271_group.saturating_add(1);
+                if grp < 12 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+            }
             _ => (0, 0, 0, 0, true),
         };
 
@@ -1040,6 +1074,10 @@ impl VgmGenerator {
             Some("VRC6") => self.next_vrc6_channel.saturating_sub(1),
             _ => 0,
         };
+        state.ymf271_group = match chip_str {
+            Some("YMF271") | Some("YMF271_PCM") => self.next_ymf271_group.saturating_sub(1),
+            _ => 0,
+        };
         state.has_channel = has_channel;
 
         for node in &part.commands {
@@ -1057,6 +1095,7 @@ impl VgmGenerator {
                 Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, &state, time); }
                 Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, &state, time); }
                 Some("YMF262") => { self.ymf262_key_off(&state, time); }
+                Some("YMF271") | Some("YMF271_PCM") => { self.ymf271_key_off(&state, time); }
                 Some("K051649") | Some("SCC") | Some("SCC1") => { self.k051649_note_off(state.k051649_ch, *time); }
                 Some("NES") | Some("NESAPU") | Some("2A03") => { self.nes_apu_note_off_pulse(state.nes_ch, *time); }
                 Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
@@ -1216,6 +1255,7 @@ impl VgmGenerator {
                         Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time); }
                         Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time); }
                         Some("YMF262") => { self.ymf262_key_off(state, time); }
+                        Some("YMF271") | Some("YMF271_PCM") => { self.ymf271_key_off(state, time); }
                         _ => {}
                     }
                     state.keyed_on = false;
@@ -1526,6 +1566,33 @@ impl VgmGenerator {
                 self.add_wait(note_on_samples, *time);
                 if !state.eon_mode {
                     self.ymf262_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                if gap > 0 {
+                    *time += gap as u64;
+                    self.add_wait(gap, *time);
+                }
+            }
+            Some("YMF271") | Some("YMF271_PCM") if state.has_channel => {
+                if !state.init_done {
+                    let inst_num = state.instrument_num;
+                    let opx_inst = inst_num.and_then(|n| self.opx_instruments.get(&n).cloned());
+                    self.ymf271_init_group(state, opx_inst.as_ref(), *time);
+                    state.init_done = true;
+                }
+                if state.keyed_on && !state.eon_mode {
+                    self.ymf271_key_off(state, time);
+                    state.keyed_on = false;
+                }
+                let note_start_time = *time;
+                self.ymf271_note_on(state, midi, *time);
+                state.keyed_on = true;
+                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                self.emit_note_event(note, state, note_start_time, note_on_samples);
+                *time += note_on_samples as u64;
+                self.add_wait(note_on_samples, *time);
+                if !state.eon_mode {
+                    self.ymf271_key_off(state, time);
                     state.keyed_on = false;
                 }
                 if gap > 0 {
@@ -2853,6 +2920,124 @@ impl VgmGenerator {
         let port = (ch_abs / 9) as u8;
         let ch = (ch_abs % 9) as u8;
         self.ymf262_write_reg(port, 0xB0 + ch, 0x00, *time);
+    }
+
+    // ── YMF271 (OPX, 48-slot) helpers ────────────────────────────────────────
+
+    /// Emit VGM command 0xD1 [port, reg, data] — one YMF271 register write.
+    ///
+    /// The libvgm player calls `ymf271_w(state, port*2, reg)` then
+    /// `ymf271_w(state, port*2+1, data)` for each such command.
+    fn ymf271_write_reg(&mut self, port: u8, reg: u8, val: u8, time: u64) {
+        self.commands.push(VgmCommand {
+            command_type: VgmCommandType::Ymf271Write,
+            data: vec![port, reg, val],
+            time,
+        });
+    }
+
+    /// Key-off all 12 groups at startup.
+    fn ymf271_global_init(&mut self) {
+        let t = 0u64;
+        for grp in 0u8..12 {
+            // Group timer register (port 6, address 0x10+grp): clear key-on bit
+            self.ymf271_write_reg(6, 0x10 + grp, 0x00, t);
+        }
+    }
+
+    /// Write a minimal FM patch to all 4 slots of the given group.
+    ///
+    /// If `opx_inst` is provided, its operator parameters are written; otherwise
+    /// a simple default sustain patch (similar to the OPM init) is used.
+    fn ymf271_init_group(
+        &mut self,
+        state: &PartCodegenState,
+        opx_inst: Option<&OpxInstrument>,
+        time: u64,
+    ) {
+        let grp = state.ymf271_group;
+        let vol = state.volume;
+
+        // YMF271 slot indices for group `grp` (0-indexed groups, 4-op mapping):
+        // S1 = grp, S3 = grp+12, S2 = grp+24, S4 = grp+36
+        // These match the MML V01-V04 → Slot01,Slot13,Slot25,Slot37 (1-indexed) layout.
+        let slots = [grp, grp + 12, grp + 24, grp + 36];
+
+        // TL maps volume: 127→0 (full), 0→127 (mute) scaled to 7-bit (0–127)
+        let car_tl = (127u16.saturating_sub(vol as u16)) as u8 & 0x7F;
+
+        for (op_idx, &slot) in slots.iter().enumerate() {
+            if let Some(inst) = opx_inst {
+                // Write instrument operator parameters
+                if let Some(op) = inst.operators.get(op_idx) {
+                    // Bank 0 (port 0): AR, D1R, KS, KF=0
+                    let b0 = (op.ar & 0x1F) | ((op.dr & 0x07) << 5);
+                    self.ymf271_write_reg(0, slot, b0, time);
+                    // Bank 1 (port 1): D2R, RR, SL
+                    let b1 = (op.sr & 0x1F) | ((op.rr & 0x07) << 5);
+                    self.ymf271_write_reg(1, slot, b1, time);
+                    // Bank 2 (port 2): TL, ML, WF
+                    let tl = op.tl.min(127);
+                    let b2 = (tl & 0x7F) | ((op.ml & 0x01) << 7);
+                    self.ymf271_write_reg(2, slot, b2, time);
+                    // Bank 3 (port 3): CON (algorithm), FB
+                    let algorithm = inst.algorithm & 0x07;
+                    let b3 = algorithm | ((op.fb & 0x07) << 3);
+                    self.ymf271_write_reg(3, slot, b3, time);
+                } else {
+                    self.ymf271_write_slot_defaults(slot, car_tl, time);
+                }
+            } else {
+                self.ymf271_write_slot_defaults(slot, car_tl, time);
+            }
+        }
+    }
+
+    /// Write a minimal default patch to one slot: fast attack, sustain, algorithm 7.
+    fn ymf271_write_slot_defaults(&mut self, slot: u8, car_tl: u8, time: u64) {
+        // Bank 0: AR=31, D1R=0
+        self.ymf271_write_reg(0, slot, 0x1F, time);
+        // Bank 1: D2R=0, RR=15, SL=0
+        self.ymf271_write_reg(1, slot, 0xE0, time);
+        // Bank 2: TL, ML=1
+        self.ymf271_write_reg(2, slot, car_tl | 0x80, time);
+        // Bank 3: algorithm=7 (all carriers), FB=0
+        self.ymf271_write_reg(3, slot, 0x07, time);
+    }
+
+    /// Set frequency (FNUM, BLOCK) and key-on for a group.
+    fn ymf271_note_on(&mut self, state: &PartCodegenState, midi_note: u8, time: u64) {
+        let grp = state.ymf271_group;
+        let (block, fnum) = Self::midi_note_to_ymf271_freq(midi_note);
+        // Group frequency registers (port 6):
+        //   address 0x00+grp: FNUM[7:0]
+        //   address 0x10+grp: KEYON(bit7) | BLOCK[2:0](bits 4:2) | FNUM[8](bit 0)
+        let fnum_lo = (fnum & 0xFF) as u8;
+        let fnum_hi = (fnum >> 8) as u8 & 0x01;
+        let hi_byte = 0x80u8 | ((block & 0x07) << 2) | fnum_hi;
+        self.ymf271_write_reg(6, 0x00 + grp, fnum_lo, time);
+        self.ymf271_write_reg(6, 0x10 + grp, hi_byte, time);
+    }
+
+    /// Clear key-on for a group.
+    fn ymf271_key_off(&mut self, state: &PartCodegenState, time: &u64) {
+        let grp = state.ymf271_group;
+        // Clear bit 7 (key-on) in the group's high frequency register
+        self.ymf271_write_reg(6, 0x10 + grp, 0x00, *time);
+    }
+
+    /// Convert a MIDI note to YMF271 (BLOCK, FNUM).
+    ///
+    /// Formula: FNUM = round(freq * 2^(20-BLOCK) / (f_osc / 12))
+    /// where f_osc = 16,934,400 Hz.  BLOCK = (midi_note / 12).saturating_sub(2), clamped 0–7.
+    fn midi_note_to_ymf271_freq(midi_note: u8) -> (u8, u16) {
+        const PHI: f64 = 16_934_400.0 / 12.0; // ≈ 1,411,200 Hz
+        let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
+        let octave = (midi_note / 12) as i32;
+        let block = (octave - 2).clamp(0, 7) as u8;
+        let fnum = (freq * (1u32 << (20 - block)) as f64 / PHI).round() as u32;
+        let fnum = fnum.min(0x1FF) as u16; // 9-bit FNUM
+        (block, fnum)
     }
 
     fn build_gd3_tag(&mut self, ast: &MmlAst) {

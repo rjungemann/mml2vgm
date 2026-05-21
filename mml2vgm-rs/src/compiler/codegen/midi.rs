@@ -5,9 +5,9 @@
 
 use super::{CodeGenerator, NoteEvent, OutputFormat, SourceMap};
 use crate::compiler::ast::{
-    Alias, Envelope, FmInstrument, Include, InstrumentSelection, Length, Loop, 
-    Metadata, MmlAst, MmlNode, Note, Octave, OctaveShift, PartDefinition, PcmInstrument,
-    Quantize, Rest, Tempo, Volume,
+    Alias, Envelope, FmInstrument, Include, InstrumentSelection, Length, Loop,
+    Metadata, MmlAst, MmlNode, Note, Octave, OctaveShift, OpxInstrument as _OpxInstrument,
+    PartDefinition, PcmInstrument, Quantize, Rest, Tempo, Volume,
 };
 use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
 use std::collections::{HashMap, HashSet};
@@ -502,6 +502,7 @@ impl MidiGenerator {
                     self.add_event(MidiEvent::ProgramChange { channel, program: new_program });
                 }
                 MmlNode::FmInstrument(_) => {}
+                MmlNode::OpxInstrument(_) => {}
                 MmlNode::PcmInstrument(_) => {}
                 MmlNode::Envelope(_) => {}
                 MmlNode::Arpeggio(_) => {}

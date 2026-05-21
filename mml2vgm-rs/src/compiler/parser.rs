@@ -4,9 +4,10 @@
 //! It takes tokens from the lexer and builds an Abstract Syntax Tree (AST).
 
 use crate::compiler::ast::{
-    Alias, Arpeggio, Aftertouch, ControlChange, Envelope, FmInstrument, Include, Length, 
-    Loop, Metadata, MidiChannel, MidiProgram, MmlAst, MmlNode, Note, Octave, OctaveShift, 
-    PartDefinition, PcmInstrument, PitchBend, PolyAftertouch, ProgramChange, Rest, 
+    Alias, Arpeggio, Aftertouch, ControlChange, Envelope, FmInstrument, Include, Length,
+    Loop, Metadata, MidiChannel, MidiProgram, MmlAst, MmlNode, Note, Octave, OctaveShift,
+    OpxInstrument, OpxMode, OpxOperator,
+    PartDefinition, PcmInstrument, PitchBend, PolyAftertouch, ProgramChange, Rest,
     SysEx, Tempo, Volume,
 };
 use crate::compiler::lexer::{Token, tokenize};
@@ -32,6 +33,8 @@ pub struct Parser {
     /// FM instrument being accumulated row-by-row: (instrument_number, rows_collected, is_m_type)
     /// M-type instruments are NOT stored in ast.fm_instruments (they go in instOPM in C#).
     pending_fm_instrument: Option<(u32, Vec<Vec<u32>>, bool)>,
+    /// OPX instrument being accumulated row-by-row: (number, mode, operator_rows, al_row_seen)
+    pending_opx_instrument: Option<(u32, OpxMode, Vec<Vec<u32>>)>,
 }
 
 impl Parser {
@@ -46,6 +49,7 @@ impl Parser {
             current_tempo: 120,
             in_definition_context: false,
             pending_fm_instrument: None,
+            pending_opx_instrument: None,
         }
     }
 
@@ -221,8 +225,9 @@ impl Parser {
             }
         }
 
-        // Finalize any FM instrument still being accumulated at end of file
+        // Finalize any instrument still being accumulated at end of file
         self.finalize_pending_fm_instrument(&mut ast);
+        self.finalize_pending_opx_instrument(&mut ast);
         Ok(ast)
     }
 
@@ -315,8 +320,18 @@ impl Parser {
                     let name = name.clone();
                     let name_upper = name.to_uppercase();
 
+                    // YMF271 part prefixes: V01-V48 (Primary), Vf01-Vf48, Vp (PCM), Vs01-Vs48 (Secondary)
+                    // The lexer emits these as Identifier("V01"), Identifier("Vf01"), etc.
+                    if let Some(part_name) = Self::try_parse_ymf271_part_name(&name_upper) {
+                        self.advance();
+                        let chip = match part_name.chars().next() {
+                            _ if name_upper.starts_with("VP") => "YMF271_PCM",
+                            _ => "YMF271",
+                        };
+                        self.ensure_part_with_chip(ast, &part_name, chip);
+                        self.current_part = Some(part_name);
                     // Single alphabetic letter followed by a channel number → C# part name (H1, I1 …)
-                    if name.len() == 1
+                    } else if name.len() == 1
                         && name.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
                     {
                         let letter = name.chars().next().unwrap().to_ascii_uppercase();
@@ -346,6 +361,62 @@ impl Parser {
         }
 
         Ok(())
+    }
+
+    /// Recognise YMF271 part names (case-insensitive):
+    /// - `V01`–`V48`  → YMF271 FM Primary
+    /// - `Vf01`–`Vf48` → YMF271 FM Primary (alternate `Vf` prefix)
+    /// - `Vp`         → YMF271 PCM channel
+    /// - `Vs01`–`Vs48` → YMF271 FM Secondary
+    ///
+    /// Returns `Some(canonical_name)` if the identifier matches, else `None`.
+    fn try_parse_ymf271_part_name(name_upper: &str) -> Option<String> {
+        if name_upper == "VP" {
+            return Some("Vp".to_string());
+        }
+        // V01-V48
+        if name_upper.starts_with('V') && !name_upper.starts_with("VF") && !name_upper.starts_with("VS") {
+            let rest = &name_upper[1..];
+            if let Ok(n) = rest.parse::<u32>() {
+                if n >= 1 && n <= 48 {
+                    return Some(format!("V{:02}", n));
+                }
+            }
+        }
+        // Vf01-Vf48
+        if name_upper.starts_with("VF") {
+            let rest = &name_upper[2..];
+            if let Ok(n) = rest.parse::<u32>() {
+                if n >= 1 && n <= 48 {
+                    return Some(format!("Vf{:02}", n));
+                }
+            }
+        }
+        // Vs01-Vs48
+        if name_upper.starts_with("VS") {
+            let rest = &name_upper[2..];
+            if let Ok(n) = rest.parse::<u32>() {
+                if n >= 1 && n <= 48 {
+                    return Some(format!("Vs{:02}", n));
+                }
+            }
+        }
+        None
+    }
+
+    /// Create a part entry with a pre-assigned chip in `ast.parts` if it does not already exist.
+    fn ensure_part_with_chip(&self, ast: &mut MmlAst, name: &str, chip: &str) {
+        if !ast.parts.contains_key(name) {
+            ast.parts.insert(
+                name.to_string(),
+                PartDefinition {
+                    name: name.to_string(),
+                    chip: Some(chip.to_string()),
+                    tempo: None,
+                    commands: Vec::new(),
+                },
+            );
+        }
     }
 
     /// Create a part entry in `ast.parts` if it does not already exist.
@@ -432,10 +503,12 @@ impl Parser {
             // Continuation row: '@ 031,012,...  — operator row or ALG/FB row
             Some(Token::Number(first)) => {
                 let first = first;
-                if self.pending_fm_instrument.is_some() {
+                if self.pending_opx_instrument.is_some() {
+                    self.parse_opx_instrument_row(ast, first)?;
+                } else if self.pending_fm_instrument.is_some() {
                     self.parse_fm_instrument_row(ast, first)?;
                 } else {
-                    // Stray numeric row with no pending FM instrument; skip it
+                    // Stray numeric row with no pending instrument; skip it
                     self.advance();
                     while let Some(token) = self.current_token() {
                         match token {
@@ -446,22 +519,34 @@ impl Parser {
                 }
             }
 
-            // Type letter that the lexer sees as an Identifier: M, P, A (not note letters)
+            // Type letter that the lexer sees as an Identifier: M, P, A, X4/X3/X2/X1 (not note letters)
             Some(Token::Identifier(ref s)) => {
                 let s_upper = s.to_uppercase();
-                self.advance(); // consume the type letter
-                if s_upper.starts_with('M') {
-                    self.start_fm_instrument(ast, true)?;
-                } else if s_upper.starts_with('F') {
-                    self.start_fm_instrument(ast, false)?;
-                } else if s_upper.starts_with('P') {
-                    self.parse_pcm_instrument(ast)?;
-                } else if s_upper.starts_with('E') {
-                    self.parse_envelope_definition(ast)?;
-                } else if s_upper.starts_with('A') {
-                    self.parse_arpeggio_definition(ast)?;
+                // OPX mode tokens: X4, X3, X2, X1
+                if s_upper == "X4" || s_upper == "X3" || s_upper == "X2" || s_upper == "X1" {
+                    let mode = match s_upper.as_str() {
+                        "X4" => OpxMode::X4,
+                        "X3" => OpxMode::X3,
+                        "X2" => OpxMode::X2,
+                        _    => OpxMode::X1,
+                    };
+                    self.advance(); // consume X4/X3/X2/X1
+                    self.start_opx_instrument(ast, mode)?;
+                } else {
+                    self.advance(); // consume the type letter
+                    if s_upper.starts_with('M') {
+                        self.start_fm_instrument(ast, true)?;
+                    } else if s_upper.starts_with('F') {
+                        self.start_fm_instrument(ast, false)?;
+                    } else if s_upper.starts_with('P') {
+                        self.parse_pcm_instrument(ast)?;
+                    } else if s_upper.starts_with('E') {
+                        self.parse_envelope_definition(ast)?;
+                    } else if s_upper.starts_with('A') {
+                        self.parse_arpeggio_definition(ast)?;
+                    }
+                    // Unknown type letter — type already consumed, silently skip
                 }
-                // Unknown type letter — type already consumed, silently skip
             }
 
             // F, E, A, B, C, D, G are note letters → Token::Note in the lexer
@@ -576,6 +661,87 @@ impl Parser {
             }
             let inst = FmInstrument { number, name: String::new(), parameters };
             ast.fm_instruments.insert(number, inst);
+        }
+    }
+
+    // ── OPX (YMF271) instrument parsing ──────────────────────────────────────
+
+    /// Begin accumulating an OPX instrument of the given mode.
+    ///
+    /// Called after `'@ X4 NNN`, `'@ X3 NNN`, `'@ X2 NNN`, or `'@ X1 NNN`.
+    fn start_opx_instrument(&mut self, ast: &mut MmlAst, mode: OpxMode) -> MmlResult<()> {
+        self.finalize_pending_opx_instrument(ast);
+
+        let number = match self.current_token() {
+            Some(Token::Number(n)) => { self.advance(); n }
+            Some(Token::Identifier(ref s)) if s.parse::<u32>().is_ok() => {
+                let n = s.parse::<u32>().unwrap();
+                self.advance();
+                n
+            }
+            _ => 0,
+        };
+        // Skip optional name string and any remaining tokens on this line
+        while let Some(token) = self.current_token() {
+            match token {
+                Token::Apostrophe | Token::Eof => break,
+                _ => self.advance(),
+            }
+        }
+        self.pending_opx_instrument = Some((number, mode, Vec::new()));
+        Ok(())
+    }
+
+    /// Accumulate one OPX row (operator row or the final AL row) into the pending instrument.
+    ///
+    /// X4 expects 4 operator rows + 1 AL row (5 rows total).
+    /// X3 expects 3 operator rows + 1 AL row.
+    /// X2 expects 2 operator rows + 1 AL row.
+    /// X1 expects 1 operator row only (no AL row).
+    fn parse_opx_instrument_row(&mut self, ast: &mut MmlAst, first: u32) -> MmlResult<()> {
+        let mut row = vec![first];
+        self.advance();
+        while let Some(token) = self.current_token() {
+            match token {
+                Token::Number(n) => { row.push(n); self.advance(); }
+                Token::Comma => self.advance(),
+                Token::Apostrophe | Token::Eof => break,
+                _ => break,
+            }
+        }
+        if let Some((_, _, rows)) = &mut self.pending_opx_instrument {
+            rows.push(row);
+        }
+        let ready = self.pending_opx_instrument.as_ref().map_or(false, |(_, mode, rows)| {
+            rows.len() >= mode.operator_count() + 1   // operator rows + AL row
+                || (matches!(mode, OpxMode::X1) && rows.len() >= 1)
+        });
+        if ready {
+            self.finalize_pending_opx_instrument(ast);
+        }
+        Ok(())
+    }
+
+    /// Commit a pending OPX instrument into the AST.
+    fn finalize_pending_opx_instrument(&mut self, ast: &mut MmlAst) {
+        if let Some((number, mode, rows)) = self.pending_opx_instrument.take() {
+            let op_count = mode.operator_count();
+            let mut operators: Vec<OpxOperator> = rows.iter()
+                .take(op_count)
+                .map(|r| OpxOperator::from_params(r))
+                .collect();
+            // Pad with defaults if fewer rows than expected
+            while operators.len() < op_count {
+                operators.push(OpxOperator::default());
+            }
+            // Last row (if present) is AL — algorithm
+            let algorithm = if !matches!(mode, OpxMode::X1) {
+                rows.get(op_count).and_then(|r| r.first()).copied().unwrap_or(0) as u8
+            } else {
+                0
+            };
+            let inst = OpxInstrument { number, name: None, mode, operators, algorithm };
+            ast.opx_instruments.insert(number, inst);
         }
     }
 

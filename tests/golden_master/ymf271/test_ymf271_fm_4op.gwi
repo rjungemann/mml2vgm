@@ -1,0 +1,22 @@
+; YMF271 (OPX) 4-operator FM test
+;
+; Tests the X4 instrument definition (4-op FM mode) and Vf part syntax.
+; Produces a simple ascending scale on OPX FM group 0.
+;
+; Instrument field order (each operator row):
+;   AR DR SR RR SL TL KS ML DT WF ACC FB LFO AMS PMS
+;
+; AL = algorithm (CON: 0-7)
+
+'@ X4 0 "OPX Brass"
+'@ 31  3  0 15  1   0  0  1  0  0  0  0  0  0  0  ;S1
+'@ 31  3  0 15  1   0  0  1  0  0  0  0  0  0  0  ;S3
+'@ 31  3  0 15  1  20  0  1  0  0  0  0  0  0  0  ;S2
+'@ 31  3  0 15  1  20  0  1  0  0  0  0  0  0  0  ;S4
+'@ 7
+
+'Vf01 t120 @0
+
+c4 d4 e4 f4 g4 a4 b4 c5
+
+r2
