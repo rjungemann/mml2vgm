@@ -1,0 +1,13 @@
+; YMF271 (OPX) PCM channel test
+;
+; Tests the Vp part (YMF271 PCM channel).
+; PCM sample playback — sample address and pitch registers.
+;
+; The Vp part maps to YMF271_PCM chip. Sample data not included;
+; this test validates register write sequencing only.
+
+'Vp t120
+
+c4 d4 e4 f4 g4 a4 b4 c5
+
+r2

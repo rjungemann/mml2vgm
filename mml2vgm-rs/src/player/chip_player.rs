@@ -82,8 +82,7 @@ impl ChipPlayer {
             SoundChip::SN76489X2 => Box::new(crate::chips::sn76489::SN76489::new()),
             SoundChip::YM2612X  => Box::new(crate::chips::ym2612::YM2612::new()),
             SoundChip::YM2612X2 => Box::new(crate::chips::ym2612::YM2612::new()),
-            // Declared-only chips produce silence; they do not panic
-            SoundChip::YMF271   => Box::new(crate::chips::SilentChip::new("YMF271", 16_934_400)),
+            SoundChip::YMF271   => Box::new(crate::chips::ymf271::YMF271::new()),
             SoundChip::MIDI      => Box::new(crate::chips::SilentChip::new("MIDI", 0)),
             SoundChip::CONDUCTOR => Box::new(crate::chips::SilentChip::new("CONDUCTOR", 0)),
             _ => {

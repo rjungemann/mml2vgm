@@ -1,0 +1,20 @@
+; YMF271 (OPX) 2-operator FM test
+;
+; Tests the X2 instrument definition (2-op FM mode).
+; Produces a simple ascending scale on OPX FM group 1.
+;
+; Instrument field order (each operator row):
+;   AR DR SR RR SL TL KS ML DT WF ACC FB LFO AMS PMS
+;
+; AL = algorithm (CON: 0-1)
+
+'@ X2 1 "OPX Sine"
+'@ 31  8  0 12  3   0  0  1  0  0  0  0  0  0  0  ;S1
+'@ 31  8  0 12  3  24  0  2  0  0  0  0  0  0  0  ;S2
+'@ 0
+
+'Vf02 t100 @1
+
+c4 e4 g4 c5 e5 g5 c6
+
+r2

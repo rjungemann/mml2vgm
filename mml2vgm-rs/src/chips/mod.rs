@@ -24,6 +24,7 @@ pub mod vrc6;
 pub mod k053260;
 pub mod k054539;
 pub mod qsound;
+pub mod ymf271;
 
 use crate::MmlResult;
 

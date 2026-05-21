@@ -184,6 +184,79 @@ pub struct PcmInstrument {
     pub option: Option<u32>,
 }
 
+/// OPX (YMF271) operator mode
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpxMode {
+    /// 4-operator FM (4 operator rows)
+    X4,
+    /// 3-operator FM (3 operator rows)
+    X3,
+    /// 2-operator FM (2 operator rows)
+    X2,
+    /// 1-operator PCM-envelope (1 operator row)
+    X1,
+}
+
+impl OpxMode {
+    pub fn operator_count(&self) -> usize {
+        match self {
+            Self::X4 => 4,
+            Self::X3 => 3,
+            Self::X2 => 2,
+            Self::X1 => 1,
+        }
+    }
+}
+
+/// OPX (YMF271) single-operator parameters (one row: AR DR SR RR SL TL KS ML DT WF ACC FB LFO AMS PMS)
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct OpxOperator {
+    pub ar: u8,
+    pub dr: u8,
+    pub sr: u8,
+    pub rr: u8,
+    pub sl: u8,
+    pub tl: u8,
+    pub ks: u8,
+    pub ml: u8,
+    pub dt: u8,
+    pub wf: u8,
+    pub acc: u8,
+    pub fb: u8,
+    pub lfo: u8,
+    pub ams: u8,
+    pub pms: u8,
+}
+
+impl OpxOperator {
+    /// Build from a flat parameter slice (15 values: AR DR SR RR SL TL KS ML DT WF ACC FB LFO AMS PMS).
+    pub fn from_params(p: &[u32]) -> Self {
+        let g = |i: usize| p.get(i).copied().unwrap_or(0) as u8;
+        Self {
+            ar: g(0), dr: g(1), sr: g(2), rr: g(3), sl: g(4),
+            tl: g(5), ks: g(6), ml: g(7), dt: g(8), wf: g(9),
+            acc: g(10), fb: g(11), lfo: g(12), ams: g(13), pms: g(14),
+        }
+    }
+}
+
+/// OPX (YMF271) instrument definition (modes X1–X4).
+///
+/// Stored separately from `FmInstrument` because the OPX operator field set
+/// (15 params including DT, WF, ACC, FB, LFO, AMS, PMS) differs from the
+/// OPN/OPM field set.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpxInstrument {
+    pub number: u32,
+    pub name: Option<String>,
+    /// X1 / X2 / X3 / X4
+    pub mode: OpxMode,
+    /// One entry per operator in mode order (S1, S3, S2, S4 for X4).
+    pub operators: Vec<OpxOperator>,
+    /// Algorithm (CON) value — the `AL` row at the end of the definition.
+    pub algorithm: u8,
+}
+
 /// Envelope definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -328,6 +401,8 @@ pub enum MmlNode {
     Include(Include),
     /// FM instrument definition
     FmInstrument(FmInstrument),
+    /// OPX (YMF271) instrument definition
+    OpxInstrument(OpxInstrument),
     /// PCM instrument definition
     PcmInstrument(PcmInstrument),
     /// Envelope definition
@@ -371,6 +446,8 @@ pub struct MmlAst {
     pub global_settings: Vec<MmlNode>,
     /// FM instruments
     pub fm_instruments: HashMap<u32, FmInstrument>,
+    /// OPX (YMF271) instruments
+    pub opx_instruments: HashMap<u32, OpxInstrument>,
     /// PCM instruments
     pub pcm_instruments: HashMap<u32, PcmInstrument>,
     /// Envelopes
@@ -403,6 +480,11 @@ impl MmlAst {
     /// Get FM instrument by number
     pub fn get_fm_instrument(&self, number: u32) -> Option<&FmInstrument> {
         self.fm_instruments.get(&number)
+    }
+
+    /// Get OPX instrument by number
+    pub fn get_opx_instrument(&self, number: u32) -> Option<&OpxInstrument> {
+        self.opx_instruments.get(&number)
     }
 
     /// Get PCM instrument by number
