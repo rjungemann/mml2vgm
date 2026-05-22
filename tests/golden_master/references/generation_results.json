@@ -4,7 +4,7 @@
   "sample_rate": 44100,
   "loops": 1,
   "fade_seconds": 1.0,
-  "passed": 43,
+  "passed": 47,
   "failed": 0,
   "skipped": 0,
   "files": [
@@ -308,6 +308,34 @@
       "ok": true,
       "size_bytes": 1896368,
       "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 474075, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x16 #0, Core VRC6, Clock 1789772, Rate 111860, Volume 0x8F\n    Cores: VRC6\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/tier3/test_vrc6_pulse.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/tier3/vrc6/test_vrc6_pulse.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 10.750\n[----------]"
+    },
+    {
+      "vgm": "validation_results/ymf271/test_ymf271_fm_2op.vgm",
+      "wav": "tests/golden_master/references/ymf271/test_ymf271_fm_2op.wav",
+      "ok": true,
+      "size_bytes": 952628,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 238140, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0E #0, Core MAME, Clock 16934400, Rate 44100, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/ymf271/test_ymf271_fm_2op.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ymf271/test_ymf271_fm_2op.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.400\n[----------]"
+    },
+    {
+      "vgm": "validation_results/ymf271/test_ymf271_fm_4op.vgm",
+      "wav": "tests/golden_master/references/ymf271/test_ymf271_fm_4op.wav",
+      "ok": true,
+      "size_bytes": 882068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 220500, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0E #0, Core MAME, Clock 16934400, Rate 44100, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/ymf271/test_ymf271_fm_4op.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ymf271/test_ymf271_fm_4op.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/ymf271/test_ymf271_mixed.vgm",
+      "wav": "tests/golden_master/references/ymf271/test_ymf271_mixed.wav",
+      "ok": true,
+      "size_bytes": 529268,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 132300, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0E #0, Core MAME, Clock 16934400, Rate 44100, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/ymf271/test_ymf271_mixed.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ymf271/test_ymf271_mixed.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 03.000\n[----------]"
+    },
+    {
+      "vgm": "validation_results/ymf271/test_ymf271_pcm_basic.vgm",
+      "wav": "tests/golden_master/references/ymf271/test_ymf271_pcm_basic.wav",
+      "ok": true,
+      "size_bytes": 882068,
+      "stderr": "PlayerName: VGM\nSongInfo: VGM v1.71, Rate 1/44100, Len 220500, Loop at -1, devices: 5\n  Dev 0: Type 0x00 #0, Core MAME, Clock 3579545, Rate 223721, Volume 0x40\n    Cores: MAME MAXM\n  Dev 1: Type 0x01 #0, Core EMU, Clock 3579545, Rate 49715, Volume 0x100\n    Cores: EMU MAME NUKE\n  Dev 2: Type 0x02 #0, Core GPGX, Clock 7670453, Rate 53267, Volume 0x80\n    Cores: GPGX GENS NUKE\n  Dev 3: Type 0x03 #0, Core MAME, Clock 3579545, Rate 55930, Volume 0x80\n    Cores: MAME NUKE\n  Dev 4: Type 0x0E #0, Core MAME, Clock 16934400, Rate 44100, Volume 0x80\n    Cores: MAME\n\nRendering /Users/rjungemann/Projects/mml2vgm/validation_results/ymf271/test_ymf271_pcm_basic.vgm to /Users/rjungemann/Projects/mml2vgm/tests/golden_master/references/ymf271/test_ymf271_pcm_basic.wav\nSamplerate: 44100\nBPS: 16\nChannels: 2\nLength: 05.000\n[----------]"
     }
   ]
 }

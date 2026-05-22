@@ -56,6 +56,9 @@ pathdiff = "0.2"
 # TTY detection for colors
 atty = "0.2"
 
+[build-dependencies]
+cc = "1"
+
 [dev-dependencies]
 # Testing
 rstest = "0.18"

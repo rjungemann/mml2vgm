@@ -41,6 +41,7 @@ pub enum ChipType {
     C140,
     POKEY,
     VRC6,
+    YMF271,
 }
 
 impl ChipType {
@@ -55,10 +56,11 @@ impl ChipType {
             6 => Some(Self::C140),
             7 => Some(Self::POKEY),
             8 => Some(Self::VRC6),
+            9 => Some(Self::YMF271),
             _ => None,
         }
     }
-    
+
     pub fn all() -> &'static [Self] {
         &[
             Self::YM2151,
@@ -70,6 +72,7 @@ impl ChipType {
             Self::C140,
             Self::POKEY,
             Self::VRC6,
+            Self::YMF271,
         ]
     }
     
@@ -84,9 +87,10 @@ impl ChipType {
             Self::C140 => "C140",
             Self::POKEY => "POKEY",
             Self::VRC6 => "VRC6",
+            Self::YMF271 => "YMF271",
         }
     }
-    
+
     pub fn short_name(&self) -> &'static str {
         match self {
             Self::YM2151 => "FM (Arcade)",
@@ -98,6 +102,7 @@ impl ChipType {
             Self::C140 => "Wave (Namco)",
             Self::POKEY => "POKEY (Atari)",
             Self::VRC6 => "VRC6 (NES)",
+            Self::YMF271 => "FM (OPX)",
         }
     }
     
@@ -169,6 +174,7 @@ pub fn create_chip(chip_type: ChipType, _sample_rate: f64) -> Option<Box<dyn Sou
         ChipType::C140 => Some(Box::new(SilentChip::new("C140", 16000000))),
         ChipType::POKEY => Some(Box::new(pokey::Pokey::new())),
         ChipType::VRC6 => Some(Box::new(vrc6::VRC6::new())),
+        ChipType::YMF271 => Some(Box::new(ymf271::YMF271::new())),
     }
 }
 
@@ -183,6 +189,7 @@ pub const CHIP_TYPES: &[ChipType] = &[
     ChipType::C140,
     ChipType::POKEY,
     ChipType::VRC6,
+    ChipType::YMF271,
 ];
 
 /// Trait for all sound chips

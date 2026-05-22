@@ -785,15 +785,140 @@
       "overall_status": "pending"
     }
   },
+  "dmg": {
+    "chip_name": "DMG (Game Boy)",
+    "tier": "tier3",
+    "reference_emulator": "Mednafen DMG",
+    "emulator_driver": "dmg",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.85",
+      "harmonic_match_percent": ">85"
+    },
+    "tests": {
+      "pulse": {
+        "test_file": "tier3/test_dmg_pulse.gwi",
+        "description": "Pulse channels 1 and 2",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "harmonic_match_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "wave": {
+        "test_file": "tier3/test_dmg_wave.gwi",
+        "description": "Wave channel (channel 3) with custom waveform",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "harmonic_match_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      },
+      "noise": {
+        "test_file": "tier3/test_dmg_noise.gwi",
+        "description": "Noise channel (channel 4)",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "harmonic_match_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "pending": 3,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "vrc6": {
+    "chip_name": "VRC6 (Konami)",
+    "tier": "tier3",
+    "reference_emulator": "Mesen-X",
+    "emulator_driver": "nes",
+    "validation_method": "binary_comparison",
+    "acceptance_criteria": {
+      "register_accuracy_percent": "≥98",
+      "timing_variance_samples": "≤1"
+    },
+    "tests": {
+      "pulse": {
+        "test_file": "tier3/test_vrc6_pulse.gwi",
+        "description": "VRC6 pulse channels",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "register_accuracy_percent": null,
+          "timing_variance_samples": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 1,
+      "passed": 0,
+      "failed": 0,
+      "pending": 1,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
+  "k051649": {
+    "chip_name": "K051649 (Konami SCC)",
+    "tier": "tier3",
+    "reference_emulator": "MAME 0.287",
+    "emulator_driver": "k051649",
+    "validation_method": "spectral_analysis",
+    "acceptance_criteria": {
+      "spectral_correlation": ">0.85",
+      "wavetable_match_percent": ">85"
+    },
+    "tests": {
+      "wavetable": {
+        "test_file": "tier3/test_k051649_wavetable.gwi",
+        "description": "Wavetable waveforms across 5 channels",
+        "validation_status": "pending",
+        "generated_date": null,
+        "metrics": {
+          "correlation": null,
+          "wavetable_match_percent": null
+        },
+        "passed": null,
+        "notes": ""
+      }
+    },
+    "summary": {
+      "total_tests": 1,
+      "passed": 0,
+      "failed": 0,
+      "pending": 1,
+      "pass_rate_percent": null,
+      "overall_status": "pending"
+    }
+  },
   "summary": {
-    "total_chips": 17,
-    "total_tests": 42,
+    "total_chips": 20,
+    "total_tests": 47,
     "tier1_chips": 8,
     "tier1_tests": 25,
     "tier2_chips": 9,
     "tier2_tests": 17,
+    "tier3_chips": 3,
+    "tier3_tests": 5,
     "tests_passed": 0,
-    "tests_pending": 42,
+    "tests_pending": 47,
     "tests_failed": 0,
     "overall_pass_rate_percent": 0,
     "phase_1_status": "infrastructure_complete",

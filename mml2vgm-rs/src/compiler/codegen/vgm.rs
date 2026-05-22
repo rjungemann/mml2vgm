@@ -2924,6 +2924,10 @@ impl VgmGenerator {
 
     // ── YMF271 (OPX, 48-slot) helpers ────────────────────────────────────────
 
+    /// Maps group index 0–11 to the fm_tab address nibble used in YMF271 register addresses.
+    /// fm_tab = {0,1,2,-1,3,4,5,-1,6,7,8,-1,9,10,11,-1}; groups skip nibbles 3,7,11,15.
+    const GROUP_TO_NIBBLE: [u8; 12] = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14];
+
     /// Emit VGM command 0xD1 [port, reg, data] — one YMF271 register write.
     ///
     /// The libvgm player calls `ymf271_w(state, port*2, reg)` then
@@ -2940,90 +2944,97 @@ impl VgmGenerator {
     fn ymf271_global_init(&mut self) {
         let t = 0u64;
         for grp in 0u8..12 {
-            // Group timer register (port 6, address 0x10+grp): clear key-on bit
-            self.ymf271_write_reg(6, 0x10 + grp, 0x00, t);
+            let nibble = Self::GROUP_TO_NIBBLE[grp as usize];
+            // KEYOFF: bank 0, reg 0x0 (synced — clears all 4 operators' key-on state)
+            self.ymf271_write_reg(0, 0x00 | nibble, 0x00, t);
         }
     }
 
-    /// Write a minimal FM patch to all 4 slots of the given group.
+    /// Write a minimal FM patch to all 4 operators of the given group.
     ///
-    /// If `opx_inst` is provided, its operator parameters are written; otherwise
-    /// a simple default sustain patch (similar to the OPM init) is used.
+    /// YMF271 register addresses use `(reg_type << 4) | nibble` where nibble = GROUP_TO_NIBBLE[grp].
+    /// Synced registers (KEYON=0, FNUM=9/a, ALG=c, CHLVL=d/e) are written once via bank 0.
+    /// Per-operator registers (TL=4, AR+KS=5, etc.) must be written once per bank (0–3).
     fn ymf271_init_group(
         &mut self,
         state: &PartCodegenState,
         opx_inst: Option<&OpxInstrument>,
         time: u64,
     ) {
-        let grp = state.ymf271_group;
+        let grp = state.ymf271_group as usize;
+        let nibble = Self::GROUP_TO_NIBBLE[grp];
         let vol = state.volume;
-
-        // YMF271 slot indices for group `grp` (0-indexed groups, 4-op mapping):
-        // S1 = grp, S3 = grp+12, S2 = grp+24, S4 = grp+36
-        // These match the MML V01-V04 → Slot01,Slot13,Slot25,Slot37 (1-indexed) layout.
-        let slots = [grp, grp + 12, grp + 24, grp + 36];
-
-        // TL maps volume: 127→0 (full), 0→127 (mute) scaled to 7-bit (0–127)
+        // TL maps volume: vol=127→car_tl=0 (full), vol=0→car_tl=127 (mute)
         let car_tl = (127u16.saturating_sub(vol as u16)) as u8 & 0x7F;
 
-        for (op_idx, &slot) in slots.iter().enumerate() {
+        // Output routing: enable all 4 output channels (reg 0xd, synced via bank 0)
+        self.ymf271_write_reg(0, 0xd0 | nibble, 0xFF, time);
+
+        // Per-operator writes (banks 0–3 correspond to operators S1–S4)
+        for bank in 0u8..4 {
             if let Some(inst) = opx_inst {
-                // Write instrument operator parameters
-                if let Some(op) = inst.operators.get(op_idx) {
-                    // Bank 0 (port 0): AR, D1R, KS, KF=0
-                    let b0 = (op.ar & 0x1F) | ((op.dr & 0x07) << 5);
-                    self.ymf271_write_reg(0, slot, b0, time);
-                    // Bank 1 (port 1): D2R, RR, SL
-                    let b1 = (op.sr & 0x1F) | ((op.rr & 0x07) << 5);
-                    self.ymf271_write_reg(1, slot, b1, time);
-                    // Bank 2 (port 2): TL, ML, WF
-                    let tl = op.tl.min(127);
-                    let b2 = (tl & 0x7F) | ((op.ml & 0x01) << 7);
-                    self.ymf271_write_reg(2, slot, b2, time);
-                    // Bank 3 (port 3): CON (algorithm), FB
-                    let algorithm = inst.algorithm & 0x07;
-                    let b3 = algorithm | ((op.fb & 0x07) << 3);
-                    self.ymf271_write_reg(3, slot, b3, time);
+                if let Some(op) = inst.operators.get(bank as usize) {
+                    // TL (reg 4): total level
+                    self.ymf271_write_reg(bank, 0x40 | nibble, op.tl.min(127), time);
+                    // AR+KS (reg 5)
+                    self.ymf271_write_reg(bank, 0x50 | nibble, (op.ar & 0x1F) | ((op.ks & 0x07) << 5), time);
+                    // D1R (reg 6)
+                    self.ymf271_write_reg(bank, 0x60 | nibble, op.dr & 0x1F, time);
+                    // D2R (reg 7)
+                    self.ymf271_write_reg(bank, 0x70 | nibble, op.sr & 0x1F, time);
+                    // RR+D1LVL (reg 8): D1LVL in high nibble, RR in low nibble
+                    self.ymf271_write_reg(bank, 0x80 | nibble, (op.sl << 4) | (op.rr & 0x0F), time);
+                    // MULTIPLE+DETUNE (reg 3)
+                    self.ymf271_write_reg(bank, 0x30 | nibble, (op.ml & 0x0F) | ((op.dt & 0x07) << 4), time);
+                    // WAVEFORM+FEEDBACK+ACCON (reg 0xb)
+                    self.ymf271_write_reg(bank, 0xb0 | nibble, (op.wf & 0x07) | ((op.fb & 0x07) << 4) | (op.acc << 7), time);
                 } else {
-                    self.ymf271_write_slot_defaults(slot, car_tl, time);
+                    self.ymf271_write_slot_defaults(nibble, car_tl, bank, time);
                 }
             } else {
-                self.ymf271_write_slot_defaults(slot, car_tl, time);
+                self.ymf271_write_slot_defaults(nibble, car_tl, bank, time);
             }
         }
+
+        // Algorithm (reg 0xc, synced via bank 0)
+        let algorithm = opx_inst.map(|i| i.algorithm & 0x0F).unwrap_or(7);
+        self.ymf271_write_reg(0, 0xc0 | nibble, algorithm, time);
     }
 
-    /// Write a minimal default patch to one slot: fast attack, sustain, algorithm 7.
-    fn ymf271_write_slot_defaults(&mut self, slot: u8, car_tl: u8, time: u64) {
-        // Bank 0: AR=31, D1R=0
-        self.ymf271_write_reg(0, slot, 0x1F, time);
-        // Bank 1: D2R=0, RR=15, SL=0
-        self.ymf271_write_reg(1, slot, 0xE0, time);
-        // Bank 2: TL, ML=1
-        self.ymf271_write_reg(2, slot, car_tl | 0x80, time);
-        // Bank 3: algorithm=7 (all carriers), FB=0
-        self.ymf271_write_reg(3, slot, 0x07, time);
+    /// Write a minimal default patch for one operator: AR=31, RR=15, all-carrier algorithm 7.
+    fn ymf271_write_slot_defaults(&mut self, nibble: u8, car_tl: u8, bank: u8, time: u64) {
+        // TL (reg 4): all operators carry (alg 7), so all get volume-scaled TL
+        self.ymf271_write_reg(bank, 0x40 | nibble, car_tl, time);
+        // AR=31 (reg 5): fastest attack
+        self.ymf271_write_reg(bank, 0x50 | nibble, 0x1F, time);
+        // D1R=0 (reg 6)
+        self.ymf271_write_reg(bank, 0x60 | nibble, 0x00, time);
+        // RR=15, D1LVL=0 (reg 8)
+        self.ymf271_write_reg(bank, 0x80 | nibble, 0x0F, time);
     }
 
     /// Set frequency (FNUM, BLOCK) and key-on for a group.
+    ///
+    /// Register protocol (bank 0, synced in 4-op mode):
+    ///   reg 0xa (addr 0xa0|nibble): store fns_hi = (block << 4) | fnum[11:8]
+    ///   reg 0x9 (addr 0x90|nibble): write fnum[7:0] — triggers frequency update using fns_hi
+    ///   reg 0x0 (addr 0x00|nibble): KEYON (bit 0 = 1)
     fn ymf271_note_on(&mut self, state: &PartCodegenState, midi_note: u8, time: u64) {
-        let grp = state.ymf271_group;
+        let grp = state.ymf271_group as usize;
+        let nibble = Self::GROUP_TO_NIBBLE[grp];
         let (block, fnum) = Self::midi_note_to_ymf271_freq(midi_note);
-        // Group frequency registers (port 6):
-        //   address 0x00+grp: FNUM[7:0]
-        //   address 0x10+grp: KEYON(bit7) | BLOCK[2:0](bits 4:2) | FNUM[8](bit 0)
         let fnum_lo = (fnum & 0xFF) as u8;
-        let fnum_hi = (fnum >> 8) as u8 & 0x01;
-        let hi_byte = 0x80u8 | ((block & 0x07) << 2) | fnum_hi;
-        self.ymf271_write_reg(6, 0x00 + grp, fnum_lo, time);
-        self.ymf271_write_reg(6, 0x10 + grp, hi_byte, time);
+        let fns_hi = (block << 4) | ((fnum >> 8) as u8 & 0x0F);
+        self.ymf271_write_reg(0, 0xa0 | nibble, fns_hi, time);
+        self.ymf271_write_reg(0, 0x90 | nibble, fnum_lo, time);
+        self.ymf271_write_reg(0, 0x00 | nibble, 0x01, time);
     }
 
     /// Clear key-on for a group.
     fn ymf271_key_off(&mut self, state: &PartCodegenState, time: &u64) {
-        let grp = state.ymf271_group;
-        // Clear bit 7 (key-on) in the group's high frequency register
-        self.ymf271_write_reg(6, 0x10 + grp, 0x00, *time);
+        let grp = state.ymf271_group as usize;
+        let nibble = Self::GROUP_TO_NIBBLE[grp];
+        self.ymf271_write_reg(0, 0x00 | nibble, 0x00, *time);
     }
 
     /// Convert a MIDI note to YMF271 (BLOCK, FNUM).
