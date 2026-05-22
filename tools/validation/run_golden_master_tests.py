@@ -26,11 +26,13 @@ from scipy.io import wavfile
 ROOT        = Path(__file__).parent.parent.parent
 VGM2WAV     = ROOT.parent / "libvgm" / "build" / "bin" / "vgm2wav"
 CARGO       = ROOT / "mml2vgm-rs" / "Cargo.toml"
+BIN         = ROOT / "mml2vgm-rs" / "target" / "release" / "mml2vgm-rs"
 REFS        = ROOT / "tests" / "golden_master" / "references"
 TIER_DIRS   = [
     ROOT / "tests" / "golden_master" / "tier1",
     ROOT / "tests" / "golden_master" / "tier2",
     ROOT / "tests" / "golden_master" / "tier3",
+    ROOT / "tests" / "golden_master" / "ymf271",
 ]
 RESULTS_DIR = ROOT / "validation_results"
 OUT_JSON    = RESULTS_DIR / "golden_master_results.json"
@@ -62,6 +64,7 @@ STEM_MAP = [
     ("test_ym2151_",     "ym2151"),
     ("test_ym2203_",     "ym2203"),
     ("test_ym2608_",     "ym2608"),
+    ("test_ymf271_",     "ymf271"),
 ]
 
 def ref_folder(stem: str) -> str | None:
@@ -98,6 +101,7 @@ STEM_TO_OPCODES: dict[str, list[int]] = {
     "test_dmg_":       [0xB3],
     "test_vrc6_":      [0xB6],
     "test_k051649_":   [0xD2],
+    "test_ymf271_":    [0xD1],
 }
 
 # Stems whose audio output is unreliable with the current toolchain.
@@ -177,14 +181,18 @@ def count_vgm_opcodes(vgm_path: Path, target_opcodes: set[int]) -> int:
 
 def compile_gwi(gwi: Path, out_vgm: Path) -> tuple[bool, str]:
     out_vgm.parent.mkdir(parents=True, exist_ok=True)
+    # Prefer pre-built release binary for speed; fall back to cargo run if missing.
+    if BIN.exists():
+        cmd = [str(BIN), str(gwi), "-o", str(out_vgm)]
+        timeout = 30
+    else:
+        cmd = ["cargo", "run", "--manifest-path", str(CARGO), "--quiet", "--",
+               str(gwi), "-o", str(out_vgm)]
+        timeout = 120
     try:
-        r = subprocess.run(
-            ["cargo", "run", "--manifest-path", str(CARGO), "--quiet", "--",
-             str(gwi), "-o", str(out_vgm)],
-            capture_output=True, text=True, timeout=120,
-        )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return False, "compile timeout (120s)"
+        return False, f"compile timeout ({timeout}s)"
     if r.returncode != 0:
         err = (r.stderr or r.stdout).strip().splitlines()
         return False, "\n".join(err[-5:])
