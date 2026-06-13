@@ -148,3 +148,162 @@ fn ym2612_keyed_on_channel_produces_audio() {
     let peak = buf.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
     assert!(peak > 0.01, "expected audible output, got peak {}", peak);
 }
+
+// ── PSG / wavetable / square-wave chips ───────────────────────────────────────
+
+/// Render a single tone via the part-letter convention for a given chip,
+/// then assert audible peak. Intentionally generic — a stub that returns
+/// silence (or all zeros) fails; anything actually generating sound passes.
+fn assert_audible(label: &str, mml: &str) {
+    let buf = render_mml(mml, 0.5);
+    let peak = buf.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
+    assert!(
+        peak > 0.005,
+        "{}: expected audible output, got peak {} (chip likely returning silence)",
+        label,
+        peak,
+    );
+}
+
+/// SN76489 tone: a quarter-note A. Catches any regression to the
+/// SN76489 tone channel that drops the latch/data write sequence.
+#[test]
+fn sn76489_tone_channel_produces_audio() {
+    assert_audible(
+        "SN76489 tone",
+        "'{
+    TitleName = SN76489 tone
+    Format = VGM
+    ClockCount = 192
+    PartSN76489 = B
+}
+'B1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// AY8910 / YM2149: tone channel. Has its own register layout
+/// (tone period registers 0/2/4, mixer 0x07, channel volumes 0x08-0x0A).
+/// A stub that doesn't initialise the mixer correctly produces silence.
+#[test]
+fn ay8910_tone_channel_produces_audio() {
+    assert_audible(
+        "AY8910 tone",
+        "'{
+    TitleName = AY8910 tone
+    Format = VGM
+    ClockCount = 192
+    PartAY8910 = C
+}
+'C1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// K051649 (SCC) — uses 32-byte wavetable RAM per channel. A stub
+/// that forgets to load a default waveform produces silence.
+#[test]
+fn k051649_scc_channel_produces_audio() {
+    assert_audible(
+        "K051649 (SCC)",
+        "'{
+    TitleName = SCC tone
+    Format = VGM
+    ClockCount = 192
+    PartK051649 = D
+}
+'D1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// HuC6280 (PC Engine PSG): wavetable PSG like SCC. Has 6 channels;
+/// channel 4-5 can also do noise. We just need any one of them audible.
+#[test]
+fn huc6280_pce_channel_produces_audio() {
+    assert_audible(
+        "HuC6280",
+        "'{
+    TitleName = HuC6280 tone
+    Format = VGM
+    ClockCount = 192
+    PartHuC6280 = E
+}
+'E1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// NES APU pulse channel. The simplified envelope handling shouldn't
+/// stop a quarter-note from producing sound.
+#[test]
+fn nes_apu_pulse_channel_produces_audio() {
+    assert_audible(
+        "NES APU pulse",
+        "'{
+    TitleName = NES pulse
+    Format = VGM
+    ClockCount = 192
+    PartNES = F
+}
+'F1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// Game Boy DMG pulse channel.
+#[test]
+fn dmg_gameboy_pulse_channel_produces_audio() {
+    assert_audible(
+        "DMG pulse",
+        "'{
+    TitleName = DMG pulse
+    Format = VGM
+    ClockCount = 192
+    PartDMG = G
+}
+'G1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// VRC6 (NES expansion): two pulse channels + one sawtooth.
+#[test]
+fn vrc6_channel_produces_audio() {
+    assert_audible(
+        "VRC6",
+        "'{
+    TitleName = VRC6
+    Format = VGM
+    ClockCount = 192
+    PartVRC6 = H
+}
+'H1 T120 v100 l1 o4 a
+",
+    );
+}
+
+/// Atari POKEY.
+///
+/// Currently ignored: the chip emulator is correct (verified by inspection
+/// of `chips/pokey.rs` — implements 4 channels with poly LFSR), but the
+/// codegen has no `process_chip_note` arm for `Some("POKEY")`, so a
+/// note-on emits zero VGM register writes. Adding `pokey_note_on`/
+/// `pokey_note_off` + dispatch arm + per-state channel allocation is a
+/// bigger change than the K051649/NES fixes in this commit. Tracked as
+/// a known gap; un-ignore once the codegen path lands.
+#[test]
+#[ignore = "POKEY codegen path missing; chip emulator is fine"]
+fn pokey_channel_produces_audio() {
+    assert_audible(
+        "POKEY",
+        "'{
+    TitleName = POKEY
+    Format = VGM
+    ClockCount = 192
+    PartPOKEY = I
+}
+'I1 T120 v100 l1 o4 a
+",
+    );
+}

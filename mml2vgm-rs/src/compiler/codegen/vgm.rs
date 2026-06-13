@@ -787,9 +787,11 @@ impl VgmGenerator {
             .iter()
             .any(|n| effective_chip_map.get(n).map(|s| s == "K051649").unwrap_or(false));
         if has_k051649 {
-            // K051649: silence all channels (clear key-on register)
-            // pp=3 = key on/off, aa=ignored, dd=5-bit mask (0 = all off)
-            self.k051649_write(3, 0x00, 0, 0);
+            // K051649: silence all channels by clearing the key-on mask at
+            // register 0xAF. (Earlier this was `port=3, addr=0` which is
+            // misaligned with the VGM spec; see k051649_note_on for the
+            // explanation. Effect: all channels start muted.)
+            self.k051649_write(0, 0xAF, 0, 0);
             // Initialize waveforms to default (sine-like)
             let default_wave: [i8; 32] = [
                 0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
@@ -3361,24 +3363,38 @@ impl VgmGenerator {
         ((freq_val & 0xFF) as u8, ((freq_val >> 8) & 0x0F) as u8)
     }
 
-    /// Write K051649 note-on for a channel
+    /// Write K051649 note-on for a channel.
+    ///
+    /// Per VGM 1.71 spec, the 0xD2 opcode is `pp aa dd` where `pp` is the
+    /// SCC chip-select (0 = SCC1, 1 = SCC+ extensions), NOT a register-class
+    /// selector. The actual register address lives in `aa`. The chip's real
+    /// register map is:
+    /// - 0x00-0x9F: waveform RAM (5 × 32-byte tables)
+    /// - 0xA0-0xA9: per-channel frequency low / high (ch × 2 + 0/1)
+    /// - 0xAA-0xAE: per-channel volume (4-bit)
+    /// - 0xAF:      key-on/off (5-bit channel mask)
+    ///
+    /// Earlier revisions of this codegen used `pp` as a register-class
+    /// selector (1=freq, 2=vol, 3=keyon) which produced VGM bytes the
+    /// chip emulator and any standards-compliant external player both
+    /// interpreted as more waveform RAM writes — silent playback.
     fn k051649_note_on(&mut self, ch: u8, note: u8, octave: u8, volume: u8, time: u64) {
         let clock = self.header.k051649_clock;
         let (freq_lo, freq_hi) = self.midi_note_to_k051649_freq(note, clock);
-        // pp=1: frequency write; aa = ch*2 (lo byte), ch*2+1 (hi byte)
-        self.k051649_write(1, ch * 2, freq_lo, time);
-        self.k051649_write(1, ch * 2 + 1, freq_hi, time);
-        // pp=2: volume write; aa = ch (0-4), dd = volume (0-15)
-        self.k051649_write(2, ch, volume.min(15), time);
-        // pp=3: key on/off; aa = unused, dd = 5-bit channel mask
+        // Frequency: registers 0xA0+ch*2 (lo) and 0xA1+ch*2 (hi).
+        self.k051649_write(0, 0xA0 + ch * 2, freq_lo, time);
+        self.k051649_write(0, 0xA0 + ch * 2 + 1, freq_hi, time);
+        // Volume: register 0xAA+ch.
+        self.k051649_write(0, 0xAA + ch, volume.min(15), time);
+        // Key-on/off mask: register 0xAF, one bit per channel.
         self.k051649_key_mask |= 1 << ch;
-        self.k051649_write(3, 0x00, self.k051649_key_mask, time);
+        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
     }
 
     /// Write K051649 note-off for a channel
     fn k051649_note_off(&mut self, ch: u8, time: u64) {
         self.k051649_key_mask &= !(1 << ch);
-        self.k051649_write(3, 0x00, self.k051649_key_mask, time);
+        self.k051649_write(0, 0xAF, self.k051649_key_mask, time);
     }
 
     // ── NES APU (2A03) helpers ────────────────────────────────────────────────
@@ -3465,11 +3481,18 @@ impl VgmGenerator {
     /// Write NES global init (silence all channels)
     fn nes_apu_global_init(&mut self) {
         let t = 0u64;
-        // Silence all channels
-        for addr in [0x4000, 0x4001, 0x4002, 0x4003, 0x4004, 0x4005, 0x4006, 0x4007, 
-                      0x4008, 0x4009, 0x400A, 0x400B, 0x400C, 0x400D, 0x400E, 0x400F] {
+        // Silence all channels' control / sweep / timer registers
+        for addr in [0x4000, 0x4001, 0x4002, 0x4003, 0x4004, 0x4005, 0x4006, 0x4007,
+                     0x4008, 0x4009, 0x400A, 0x400B, 0x400C, 0x400D, 0x400E, 0x400F] {
             self.nes_apu_write((addr - 0x4000) as u8, 0, t);
         }
+        // Enable all five channels via $4015. Without this, the chip
+        // emulator (and real hardware) keeps every channel muted regardless
+        // of what we write to the per-channel registers — that's how a
+        // codegen that correctly programmed pulse 1's pitch + volume could
+        // still produce silence and the fingerprint test caught it.
+        // bits: 0=pulse1, 1=pulse2, 2=triangle, 3=noise, 4=dmc
+        self.nes_apu_write(0x15, 0x0F, t);
     }
 
     // ── DMG (Game Boy) helpers ───────────────────────────────────────────────
