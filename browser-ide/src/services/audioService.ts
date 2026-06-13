@@ -231,8 +231,7 @@ export class AudioService {
   private audioWorkletNode: AudioWorkletNode | null = null;
   private audioDestination: AudioNode | null = null;
   
-  // Sample buffer and queue
-  private sampleBuffer: Float32Array | null = null;
+  // Reentrancy guard for the producer loop in startSampleGeneration.
   private isProcessing = false;
 
   // SharedArrayBuffer ring buffer for low-latency audio
@@ -251,6 +250,15 @@ export class AudioService {
   // Original VGM byte stream (kept for diagnostics / re-parse). All actual
   // playback runs through the chip player and `vgmCommands` queue.
   private vgmData: Uint8Array | null = null;
+
+  // Path-C (ScriptProcessor) handoff: producer pushes interleaved-stereo
+  // Float32Arrays here; the audio callback drains them in `onaudioprocess`.
+  // Path A bypasses this (uses the SAB ring buffer); Path B uses postMessage.
+  private fallbackSampleQueue: Float32Array[] = [];
+  // Index into the head of `fallbackSampleQueue` measured in *frames* (one
+  // frame = one L,R pair = 2 floats). Lets the audio callback consume a
+  // single producer buffer across multiple `onaudioprocess` invocations.
+  private fallbackQueueFrameIndex = 0;
   
   // Chip player state
   private chipPlayerId: string | null = null;
@@ -1102,59 +1110,76 @@ export class AudioService {
         
         registerProcessor('mml-audio-processor', MMLAudioProcessor);
       ` : `
+        // Path B — AudioWorklet without SharedArrayBuffer. Producer ships
+        // interleaved stereo Float32Arrays via port.postMessage; we queue
+        // them and drain in frame-pairs each render quantum. Stride 2 keeps
+        // L,R order intact instead of collapsing to phase-shifted mono.
         class MMLAudioProcessor extends AudioWorkletProcessor {
           constructor() {
             super();
-            this.sampleBuffer = null;
-            this.bufferIndex = 0;
+            this.queue = [];
+            this.frameIndex = 0;
             this.port.onmessage = (e) => {
-              if (e.data.type === 'samples') {
-                this.sampleBuffer = e.data.samples;
-                this.bufferIndex = 0;
+              if (e.data && e.data.type === 'samples' && e.data.samples) {
+                this.queue.push(e.data.samples);
+                // Cap pending buffers so a stalled audio thread can't grow
+                // the queue without bound.
+                if (this.queue.length > 8) {
+                  this.queue.splice(0, this.queue.length - 8);
+                  this.frameIndex = 0;
+                }
               }
             };
           }
-          
+
           process(inputs, outputs, parameters) {
             const output = outputs[0];
             const channelCount = output.length;
             const samplesNeeded = output[0].length;
-            
-            if (!this.sampleBuffer || this.bufferIndex >= this.sampleBuffer.length) {
-              // Fill with silence
-              for (let i = 0; i < samplesNeeded; i++) {
-                for (let c = 0; c < channelCount; c++) {
-                  output[c][i] = 0;
+            const STRIDE = 2;
+
+            let written = 0;
+            while (written < samplesNeeded && this.queue.length > 0) {
+              const head = this.queue[0];
+              const framesInHead = (head.length / STRIDE) | 0;
+              const framesRemaining = framesInHead - this.frameIndex;
+              const framesToTake = Math.min(framesRemaining, samplesNeeded - written);
+
+              for (let i = 0; i < framesToTake; i++) {
+                const base = (this.frameIndex + i) * STRIDE;
+                const left = head[base];
+                const right = head[base + 1];
+                if (channelCount === 1) {
+                  output[0][written + i] = (left + right) * 0.5;
+                } else {
+                  output[0][written + i] = left;
+                  output[1][written + i] = right;
+                  for (let c = 2; c < channelCount; c++) {
+                    output[c][written + i] = (left + right) * 0.5;
+                  }
                 }
               }
-              // Request more samples
-              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * channelCount });
-              return true;
-            }
-            
-            // Copy samples from buffer
-            for (let i = 0; i < samplesNeeded; i++) {
-              if (this.bufferIndex < this.sampleBuffer.length) {
-                const sample = this.sampleBuffer[this.bufferIndex++];
-                for (let c = 0; c < channelCount; c++) {
-                  output[c][i] = sample;
-                }
-              } else {
-                for (let c = 0; c < channelCount; c++) {
-                  output[c][i] = 0;
-                }
+
+              this.frameIndex += framesToTake;
+              written += framesToTake;
+              if (this.frameIndex >= framesInHead) {
+                this.queue.shift();
+                this.frameIndex = 0;
               }
             }
-            
-            // Request more samples if buffer is getting low
-            if (this.bufferIndex > this.sampleBuffer.length * 0.8) {
-              this.port.postMessage({ type: 'needSamples', count: samplesNeeded * channelCount });
+
+            // Silence pad whatever we couldn't fill — the producer's next
+            // setTimeout tick will refill the queue before the next quantum.
+            for (let i = written; i < samplesNeeded; i++) {
+              for (let c = 0; c < channelCount; c++) {
+                output[c][i] = 0;
+              }
             }
-            
+
             return true;
           }
         }
-        
+
         registerProcessor('mml-audio-processor', MMLAudioProcessor);
       `;
       
@@ -1268,40 +1293,75 @@ export class AudioService {
 
   /**
    * Fallback to ScriptProcessorNode for browsers without AudioWorklet.
+   *
+   * `onaudioprocess` runs synchronously on each render quantum and pulls
+   * stereo frames from `fallbackSampleQueue` (filled by the producer loop).
+   * The chip player emits interleaved `L,R,L,R,...` so each "frame" = 2
+   * consecutive floats. The producer self-paces via `setTimeout`, so if the
+   * queue runs dry we emit silence for the rest of this quantum and the
+   * producer's next tick refills it.
    */
   private setupScriptProcessorNode(): void {
     if (!this.audioContext) return;
-    
+
     try {
       this.audioWorkletNode = (this.audioContext as any).createScriptProcessor(
         this.bufferSize,
         0,
         this.outputChannels
       );
-      
+
+      const STRIDE = 2;
       this.audioWorkletNode.onaudioprocess = (e: any) => {
         const output = e.outputBuffer;
         const channelCount = output.numberOfChannels;
         const samplesNeeded = output.length;
-        
+        const channels: Float32Array[] = [];
         for (let c = 0; c < channelCount; c++) {
-          const channelData = output.getChannelData(c);
-          for (let i = 0; i < samplesNeeded; i++) {
-            // Fill with samples or silence
-            if (this.sampleBuffer && this.bufferIndex < this.sampleBuffer.length) {
-              channelData[i] = this.sampleBuffer[this.bufferIndex++];
+          channels.push(output.getChannelData(c));
+        }
+
+        let written = 0;
+        while (written < samplesNeeded && this.fallbackSampleQueue.length > 0) {
+          const head = this.fallbackSampleQueue[0];
+          const framesInHead = (head.length / STRIDE) | 0;
+          const framesRemaining = framesInHead - this.fallbackQueueFrameIndex;
+          const framesToTake = Math.min(framesRemaining, samplesNeeded - written);
+
+          for (let i = 0; i < framesToTake; i++) {
+            const base = (this.fallbackQueueFrameIndex + i) * STRIDE;
+            const left = head[base];
+            const right = head[base + 1];
+            if (channelCount === 1) {
+              channels[0][written + i] = (left + right) * 0.5;
             } else {
-              channelData[i] = 0;
+              channels[0][written + i] = left;
+              channels[1][written + i] = right;
+              for (let c = 2; c < channelCount; c++) {
+                channels[c][written + i] = (left + right) * 0.5;
+              }
             }
           }
+
+          this.fallbackQueueFrameIndex += framesToTake;
+          written += framesToTake;
+          if (this.fallbackQueueFrameIndex >= framesInHead) {
+            this.fallbackSampleQueue.shift();
+            this.fallbackQueueFrameIndex = 0;
+          }
         }
-        // The producer loop already self-reschedules in startSampleGeneration;
-        // no explicit request needed here.
+
+        // Pad anything we couldn't fill with silence.
+        for (let i = written; i < samplesNeeded; i++) {
+          for (let c = 0; c < channelCount; c++) {
+            channels[c][i] = 0;
+          }
+        }
       };
-      
+
       this.audioWorkletNode.connect(this.audioContext.destination);
       this.audioDestination = this.audioWorkletNode;
-      
+
       console.log('[AudioService] Using ScriptProcessorNode fallback');
     } catch (error) {
       console.error('[AudioService] Failed to create ScriptProcessorNode:', error);
@@ -1538,20 +1598,28 @@ export class AudioService {
           this.emitError(new Error(`Playback running but audio is silent (${diag}).`));
         }
         
-        // If using SharedArrayBuffer, write directly to the ring buffer
+        // Three output paths, depending on browser capabilities:
+        //
+        //   A. AudioWorklet + SharedArrayBuffer — lock-free ring buffer (preferred).
+        //   B. AudioWorklet + postMessage      — transfer Float32Arrays per buffer.
+        //   C. ScriptProcessorNode             — push onto an in-process queue.
+        //
+        // The chip player always emits stereo-interleaved Float32Arrays
+        // (`L,R,L,R,...`), so every consumer treats `samples` as pairs.
         if (this.usingSharedArrayBuffer && this.sharedRingBuffer && this.sharedRingBufferBytes) {
           this.writeSamplesToRingBuffer(samples);
+        } else if (this.audioWorkletNode && 'port' in this.audioWorkletNode) {
+          // Path B — AudioWorkletNode has a MessagePort; ScriptProcessorNode
+          // does NOT. The `'port' in` check distinguishes the two without
+          // having to track which kind we created.
+          this.audioWorkletNode.port.postMessage({ type: 'samples', samples });
         } else {
-          // Fallback: Store samples for playback
-          this.sampleBuffer = samples;
-          this.bufferIndex = 0;
-          
-          // Send to audio worklet
-          if (this.audioWorkletNode) {
-            this.audioWorkletNode.port.postMessage({
-              type: 'samples',
-              samples: samples,
-            });
+          // Path C — push onto the ScriptProcessor queue; the audio callback
+          // drains it. Cap the queue so a stalled audio thread can't make us
+          // hold gigabytes of pending buffers.
+          this.fallbackSampleQueue.push(samples);
+          if (this.fallbackSampleQueue.length > 8) {
+            this.fallbackSampleQueue.splice(0, this.fallbackSampleQueue.length - 8);
           }
         }
         
@@ -1655,11 +1723,12 @@ export class AudioService {
       this.chipPlayerId = null;
     }
     
-    // Clear sample queue
-    this.sampleQueue = [];
-    this.sampleBuffer = null;
-    this.bufferIndex = 0;
-    
+    // Clear fallback-path queue (Path C ScriptProcessor); the SAB ring and
+    // Path B postMessage transports both restart cleanly from zero-state on
+    // the next startPlayback.
+    this.fallbackSampleQueue.length = 0;
+    this.fallbackQueueFrameIndex = 0;
+
     this.emitStop();
     console.log('[AudioService] Playback stopped');
   }
@@ -2012,9 +2081,6 @@ export class AudioService {
     this.listeners.forEach(l => l.onError?.(error));
   }
   
-  // Cleanup buffer index tracking
-  private bufferIndex = 0;
-  
   // ========================================================================
   // Cleanup
   // ========================================================================
@@ -2031,9 +2097,9 @@ export class AudioService {
     }
     
     this.listeners = [];
-    this.sampleQueue = [];
-    this.sampleBuffer = null;
-    
+    this.fallbackSampleQueue.length = 0;
+    this.fallbackQueueFrameIndex = 0;
+
     // Cleanup WASM player
     if (this.chipPlayerId) {
       wasmService.destroyChipPlayer(this.chipPlayerId);

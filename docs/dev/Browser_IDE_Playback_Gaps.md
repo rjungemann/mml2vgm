@@ -65,6 +65,46 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### O. ScriptProcessor + non-SAB AudioWorklet fallback paths fixed
+Three audio output paths now coexist and are individually correct:
+
+- **Path A** (AudioWorklet + SharedArrayBuffer): lock-free SAB ring buffer,
+  stereo de-interleaved by the worklet reading frame pairs. Unchanged
+  from §B but stays the preferred path.
+- **Path B** (AudioWorklet + postMessage): producer ships interleaved
+  stereo `Float32Array` via `port.postMessage({type:'samples', samples})`;
+  worklet maintains a small queue, reads frame pairs, silence-pads when
+  the queue runs dry, caps at 8 buffers to bound memory if the audio
+  thread stalls. Same stereo bug §B fixed for Path A had been latent
+  here; now patched.
+- **Path C** (ScriptProcessorNode): producer pushes onto an in-process
+  queue (`fallbackSampleQueue`); `onaudioprocess` drains it identically
+  to Path B's worklet logic. Caps at 8 buffers.
+
+The producer-side dispatcher now distinguishes the three paths
+explicitly: SAB ring → `writeSamplesToRingBuffer`; AudioWorkletNode (has
+a `.port`) → `port.postMessage`; ScriptProcessor (no `.port`) →
+`fallbackSampleQueue.push`. Previously it called `.port.postMessage`
+unconditionally, which would throw `TypeError` the moment Path C
+activated (ScriptProcessorNode has no port property).
+
+Two bugs killed Path C end-to-end before:
+- The producer always called `this.audioWorkletNode.port.postMessage`,
+  but Path C's `audioWorkletNode` was a ScriptProcessorNode with no
+  `.port` — synchronous TypeError per buffer.
+- The audio callback read `this.sampleBuffer[bufferIndex++]` as if mono
+  (replicating one float to all output channels) while the producer fed
+  it interleaved stereo — same half-rate / phase-shifted pseudo-mono as
+  §B in Path A.
+
+Dropped now-orphaned state: the `sampleBuffer`/`bufferIndex` field pair
+(replaced by the queue) and the never-declared `sampleQueue =` assignments
+in `stop`/`destroy` (TS was already flagging them as TS2339).
+
+Also surfaced: `YMF271` wasn't in the `SoundChip` type union, so the
+parser case I added in §L (`push('YMF271', ...)`) had been a TypeScript
+error my last typecheck filter was hiding. Added to the union.
+
 ### N. Dead vgmPlayerId / generateMoreSamples paths removed
 - `vgmPlayerId` field deleted along with all three `if (this.vgmPlayerId)`
   branches in `startSampleGeneration`, `stop`, and `destroy`. The field was
@@ -254,13 +294,7 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 
 ### 6. ✅ Dead generateMoreSamples removed — DONE (see resolved §N)
 
-### 7. ScriptProcessor fallback is broken end-to-end
-`setupScriptProcessorNode` uses `createScriptProcessor` and writes into
-`this.sampleBuffer`, but the producer path posts samples via
-`port.postMessage({type:'samples', samples})` to the worklet only when
-`!usingSharedArrayBuffer`. The two halves disagree on the transport.
-On a browser without SharedArrayBuffer, playback would silently produce
-nothing.
+### 7. ✅ ScriptProcessor + non-SAB fallbacks repaired — DONE (see resolved §O)
 
 ### 8. `outputChannels` configurable but not robust
 `AudioServiceOptions.outputChannels` defaults to 2, and the chip player
