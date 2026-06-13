@@ -7,9 +7,11 @@
 //! Typical use:
 //! ```no_run
 //! use mml2vgm::live_player::LivePlayer;
+//! let source = "{ PartYM2612 = A }";
 //! let mut player = LivePlayer::from_source(source, 44100).unwrap();
 //! player.note_on("A1", 60, 100); // C4 on channel A1
-//! // ... audio callback calls player.generate_samples(buf, 44100) ...
+//! let mut buf = vec![0.0f32; 2048];
+//! player.generate_samples(&mut buf, 44100); // called from the audio callback
 //! player.note_off("A1");
 //! ```
 
