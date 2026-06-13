@@ -335,14 +335,14 @@ export class AudioService {
   }
 
   private captureWaveformSamples(samples: Float32Array): void {
-    const channelCount = Math.max(1, this.outputChannels);
-    for (let i = 0; i < samples.length; i += channelCount) {
-      let mono = 0;
-      const availableChannels = Math.min(channelCount, samples.length - i);
-      for (let c = 0; c < availableChannels; c++) {
-        mono += samples[i + c];
-      }
-      mono /= availableChannels;
+    // The chip player always emits stereo-interleaved frames (2 floats per
+    // frame). The waveform ring stores one mono sample per frame, so step
+    // by 2 and average the L/R pair — NOT by `outputChannels` (the consumer
+    // render channel count), which has nothing to do with the producer's
+    // frame layout.
+    const STRIDE = 2;
+    for (let i = 0; i + STRIDE <= samples.length; i += STRIDE) {
+      const mono = (samples[i] + samples[i + 1]) * 0.5;
 
       this.waveformRing[this.waveformWriteIndex] = mono;
       this.waveformWriteIndex = (this.waveformWriteIndex + 1) % this.waveformRing.length;
@@ -950,31 +950,43 @@ export class AudioService {
 
   /**
    * Initialize the SharedArrayBuffer ring buffer.
-   * Uses a circular buffer with Atomics for synchronization.
+   *
+   * Capacity is sized to the PRODUCER's output format (chip player → stereo
+   * interleaved, always 2 floats per frame), NOT to the consumer's output
+   * channel count. Previously the calculation multiplied by `outputChannels`,
+   * which produced too-small buffers whenever the consumer asked for mono
+   * output (the chip player still emits stereo regardless of how many
+   * channels the worklet renders).
+   *
+   * One second of stereo audio at 44.1 kHz is 88,200 floats — far more than
+   * one render quantum (typically 128 frames) and plenty of slack for the
+   * producer-consumer drift inherent to the `setTimeout` self-rescheduling.
    */
   private initSharedRingBuffer(): void {
-    // Calculate capacity: enough for ~50ms of audio at 44100Hz stereo
-    // 44100 samples/sec * 0.05 sec * 2 channels = 4410 samples
-    const capacity = this.sampleRate * this.outputChannels;
-    
-    // Create SharedArrayBuffer: Float32Array for samples + Int32Array for indices
-    // Float32Array: capacity * 4 bytes per sample
-    // Int32Array: 4 integers (readIndex, writeIndex, capacity, bufferSize) * 4 bytes each = 16 bytes
+    const CHIP_OUTPUT_STRIDE = 2; // chip player always emits stereo
+    const bufferSeconds = 1.0;
+    const capacityFrames = Math.floor(this.sampleRate * bufferSeconds);
+    const capacity = capacityFrames * CHIP_OUTPUT_STRIDE; // total floats
+
+    // Layout: Float32Array samples region, then Int32Array (readIndex,
+    // writeIndex, capacity, bufferSize) = 4 × 4 bytes = 16 bytes header.
     const bufferSize = (capacity * 4) + 16;
-    
+
     try {
       this.sharedArrayBuffer = new SharedArrayBuffer(bufferSize);
       this.sharedRingBuffer = new Float32Array(this.sharedArrayBuffer, 0, capacity);
       this.sharedRingBufferBytes = new Int32Array(this.sharedArrayBuffer, capacity * 4, 4);
-      
-      // Initialize indices
-      this.sharedRingBufferBytes[0] = 0; // readIndex
-      this.sharedRingBufferBytes[1] = 0; // writeIndex
-      this.sharedRingBufferBytes[2] = capacity; // capacity
-      this.sharedRingBufferBytes[3] = this.bufferSize; // audio buffer size
-      
+
+      this.sharedRingBufferBytes[0] = 0;           // readIndex (in floats)
+      this.sharedRingBufferBytes[1] = 0;           // writeIndex (in floats)
+      this.sharedRingBufferBytes[2] = capacity;    // capacity (in floats)
+      this.sharedRingBufferBytes[3] = this.bufferSize; // producer buffer size
+
       this.usingSharedArrayBuffer = true;
-      console.log('[AudioService] SharedArrayBuffer ring buffer initialized, capacity:', capacity);
+      console.log(
+        '[AudioService] SharedArrayBuffer ring buffer initialized:',
+        `${capacity} floats = ${capacityFrames} stereo frames (≈${bufferSeconds}s)`
+      );
     } catch (e) {
       console.warn('[AudioService] Failed to create SharedArrayBuffer:', e);
       this.usingSharedArrayBuffer = false;

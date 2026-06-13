@@ -118,11 +118,17 @@ impl MmlCompiler {
         let mut out_lines: Vec<&str> = Vec::new();
         let mut in_block = false;
 
+        // Lines consumed by the song-info block are replaced with this empty
+        // sentinel rather than dropped from `out_lines`. That keeps the
+        // 1-based line number of every surviving line identical to the
+        // original source, so source-map note events point at the right
+        // editor line (instead of being off by the header-block height).
+        const STRIPPED: &str = "";
+
         for line in source.lines() {
             let trimmed = line.trim();
 
             if !in_block {
-                // `'{` or bare `{` starts the block.
                 let block_start = if trimmed.starts_with("'{") {
                     Some(trimmed[2..].trim())
                 } else if trimmed == "{" {
@@ -133,7 +139,7 @@ impl MmlCompiler {
 
                 if let Some(content) = block_start {
                     if content.ends_with('}') {
-                        // Entire block on one line: '{ key = val }
+                        // Single-line block: '{ key = val }
                         let inner = content.trim_end_matches('}').trim();
                         Self::process_song_info_line(inner, &mut metadata, &mut chip_map);
                     } else {
@@ -142,6 +148,7 @@ impl MmlCompiler {
                             Self::process_song_info_line(content, &mut metadata, &mut chip_map);
                         }
                     }
+                    out_lines.push(STRIPPED);
                     continue;
                 }
             }
@@ -152,6 +159,7 @@ impl MmlCompiler {
                 } else {
                     Self::process_song_info_line(trimmed, &mut metadata, &mut chip_map);
                 }
+                out_lines.push(STRIPPED);
                 continue;
             }
 

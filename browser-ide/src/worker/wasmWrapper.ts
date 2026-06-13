@@ -113,6 +113,9 @@ export function extractResultData(result: any): {
   durationSamples: bigint;
   durationSeconds: number;
   chipsUsed: string;
+  /** JSON-encoded SourceMap (`{events: [...]}`). Empty string if the WASM
+   *  build doesn't expose it or extraction fails. */
+  sourceMapJson: string;
 } {
   if (!result) {
     throw new Error('Result is null or undefined');
@@ -205,6 +208,20 @@ export function extractResultData(result: any): {
     chipsUsed = '[]';
   }
 
+  // Source map: a JSON-encoded `{events: SourceMapEvent[]}` produced by the
+  // Rust codegen. Old WASM builds didn't expose this getter; in that case
+  // we drop to an empty string and the trace service treats the document as
+  // sourcemap-less (highlighting just doesn't fire).
+  let sourceMapJson: string;
+  try {
+    const raw = readValue<any>(result, 'source_map_json', '');
+    sourceMapJson = typeof raw === 'string' ? raw : '';
+    console.log('[WasmWrapper] source_map_json length:', sourceMapJson.length);
+  } catch (e) {
+    console.error('[WasmWrapper] source_map_json() failed:', e);
+    sourceMapJson = '';
+  }
+
   console.log('[WasmWrapper] Result extraction completed');
 
   return {
@@ -214,6 +231,7 @@ export function extractResultData(result: any): {
     durationSamples,
     durationSeconds,
     chipsUsed,
+    sourceMapJson,
   };
 }
 

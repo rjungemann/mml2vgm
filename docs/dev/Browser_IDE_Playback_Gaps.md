@@ -65,6 +65,72 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### Q. Source-map plumbed end-to-end + line numbers corrected
+The Rust codegen has been pushing `NoteEvent`s into a `SourceMap` per note
+all along — the browser never saw any because nothing read
+`source_map_json` between the WASM boundary and the trace service.
+
+**End-to-end wiring:**
+- `wasmWrapper.extractResultData` now reads `source_map_json` from the
+  `JsCompileResult` (defaults to empty string if the WASM build is older
+  and doesn't expose it).
+- `compilerWorker.compileMml` parses the JSON once on the worker thread,
+  attaches the resulting `{events: [...]}` to the message under
+  `source_map`, and logs the event count so the gap will be visible in
+  the console if it ever reappears.
+- `wasmService.compile` (the non-worker path used by some test fixtures)
+  parses the same JSON and includes `source_map` in its `CompileResult`.
+- `StoreCompileResult` gained the optional `source_map?: SourceMap` field;
+  the store forwarder copies it from the worker payload. `App.tsx` was
+  already reading `result.source_map` — the previously-flagged TS2339
+  error on that access disappears now that the field exists.
+
+**Line-number fix:** `preprocess_song_info` was stripping the
+`'{ ... }` header block from the source before tokenisation, which
+shifted every subsequent line up by the header height (13 lines for
+Hello World). Source-map note events therefore pointed at e.g. line 20
+(the FM instrument definition) instead of line 33 (the actual part
+track). Fix: stripped lines are replaced with empty strings in the
+preprocessed source rather than dropped, so line numbering is preserved
+end-to-end. Verified with a Rust integration test that dumps source-map
+events for `hello_world.gwi`: now reports `line=33` for the A1 melody
+and `line=38` for the B1 bass, matching the editor positions.
+
+### P. Ring-buffer capacity decoupled from outputChannels
+`initSharedRingBuffer` was sizing capacity as
+`sampleRate * outputChannels`. The chip player always emits stereo
+interleaved (2 floats per frame) regardless of how many channels the
+consumer renders, so the multiplier should track the *producer* format,
+not the consumer's channel count.
+
+Effect of the old formula at the configurable extremes:
+- `outputChannels = 1` → capacity 44,100 floats = 22,050 frames =
+  ~0.5 s of stereo audio. The producer still emits 2 floats per frame
+  but the consumer indexed each as a sample, so a single producer tick
+  of 4,096 frames (8,192 floats) would consume 8,192 of the 44,100
+  capacity (~18.5%); workable but tight when 8 buffers are queued.
+- `outputChannels = 4` → capacity 176,400 floats = 88,200 frames = 2 s.
+  Just wasteful, but harmless.
+- `outputChannels = 2` (default) → 88,200 floats = 1 s. Worked by
+  accident because the stereo math happens to balance.
+
+New formula: `capacityFrames = sampleRate * 1.0; capacity =
+capacityFrames * 2` — explicit `STRIDE = 2` for chip-player stereo,
+1 s of headroom regardless of consumer channel count. Log line now
+reports both float count and frame count for clarity.
+
+**Companion fix:** `captureWaveformSamples` had the same misuse — it
+stepped through `samples` in increments of `outputChannels` and averaged
+that many floats into one mono waveform point. Stride should be 2
+(chip-player frame size). At `outputChannels=1` it would have stored
+alternating L and R floats as separate waveform points (visual phase
+artefact); at `outputChannels=4` it would have averaged across frame
+boundaries (garbage).
+
+Consumers that legitimately care about render channel count
+(`AudioWorkletNode outputChannelCount`, `ScriptProcessor channelCount`,
+the worklet's downmix logic) all still use `outputChannels` correctly.
+
 ### O. ScriptProcessor + non-SAB AudioWorklet fallback paths fixed
 Three audio output paths now coexist and are individually correct:
 
@@ -296,19 +362,9 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 
 ### 7. ✅ ScriptProcessor + non-SAB fallbacks repaired — DONE (see resolved §O)
 
-### 8. `outputChannels` configurable but not robust
-`AudioServiceOptions.outputChannels` defaults to 2, and the chip player
-always emits stereo. Setting `outputChannels: 1` shrinks the ring buffer
-(`sampleRate * outputChannels`) by half but the chip player still produces
-2× the floats per call — guarantees underruns. Worklet downmix is now
-correct, but ring-buffer sizing should track *chip output* (stereo, fixed),
-not output channels.
+### 8. ✅ Ring-buffer capacity decoupled from outputChannels — DONE (see resolved §P)
 
-### 9. Empty source-map / trace events
-Log: `TraceService] Initialized with 2 parts and 0 source map events`. The
-WASM compile result returns an empty source map, so the editor's active-note
-highlighting never fires even when register writes work. Probably a
-`mml2vgm-wasm` binding gap.
+### 9. ✅ Source-map plumbed end-to-end + line numbers correct — DONE (see resolved §Q)
 
 ### 10. `chips_used` returns `[]` from the WASM result
 Per the log: `chips_used(): []`. Informational since we now detect from the

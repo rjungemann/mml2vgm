@@ -162,6 +162,21 @@ async function handleCompile(
     console.log(`[Worker][${requestId}] Result part_count:`, resultData.partCount);
     console.log(`[Worker][${requestId}] Result command_count:`, resultData.commandCount);
 
+    // Parse the source map JSON once on the worker side so the main thread
+    // doesn't have to re-validate. The trace service consumes this directly.
+    let parsedSourceMap: { events: any[] } | undefined;
+    if (resultData.sourceMapJson && resultData.sourceMapJson.length > 0) {
+      try {
+        const parsed = JSON.parse(resultData.sourceMapJson);
+        if (parsed && Array.isArray(parsed.events)) {
+          parsedSourceMap = parsed;
+          console.log(`[Worker][${requestId}] Source-map events:`, parsedSourceMap.events.length);
+        }
+      } catch (e) {
+        console.warn(`[Worker][${requestId}] Failed to parse source_map_json:`, e);
+      }
+    }
+
     // Extract data from result
     const compileResult: any = {
       data: resultData.data,
@@ -175,6 +190,7 @@ async function handleCompile(
         chips_used: resultData.chipsUsed ? JSON.parse(resultData.chipsUsed) : [],
         format_version: result.format_version || '',
       },
+      source_map: parsedSourceMap,
     };
 
     postMessageToMain({

@@ -229,7 +229,24 @@ export class WasmService {
                 chips_used = [];
             }
         }
-        
+
+        // Source map: JSON-encoded `{events: SourceMapEvent[]}` from the
+        // codegen. The TraceService consumes the parsed events to drive
+        // editor highlighting. Missing/invalid JSON → no highlighting,
+        // which is preferable to throwing.
+        const rawSourceMap = readValue<any>(result, 'source_map_json', '');
+        let source_map: { events: any[] } | undefined;
+        if (typeof rawSourceMap === 'string' && rawSourceMap.length > 0) {
+            try {
+                const parsed = JSON.parse(rawSourceMap);
+                if (parsed && Array.isArray(parsed.events)) {
+                    source_map = parsed;
+                }
+            } catch (e) {
+                console.warn('[WasmService] source_map_json parse failed:', e);
+            }
+        }
+
         return {
             data,
             errors: [],
@@ -242,6 +259,7 @@ export class WasmService {
                 chips_used,
                 format_version: '',
             },
+            source_map,
         };
     }
     

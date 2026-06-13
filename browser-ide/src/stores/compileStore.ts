@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import type { CompileOptions, CompileError } from '@/types';
+import type { CompileOptions, CompileError, SourceMap } from '@/types';
 import { WorkerManager, getWorkerManager, resetWorkerManager, configureWorkerManager, preWarmWorkers } from '@/services/workerService';
 import { wasmService } from '@/services/wasmService';
 import { sampleService } from '@/services/sampleService';
@@ -62,6 +62,11 @@ export interface StoreCompileResult {
     durationSeconds: number;
     chipsUsed: string[];
     timing?: CompileTimingBreakdown;
+    /** Source-map note events from the codegen (line/col → sample range +
+     *  MIDI/part/instrument). Drives editor highlighting via TraceService.
+     *  Undefined when the WASM build doesn't expose `source_map_json` or
+     *  the codegen emitted no spannable events. */
+    source_map?: SourceMap;
 }
 
 interface CompileState {
@@ -509,6 +514,7 @@ export const useCompileStore = create<CompileStore>()(
                     durationSamples: info.duration_samples || 0,
                     durationSeconds: info.duration_seconds || 0,
                     chipsUsed,
+                    source_map: (result as any).source_map,
                 };
 
                 // Store result
