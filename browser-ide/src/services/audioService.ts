@@ -459,6 +459,20 @@ export class AudioService {
    * 0x20) so the playback loop can wrap back to the loop point when the VGM
    * ends. See VGM 1.71 spec section 3 ("Header").
    */
+  /**
+   * Parse a VGM byte stream into an array of `ParsedVgmCommand` objects plus
+   * loop metadata.
+   *
+   * Allocation note: each register-write opcode produces one `ParsedVgmCommand`
+   * heap object. At current scale (largest mml2vgm sample is ~1100 commands)
+   * the GC cost is sub-millisecond per parse and well below any audible
+   * threshold, so we keep the readable object-per-write layout rather than
+   * a typed-array `[time, chipIdx, addr, data]` representation. If a profiler
+   * later shows GC pressure on minutes-long PCM-heavy songs (the realistic
+   * pessimal case: YM2608 ADPCM at 30k+ events), the swap is mechanical —
+   * `applyPendingVgmCommands` is the only hot reader and would just index
+   * into stride-4 lanes instead of dereferencing object fields.
+   */
   private parseVgmStream(data: Uint8Array): ParsedVgmStream {
     const empty: ParsedVgmStream = {
       commands: [],

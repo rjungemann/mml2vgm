@@ -65,6 +65,27 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### V. Parser allocation deferral (measurement-gated)
+Measured against every `browser-ide/public/samples/*.gwi` file: the
+largest emits 1,087 register-write commands (`35_ensemble`), with most
+samples in the 100-500 range. JS object-per-write allocation at that
+scale is sub-millisecond per parse and well below any audible
+threshold — there's no profiler signal to justify the typed-array
+rewrite.
+
+Added a comment on `parseVgmStream` documenting:
+- the current scale (so a future reader doesn't redo the same
+  measurement),
+- the realistic pessimal case to watch for (minutes-long YM2608
+  ADPCM with 30k+ DAC events),
+- the mechanical conversion path if the threshold is ever crossed
+  (`applyPendingVgmCommands` is the only hot reader and would
+  switch from object-field dereference to stride-4 typed-array lane
+  indexing).
+
+This is a deliberate non-optimisation, not an oversight; revisit
+only when a profiler shows GC pressure on real content.
+
 ### U. Spurious chip-clock defaults zeroed
 Follow-up surfaced during §R. `VgmHeader::default()` in
 `mml2vgm-rs/src/compiler/codegen/mod.rs` was initialising
@@ -491,11 +512,7 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 
 ### 12. ✅ Octave-Rev applied at parse time — DONE (see resolved §T)
 
-### 13. `parseVgmCommands` allocation profile
-One `ParsedVgmCommand` object per write. Fine for Hello World (111
-commands). A 30-second YM2608+ADPCM piece could be tens of thousands. A
-typed-array layout (`Int32Array` of `[time, chipIdx, addr, data]`) would
-cut both parse time and GC pressure if it ever shows up in profiles.
+### 13. ✅ Parser allocation deliberately deferred — DONE (see resolved §V)
 
 ---
 
