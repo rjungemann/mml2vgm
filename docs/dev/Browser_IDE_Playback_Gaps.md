@@ -65,6 +65,27 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### R. CompileInfo.chips_used populated from VGM header
+`info_from_vgm` filled the rest of `CompileInfo` (part count, command
+count, duration) but left `chips_used` at `Vec::default()` (empty), so the
+WASM `chips_used()` getter always returned `[]` and the browser's log
+line `chips_used(): []` was reporting truthfully.
+
+Added `chips_from_vgm_header(data)` that walks the VGM 1.71 chip-clock
+table (25 entries) and returns every chip whose clock field is nonzero
+(top bit masked, since VGM uses it for the dual-chip flag). The entry
+table is gated by header `version` so older VGMs don't misread reserved
+bytes. `info_from_vgm` now calls it to populate `chips_used` whenever
+the header magic checks out.
+
+The browser-side `detectChipsFromVgmHeader` already runs the same scan
+in `audioService.ts` — the two layers are now in sync and both report
+exactly what the binary header declares. For Hello World that's
+`[SN76489, YM2413, YM2612, YM2151]` instead of `[]`. The YM2413 and
+YM2151 entries reflect a separate codegen-side bug (those clocks are
+non-zero in the emitted header even though the parts don't use those
+chips) — that's a Rust codegen cleanup, not a CompileInfo issue.
+
 ### Q. Source-map plumbed end-to-end + line numbers corrected
 The Rust codegen has been pushing `NoteEvent`s into a `SourceMap` per note
 all along — the browser never saw any because nothing read
@@ -366,10 +387,13 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 
 ### 9. ✅ Source-map plumbed end-to-end + line numbers correct — DONE (see resolved §Q)
 
-### 10. `chips_used` returns `[]` from the WASM result
-Per the log: `chips_used(): []`. Informational since we now detect from the
-header, but it's a regression in the WASM bindings worth tracking. Likely a
-metadata-extraction bug, not a codegen bug.
+### 10. ✅ chips_used populated from VGM header — DONE (see resolved §R)
+
+A follow-up worth filing separately: the codegen emits non-zero clocks
+for chips that aren't used (Hello World's header has YM2413 and YM2151
+clocks set even though only YM2612 + SN76489 are referenced). The fix
+belongs in `extract_chips` / header initialisation in
+`mml2vgm-rs/src/compiler/codegen/vgm.rs`, not in the info extractor.
 
 ### 11. Compile encoding always sends `"utf-8-bom"`
 The C# tool emitted BOMs; the Rust parser ought to consume them transparently.

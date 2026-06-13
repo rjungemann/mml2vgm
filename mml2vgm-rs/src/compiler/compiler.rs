@@ -381,6 +381,7 @@ impl MmlCompiler {
                 u32::from_le_bytes([data[0x18], data[0x19], data[0x1A], data[0x1B]]);
             info.duration_samples = total_samples as u64;
             info.duration_seconds = total_samples as f64 / 44100.0;
+            info.chips_used = Self::chips_from_vgm_header(data);
             // Count register-write commands (opcodes 0x50-0xDF range)
             let mut command_count: usize = 0;
             let data_offset = if data.len() > 0x40 {
@@ -406,6 +407,60 @@ impl MmlCompiler {
             info.command_count = command_count;
         }
         info
+    }
+
+    /// Inspect a VGM byte stream's header and return the chips it declares.
+    /// Each chip occupies one little-endian u32 clock field at a fixed
+    /// offset; a nonzero value (top bit masked, since VGM uses it as the
+    /// dual-chip flag) marks the chip as present. The browser side runs the
+    /// same scan in `detectChipsFromVgmHeader`; the table here is gated by
+    /// the header's declared version so we don't misread reserved bytes on
+    /// older VGM streams.
+    fn chips_from_vgm_header(data: &[u8]) -> Vec<crate::SoundChip> {
+        use crate::SoundChip;
+        if data.len() < 0x40 { return Vec::new(); }
+        let read_u32 = |off: usize| -> u32 {
+            if off + 4 > data.len() { return 0; }
+            u32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+        };
+        let version = read_u32(0x08);
+
+        // (offset, min_version, chip)
+        const ENTRIES: &[(usize, u32, SoundChip)] = &[
+            (0x0C, 0x100, SoundChip::SN76489),
+            (0x10, 0x100, SoundChip::YM2413),
+            (0x2C, 0x110, SoundChip::YM2612),
+            (0x30, 0x110, SoundChip::YM2151),
+            (0x38, 0x151, SoundChip::SegaPCM),
+            (0x40, 0x151, SoundChip::RF5C164),
+            (0x44, 0x151, SoundChip::YM2203),
+            (0x48, 0x151, SoundChip::YM2608),
+            (0x4C, 0x151, SoundChip::YM2610B),
+            (0x50, 0x151, SoundChip::YM3812),
+            (0x54, 0x151, SoundChip::YM3526),
+            (0x58, 0x151, SoundChip::Y8950),
+            (0x5C, 0x151, SoundChip::YMF262),
+            (0x6C, 0x171, SoundChip::YMF271),
+            (0x74, 0x161, SoundChip::AY8910),
+            (0x80, 0x161, SoundChip::DMG),
+            (0x84, 0x161, SoundChip::NES),
+            (0x9C, 0x161, SoundChip::K054539),
+            (0xA0, 0x161, SoundChip::HuC6280),
+            (0xA4, 0x161, SoundChip::C140),
+            (0xAC, 0x161, SoundChip::K053260),
+            (0xB0, 0x161, SoundChip::POKEY),
+            (0xB4, 0x161, SoundChip::QSound),
+            (0xC4, 0x171, SoundChip::C352),
+            (0xE0, 0x171, SoundChip::VRC6),
+        ];
+
+        let mut found = Vec::new();
+        for &(offset, min_version, chip) in ENTRIES {
+            if version < min_version { continue; }
+            let clock = read_u32(offset) & 0x7fff_ffff; // mask dual-chip flag
+            if clock != 0 { found.push(chip); }
+        }
+        found
     }
 
     /// Validate MML source code from a string without generating output
