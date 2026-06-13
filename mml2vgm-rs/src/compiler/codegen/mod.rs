@@ -220,11 +220,25 @@ pub struct VgmHeader {
 
 impl Default for VgmHeader {
     fn default() -> Self {
+        // Every chip-clock field starts at zero. `VgmGenerator::extract_chips`
+        // sets only the clocks for chips that are actually referenced (via
+        // `target_chips`, per-part assignments, `PartXxx` metadata, or the
+        // global `CHIP` directive), so unused chips stay zero and the
+        // header faithfully reports what the binary contains.
+        //
+        // Previously this struct defaulted `sn76489_clock`, `ym2413_clock`,
+        // `ym2612_clock`, and `ym2151_clock` to non-zero values. The
+        // SN76489/YM2612 numbers were harmless because the `extract_chips`
+        // empty-chips fallback would have set them anyway; the YM2413 and
+        // YM2151 numbers were genuinely spurious — Hello World ended up
+        // declaring YM2413/YM2151 in its header even though no part used
+        // those chips, which made the browser-side chip detector report
+        // them and the chip player instantiate emulators for nothing.
         Self {
             ident: [b'V', b'g', b'm', b' '],
             version: 0x00000171, // Version 1.71
-            sn76489_clock: 3_579_545,
-            ym2413_clock: 3_579_545,
+            sn76489_clock: 0,
+            ym2413_clock: 0,
             gd3_offset: 0,
             total_samples: 0,
             loop_offset: 0,
@@ -233,8 +247,8 @@ impl Default for VgmHeader {
             sn76489_feedback: 0x0009,
             sn76489_shift_register_width: 16,
             sn76489_flags: 0,
-            ym2612_clock: 7_670_453,
-            ym2151_clock: 3_579_545,
+            ym2612_clock: 0,
+            ym2151_clock: 0,
             data_offset: 0,
             ym2203_clock: 0,
             ym2608_clock: 0,
@@ -277,9 +291,13 @@ mod tests {
         let header = VgmHeader::default();
         assert_eq!(header.ident, [b'V', b'g', b'm', b' ']);
         assert_eq!(header.version, 0x00000171);
-        assert_eq!(header.sn76489_clock, 3_579_545);
         assert_eq!(header.rate, 44100);
-        // New console chip fields should default to 0
+        // Every chip clock starts at zero; extract_chips populates only
+        // the ones whose chip is actually referenced by the MML.
+        assert_eq!(header.sn76489_clock, 0);
+        assert_eq!(header.ym2413_clock, 0);
+        assert_eq!(header.ym2612_clock, 0);
+        assert_eq!(header.ym2151_clock, 0);
         assert_eq!(header.dmg_clock, 0);
         assert_eq!(header.nes_apu_clock, 0);
         assert_eq!(header.k051649_flags, 0);

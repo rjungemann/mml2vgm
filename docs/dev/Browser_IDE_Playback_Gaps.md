@@ -65,6 +65,37 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### U. Spurious chip-clock defaults zeroed
+Follow-up surfaced during §R. `VgmHeader::default()` in
+`mml2vgm-rs/src/compiler/codegen/mod.rs` was initialising
+`sn76489_clock`, `ym2413_clock`, `ym2612_clock`, and `ym2151_clock` to
+their nominal nominal rates (3.58 MHz / 7.67 MHz). The
+`extract_chips` post-processing only ever **overwrites** the clocks for
+chips actually referenced — it never clears clocks that weren't, so
+files like Hello World ended up emitting non-zero YM2413 + YM2151
+clocks even though no part used those chips. Downstream consumers
+(both the browser-side `detectChipsFromVgmHeader` and the new Rust
+`chips_from_vgm_header` from §R) read those clock fields verbatim and
+faithfully reported the spurious chips as "in use", which then
+instantiated emulators on the chip player that did nothing.
+
+Fix: all chip-clock fields now default to 0. `extract_chips` populates
+only the clocks for chips that are referenced. The SN76489/YM2612
+nonzero defaults were also harmless redundancy — the `extract_chips`
+empty-chips fallback (`self.chips = vec![YM2612, SN76489]`) sets them
+to identical values anyway. The test `test_vgm_header_default` was
+updated to assert all chip clocks zero by default.
+
+**Hello World after the fix:**
+- Header `0x10` (YM2413 clock): now `00 00 00 00`, was `99 9E 36 00`.
+- Header `0x30` (YM2151 clock): now `00 00 00 00`, was `99 9E 36 00`.
+- `CompileInfo.chips_used`: now `[SN76489, YM2612]`, was
+  `[SN76489, YM2413, YM2612, YM2151]`.
+- Browser-side detection sees the same `[SN76489, YM2612]` and creates
+  exactly two chip emulators.
+
+All 581 integration tests + 25 vgm_codegen_accuracy tests pass.
+
 ### T. Octave-Rev header flag implemented at parse time
 The `Octave-Rev = TRUE` header in the C# MML dialect swaps the meaning of
 `>` and `<` so that `>` shifts the octave down. The Rust compiler was
@@ -448,12 +479,7 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 ### 9. ✅ Source-map plumbed end-to-end + line numbers correct — DONE (see resolved §Q)
 
 ### 10. ✅ chips_used populated from VGM header — DONE (see resolved §R)
-
-A follow-up worth filing separately: the codegen emits non-zero clocks
-for chips that aren't used (Hello World's header has YM2413 and YM2151
-clocks set even though only YM2612 + SN76489 are referenced). The fix
-belongs in `extract_chips` / header initialisation in
-`mml2vgm-rs/src/compiler/codegen/vgm.rs`, not in the info extractor.
+### 10a. ✅ Spurious YM2413/YM2151 clock defaults zeroed — DONE (see resolved §U)
 
 ### 11. ✅ Dead encoding option dropped — DONE (see resolved §S)
 
