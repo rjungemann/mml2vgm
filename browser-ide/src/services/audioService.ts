@@ -1693,24 +1693,35 @@ export class AudioService {
   /**
    * Estimate how long to sleep before generating the next audio buffer.
    *
-   * Target steady state: the ring buffer holds roughly `TARGET_FILL_MS` of
-   * already-rendered audio. After a fresh `bufferSize`-frame generation
-   * fill jumps to `TARGET_FILL_MS + bufferMs`; sleep until it drains back
-   * to `TARGET_FILL_MS`, then fire again. That keeps the producer one
-   * buffer-ahead of the consumer rather than racing far ahead (the old
-   * `setTimeout(0)` behaviour, which overshot vgmSampleCursor relative to
-   * wall-clock and made end-of-stream fire prematurely — songs appeared
-   * to "halt" mid-playback).
+   * Steady-state model: each cycle adds `bufferMs` of audio in the gen step
+   * and drains `cycleDur + sleep` of audio across cycle+sleep. For the
+   * buffer to stay level: `sleep = bufferMs - cycleDur`.
+   *
+   * Tuning from a real-world Firefox profile (01_fm_basics):
+   *   - Cycle CPU cost: mean 27 ms, p99 32 ms, max 38 ms (chip emulation).
+   *   - Buffer: 4096 stereo frames at 44.1 kHz ≈ 92.8 ms of audio.
+   *   - Steady-state sleep ≈ 92.8 - 27 ≈ 66 ms.
+   *
+   *   `SLEEP_CAP_MS = 70 ms` matches `bufferMs - typical cycle`. At the
+   *   target fill the producer settles into a sleep ≈ 70 ms per cycle and
+   *   the buffer stops growing. A slow cycle (38 ms) adapts itself: the
+   *   pacer just computes a shorter sleep that turn, keeping fill stable.
+   *
+   *   `TARGET_FILL_MS = 250 ms` gives the buffer ~250 ms of slack ahead
+   *   of the consumer. A single 127-ms gap (the worst we saw in the
+   *   profile) drains 127 ms, dropping fill to ~120 ms — still 30 ms
+   *   above the bufferMs floor, so the next cycle's gen catches up
+   *   without underrun.
    *
    * Path A (SAB ring): read the actual frame fill from the indices.
    * Path B (postMessage worklet): can't see the worklet's internal queue,
-   *   so fire at a fixed wall-clock cadence of one bufferSize at a time.
+   *   so fire at a fixed wall-clock cadence of ~70 ms.
    * Path C (ScriptProcessor queue): fill = pending floats in `fallbackSampleQueue`.
    */
   private computeProducerDelayMs(): number {
-    const TARGET_FILL_MS = 150;
+    const TARGET_FILL_MS = 250;
+    const SLEEP_CAP_MS = 70;
     const sr = this.sampleRate || 44100;
-    const bufferMs = (this.bufferSize * 1000) / sr;
 
     let bufferedMs = 0;
     if (this.usingSharedArrayBuffer && this.sharedRingBufferBytes) {
@@ -1723,8 +1734,9 @@ export class AudioService {
       bufferedMs = (bufferedFrames * 1000) / sr;
     } else if (this.audioWorkletNode && 'port' in this.audioWorkletNode) {
       // Path B — no back-channel from the worklet. Cadence-pace at the
-      // buffer drain rate; the worklet queue caps itself at 8 buffers.
-      return Math.max(0, bufferMs - 5);
+      // steady-state sleep value; the worklet's internal queue caps at 8
+      // buffers, plenty of head-room for an occasional slow cycle.
+      return SLEEP_CAP_MS;
     } else {
       // Path C — sum up pending queued floats.
       let frames = 0;
@@ -1734,18 +1746,12 @@ export class AudioService {
       bufferedMs = (frames * 1000) / sr;
     }
 
-    // Steady-state target: fill at TARGET_FILL_MS just before the next gen.
-    // Sleep so the consumer drains down to that level.
     if (bufferedMs <= TARGET_FILL_MS) {
-      // Underfilled — fire immediately. The browser still clamps `0` to a
-      // few ms, which is plenty given the consumer is real-time.
+      // Underfilled — fire ASAP. Browser clamps `0` to a few ms, fine.
       return 0;
     }
-    // Overfilled — sleep enough to land just at TARGET_FILL_MS.
     const sleepMs = bufferedMs - TARGET_FILL_MS;
-    // Cap at one buffer's worth so we never miss a refill window if the
-    // consumer briefly speeds up (browser audio thread reschedules).
-    return Math.min(sleepMs, bufferMs);
+    return Math.min(sleepMs, SLEEP_CAP_MS);
   }
   
   /**

@@ -65,6 +65,51 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### X. Producer pacing re-tuned from Firefox profile
+User-supplied Firefox performance profile of `01_fm_basics.gwi`
+playback. Analysis of `audioService` self-time and `setTimeout
+callback` marker durations on the COOP+COEP renderer thread:
+
+- **Self-time hot spot:** `wasm-function[69]`
+  (`chip_player_generate_samples`) at 31 % of main-thread samples —
+  the FM emulator itself is the dominant CPU consumer. Generation
+  is otherwise just float copies + ring writes.
+- **Cycle duration:** mean 27.4 ms, p95 28.6 ms, p99 31.7 ms,
+  **max 38.2 ms** per `generateSamples` setTimeout callback.
+- **Inter-cycle gap (start→start):** median 63 ms, p95 95 ms,
+  **max 127 ms** — and `127 ms > bufferMs (92.8 ms)`.
+- **Main-thread `eventDelay`:** max 38 ms; no classical jank.
+
+The 127 ms gap was the smoking gun. When a gap exceeds one
+buffer's worth of audio, the ring drains more than the producer
+refills on that iteration. Previous tuning (`TARGET_FILL_MS=150`,
+sleep cap=bufferMs) wasn't tight enough.
+
+Re-derived steady-state model: each cycle adds `bufferMs` of audio
+in the gen step and drains `cycleDur + sleep`. For the buffer to
+hold level, **sleep ≈ bufferMs − cycleDur ≈ 65–70 ms**.
+
+New parameters:
+- `TARGET_FILL_MS = 250` — gives 250 ms of slack ahead of the
+  consumer, so a worst-case 127 ms gap still leaves ~120 ms in the
+  ring (above the bufferMs floor) and the next cycle refills
+  without underrun.
+- `SLEEP_CAP_MS = 70` — set to match the steady-state sleep value.
+  A slow cycle (38 ms) adapts itself: the pacer computes a shorter
+  sleep that turn, but never sleeps longer than 70 ms, so the gap
+  caps at `worstCycle + 70 ≈ 108 ms < bufferMs (92.8 ms ... well,
+  almost; the buffer's existing 250 ms slack absorbs the last 15 ms).
+
+Path B (postMessage worklet) cadence-paces at `SLEEP_CAP_MS`; Path
+C (ScriptProcessor) reads the in-process queue directly. 146 tests
+pass.
+
+**Note:** the FM emulator's main-thread CPU cost remains the
+underlying constraint. Offloading chip emulation to a Web Worker
+would eliminate the cyclic main-thread blocking entirely; not in
+scope here, but worth filing if hitches return on heavier
+multi-chip samples.
+
 ### W. Producer hot-path desync & overrun: choppy / halting playback
 User reported `01_fm_basics.gwi` "starts fairly clear and then quickly
 gets more garbled until it seems to halt." Same class of artefact on
