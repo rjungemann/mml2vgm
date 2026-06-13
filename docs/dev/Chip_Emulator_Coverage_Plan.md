@@ -24,44 +24,55 @@ samples.
 This document inventories every chip emulator, classifies what's missing,
 and proposes a remediation path including the testing gap.
 
-## Audit results — 2026-06-13
+## Audit results — 2026-06-13 (revised after manual code review)
 
-Static signals (algorithm-routing detection in `get_output`/`get_channel_output`,
-per-operator references, placeholder/simplified comments):
+**Initial static audit was wildly over-reporting.** My regex for
+"algorithm routing detected" matched `match channel.algorithm` exactly
+and missed every variation (`match self.channels[ch].algorithm`,
+`match self.fm_channels[ch].algorithm`, the OPL `connection` toggle,
+etc.). Manual code review of each "stub" file revealed real
+implementations. Revised table below:
 
-| Chip       | File              | Status                       | Symptom |
-|------------|-------------------|------------------------------|---------|
-| YM2612     | `ym2612.rs`       | ✅ Fixed this pass            | Was sine-of-op1 only; full 8-algo routing + FB now implemented |
-| YM2151     | `ym2151.rs`       | ❌ Stub                       | No algorithm routing; output references no operators at all |
-| YM2203     | `ym2203.rs`       | ❌ Stub                       | No algorithm routing |
-| YM2608     | `ym2608.rs`       | ❌ Stub                       | No algorithm routing; FM side identical to YM2612 needs |
-| YM2413     | `ym2413.rs`       | ❌ Stub + placeholder banner   | No algorithm routing; "simplified FM" comment in file header |
-| YM3526     | `ym3526.rs`       | ❌ Stub                       | 2-op output references op0+op1 but no OPL2 routing |
-| YM3812     | `ym3812.rs`       | ❌ Stub                       | Same as YM3526 — 2-op stub |
-| Y8950      | `y8950.rs`        | ❌ Stub                       | Same as YM3526 — 2-op stub |
-| YMF262     | `ymf262.rs`       | ❌ Stub                       | OPL3 needs 2-op + 4-op modes; currently stub |
-| YMF271     | `ymf271.rs`       | ❌ Skeleton only              | No feedback path, no algorithm routing — empty `generate_samples`? |
-| SN76489    | `sn76489.rs`      | ⚠️ Audible (verified)         | Has note: "For now, simple noise implementation" — tone OK, noise approximate |
-| AY8910     | `ay8910.rs`       | ❓ Untested                    | Channel-aware; no audible-quality verification on hand |
-| K051649    | `k051649.rs`      | ❓ Untested                    | Wavetable SCC; channel-aware |
-| HuC6280    | `huc6280.rs`      | ❓ Untested                    | Wavetable PSG; channel-aware |
-| NES APU    | `nes_apu.rs`      | ⚠️ Placeholder note            | Pulse/triangle/noise/DPCM; "simplified" envelope code |
-| DMG        | `dmg.rs`          | ⚠️ No `.channels` references   | GB pulse/wave/noise; suspicious — heuristic says "no channel access" |
-| VRC6       | `vrc6.rs`         | ❓ Untested                    | NES extension; channel-aware? — heuristic flagged no channel access |
-| POKEY      | `pokey.rs`        | ❓ Untested                    | Atari PSG; channel-aware |
-| SegaPCM    | `segapcm.rs`      | ❓ Untested                    | Sample-data playback; needs verification |
-| RF5C164    | `rf5c164.rs`      | ❌ Banner: "placeholder"       | Mega CD PCM; no PCM sample read path on heuristic |
-| C140       | `c140.rs`         | ❓ Untested                    | Namco arcade PCM |
-| C352       | `c352.rs`         | ⚠️ No PCM read path detected   | Namco System 22 PCM |
-| K053260    | `k053260.rs`      | ❓ Untested                    | Konami arcade PCM |
-| K054539    | `k054539.rs`      | ❓ Untested                    | Konami arcade PCM |
-| QSound     | `qsound.rs`       | ❓ Untested (largest file)     | Capcom; 900 lines, channel-aware |
+| Chip       | File              | Status                          | Notes |
+|------------|-------------------|---------------------------------|-------|
+| YM2612     | `ym2612.rs`       | ✅ Fixed this pass               | Was the only true FM stub — sine-of-op1 only. Full 8-algo routing + feedback now in place; verified via `chip_audio_fingerprint::ym2612_alg0_has_more_hf_content_than_alg7` (ALG0 cascade produces ~9× the HF content of ALG7 parallel) |
+| YM2151     | `ym2151.rs`       | ✅ Implemented                   | Full 8-algorithm match in `get_channel_output` lines ~147-193; uses `op_output` + `op_feedback` |
+| YM2203     | `ym2203.rs`       | ✅ Implemented                   | 8-algorithm match in `get_fm_output` lines ~148-160; OPN side; also has SSG side |
+| YM2608     | `ym2608.rs`       | ✅ Implemented                   | Same OPNA-style 8-algorithm match in `get_fm_output` line ~161 |
+| YM2413     | `ym2413.rs`       | ✅ Implemented                   | OPLL: only 1 algorithm (mod→carrier), proper feedback + phase modulation in `channel_sample` lines ~174-222 |
+| YM3526     | `ym3526.rs`       | ✅ Implemented                   | OPL: 2-op with `connection` toggle (FM vs AM) — the OPL spec doesn't expose multiple algorithms |
+| YM3812     | `ym3812.rs`       | ✅ Implemented                   | OPL2: same pattern as YM3526 |
+| Y8950      | `y8950.rs`        | ✅ Implemented                   | MSX-AUDIO: same pattern, line ~125 has the `connection == 0` switch |
+| YMF262     | `ymf262.rs`       | ⚠️ 2-op only                     | OPL3: implements the 2-op-per-channel `connection` toggle but does NOT implement the 4-op mode (which lets pairs of channels combine into one 4-op voice). Currently sounds like OPL2 when 4-op is enabled. Distinct from "stub" but incomplete. |
+| YMF271     | `ymf271.rs`       | ✅ FFI to external               | Uses MAME's OPX emulator via FFI; substantially more accurate than anything we could write |
+| SN76489    | `sn76489.rs`      | ✅ Audible / ⚠️ noise simplified  | Tone channels correct (Hello World bass verified). Noise channel uses a simplified LFSR — "For now, simple noise implementation" comment. Not a stub; just lower fidelity. |
+| AY8910     | `ay8910.rs`       | ❓ Audibility-untested            | Has channel-aware generate; no fingerprint test yet |
+| K051649    | `k051649.rs`      | ❓ Audibility-untested            | SCC wavetable; reads from waveform RAM |
+| HuC6280    | `huc6280.rs`      | ❓ Audibility-untested            | PCE wavetable PSG |
+| NES APU    | `nes_apu.rs`      | ⚠️ Audible / simplified envelope | "Constant volume from envelope (simplified: use volume field)" — works but envelope handling shortcut |
+| DMG        | `dmg.rs`          | ❓ Audibility-untested            | Static heuristic falsely flagged "no channel access" — re-read needed |
+| VRC6       | `vrc6.rs`         | ❓ Audibility-untested            | NES expansion; static heuristic flagged "no channel access" |
+| POKEY      | `pokey.rs`        | ❓ Audibility-untested            | Atari |
+| SegaPCM    | `segapcm.rs`      | ❓ Audibility-untested            | Sample-data playback |
+| RF5C164    | `rf5c164.rs`      | ⚠️ Misleading banner              | Module doc says "placeholder" but has functional PCM playback (`current_addr` advance, volume + pan in `generate_samples` line ~228). The "placeholder" note is stale documentation, not real code state. |
+| C140       | `c140.rs`         | ❓ Audibility-untested            | Namco arcade PCM |
+| C352       | `c352.rs`         | ❓ Audibility-untested            | Namco System 22 PCM — heuristic flagged "no PCM read path", needs verification |
+| K053260    | `k053260.rs`      | ❓ Audibility-untested            | Konami arcade PCM |
+| K054539    | `k054539.rs`      | ❓ Audibility-untested            | Konami arcade PCM |
+| QSound     | `qsound.rs`       | ❓ Audibility-untested            | Capcom; 900 lines, complex |
 
-**Legend:** ✅ verified-correct or freshly-fixed. ⚠️ has implementation but
-contains "simplified" / "for now" comments — likely partially-correct.
-❌ confirmed stub (no algorithm routing in an FM chip, or explicit
-placeholder banner). ❓ untested — needs an audible/golden-master test
-before we can claim it's correct.
+**Legend (revised):** ✅ implementation present and verified-correct or
+known-good. ⚠️ implementation present but has known simplifications /
+misleading docs / incomplete features (not a stub). ❓ audibility-untested
+— no fingerprint test exists yet. **No chips are confirmed stubs after
+the YM2612 fix.**
+
+**Lesson learned about audit methodology:** static signal scans
+("does this file mention `match algorithm`?") gave 9 false positives
+out of 10 FM chips. The actual stub was caught only because the user
+heard sine waves and reported them. **Static heuristics are not a
+substitute for either reading the code or running fingerprint tests
+that produce audible audio and assert spectral content.**
 
 ## Why the existing golden-master suite didn't catch this
 
@@ -127,16 +138,22 @@ PSG are smaller scope):
 4. Add a focused test asserting the chip produces non-trivial harmonic
    content (see Phase 2).
 
-**Suggested order** (by user-visible impact / sample coverage):
-1. ✅ YM2612 — fixed in this branch (Hello World, Genesis FM).
-2. ⏭ YMF262 / YM3812 / YM3526 / Y8950 (OPL2/OPL3 family — many samples
-   reference these and they share the same shape).
-3. ⏭ YM2151 (Sharp X68000, arcade) — distinct from YM2612 algorithm chart.
-4. ⏭ YM2608 (PC-98) — adds SSG + ADPCM to YM2612-style FM.
-5. ⏭ YM2203 / YM2413 (PC-88 / Master System / NES expansions).
-6. ⏭ NES APU / DMG (verify channel mixing actually fires).
-7. ⏭ RF5C164 and other PCM chips (verify PCM data read path).
-8. ⏭ YMF271 (least-used; lowest priority).
+**Suggested order** (revised — most FM chips already work, audibility
+testing is what's missing):
+
+1. ✅ YM2612 stub fixed and fingerprint-tested.
+2. ⏭ Add fingerprint tests for every chip that's currently in the
+   "❓ Audibility-untested" column. One test per chip would have
+   caught the YM2612 stub; one test per (chip, algorithm) gives
+   broader coverage. **This is the highest-leverage next step** —
+   it converts "we *think* it works" into "we *know* it works."
+3. ⏭ YMF262 4-op mode (real feature gap; OPL3 4-op pairs aren't
+   implemented).
+4. ⏭ SN76489 noise channel — the simplified LFSR is audible but
+   not pitch-accurate against silicon.
+5. ⏭ NES APU envelope simplification — affects sustained tones.
+6. ⏭ Stale "placeholder" doc-comments (RF5C164) — clean up the
+   text so audits don't keep mis-firing.
 
 ### Phase 2: build the missing test layer
 
@@ -187,15 +204,23 @@ small phase shifts).
   pipeline and codegen are correct — both are now verified via §W/§X plus
   the existing 25-test vgm_codegen_accuracy suite.
 
-## Quick reference: status by category
+## Quick reference: status by category (revised)
 
 ```
-FM-family   (10):  fixed 1 / stub 8 / skeleton 1  →  fixed 10%
-PSG-family  (8):   audible 2 / untested 6        →  unknown
-PCM-family  (7):   stub 1 / suspect 1 / untested 5 →  unknown
+FM-family   (10):  fixed 1 (YM2612) / implemented 8 / FFI-backed 1
+                   + 1 known gap (YMF262 4-op mode)
+PSG-family  (8):   audible+verified 2 (SN76489 tone, Hello World bass)
+                   / audible-but-simplified 1 (NES APU envelope)
+                   / audibility-untested 5
+PCM-family  (7):   stale-placeholder-banner 1 (RF5C164 works in practice)
+                   / audibility-untested 6
 ```
 
-Only ~10% of the chip emulators have been verified through real audio.
-The other ~90% will need either Phase-1 implementation work or Phase-2
-fingerprint tests before we can claim browser-IDE playback is faithful
-across the supported chip library.
+After the YM2612 fix, **no chip is a confirmed stub.** What's
+missing is *audibility verification* for ~17 of the 25 emulators —
+the same gap that let the YM2612 sine-stub live. Phase 2 of this
+plan (fingerprint tests) directly closes that gap; the Phase-1
+implementation work is much smaller than the original audit
+suggested. Spending the next iteration on writing Layer-2 fingerprint
+tests for every untested chip is higher leverage than rewriting any
+single emulator from scratch.
