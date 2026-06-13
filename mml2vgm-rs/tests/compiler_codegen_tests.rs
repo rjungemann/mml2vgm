@@ -1,8 +1,19 @@
-//! Phase 8: VGM codegen accuracy tests.
+//! Compiler-side codegen tests (Golden Master Test Plan, Layer 1).
 //!
-//! These tests open the generated VGM binary and verify that the register-write
-//! bytes match the theoretical values derived from the MML input (MIDI note
-//! numbers, tempo-derived wait durations, etc.).
+//! These are **compiler** unit tests, not emulator/audio tests. They open the
+//! generated VGM binary and verify that the register-write bytes match the
+//! theoretical values derived from the MML input (MIDI note numbers,
+//! tempo-derived wait durations, etc.). Expected values are hand-derived from
+//! the VGM spec and chip datasheets — there is no regeneration/blessing step;
+//! a failure means either the codegen changed or the expected value was wrong,
+//! and the fix is to re-verify the byte by hand before updating it.
+//!
+//! What this layer catches: parser/lexer bugs, register-write codegen bugs,
+//! header-field bugs, source-map drift. What it does NOT catch: anything about
+//! the renderer/emulator — a stub emulator that synthesises a single sine
+//! passes every test here. Audible correctness lives in the Layer 2 spectral
+//! fingerprint tests (`chip_audio_fingerprint.rs`) and the Layer 4 invariant
+//! tests (`chip_audio_invariants.rs`). See `docs/dev/Golden_Master_Test_Plan.md`.
 
 use mml2vgm::compiler::compiler::MmlCompiler;
 use mml2vgm::{CompileOptions, OutputFormat};
