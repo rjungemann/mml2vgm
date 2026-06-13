@@ -121,6 +121,12 @@ pub struct FmChannel {
     pub left_enable: bool,
     /// Right output enabled
     pub right_enable: bool,
+    /// Two-sample history of operator 1's output, used for self-feedback
+    /// on op1 (averaged per the real YM2612 chip's `(prev + prev_prev) / 2`
+    /// feedback path). Stored on the channel rather than the operator so it
+    /// only exists where it's used.
+    pub op0_fb_prev: f32,
+    pub op0_fb_prev2: f32,
 }
 
 impl Default for FmChannel {
@@ -135,6 +141,8 @@ impl Default for FmChannel {
             output_level: 0,
             left_enable: true,
             right_enable: true,
+            op0_fb_prev: 0.0,
+            op0_fb_prev2: 0.0,
         }
     }
 }
@@ -258,13 +266,14 @@ impl YM2612 {
     }
 
     /// Get the current output sample
-    pub fn get_output(&self) -> (f32, f32) {
+    pub fn get_output(&mut self) -> (f32, f32) {
         let mut left = 0.0f32;
         let mut right = 0.0f32;
 
-        // Sum outputs from all channels
-        for channel in &self.channels {
-            let (ch_left, ch_right) = self.get_channel_output(channel);
+        // Sum outputs from all channels. Mut iteration is needed because
+        // feedback updates per-channel history (op0_fb_prev).
+        for channel in self.channels.iter_mut() {
+            let (ch_left, ch_right) = Self::get_channel_output(channel);
             left += ch_left;
             right += ch_right;
         }
@@ -275,41 +284,133 @@ impl YM2612 {
     }
 
     /// Get output from a single channel
-    fn get_channel_output(&self, channel: &FmChannel) -> (f32, f32) {
-        // For now, simple sine wave output from operator 1
-        // Full FM synthesis implementation will come later
-        
+    /// Compute one stereo sample for one channel, applying full 4-op FM
+    /// synthesis with feedback on op1 and the YM2612's 8 algorithms.
+    ///
+    /// Operator indices map to the chip's documented operators as
+    /// `operators[0] = OP1`, `[1] = OP2`, `[2] = OP3`, `[3] = OP4`.
+    /// (The chip's hardware update order is OP1,OP3,OP2,OP4, but for our
+    /// purposes we evaluate in dependency order per algorithm.)
+    ///
+    /// Output scale: each operator emits a sine in [-env, +env] where
+    /// `env ∈ [0, 0.5]` (envelope_level=0 → loudest at 0.5). Carrier
+    /// outputs are summed; modulator outputs are fed forward as a phase
+    /// offset in *radians* into the next operator's sine. The MOD_SCALE
+    /// factor of `π` matches a unit-amplitude modulator producing a
+    /// half-period phase swing — close enough to YM2612 character for
+    /// our non-bit-accurate floating-point pipeline.
+    fn get_channel_output(channel: &mut FmChannel) -> (f32, f32) {
         if !channel.key_on {
             return (0.0, 0.0);
         }
 
-        // Get output from operator 1 (simplified)
-        let output = self.get_operator_output(&channel.operators[0]);
+        // π in modulation units: a unit-amplitude modulator swings the
+        // carrier's phase by ±π (one half-cycle), matching the rough
+        // ratio of YM2612's standard FM ID = 4.0 at full-volume modulator.
+        const MOD_SCALE: f32 = std::f32::consts::PI;
 
-        // Apply output level (0 = max volume, 127 = silent)
-        let scaled_output = output * (1.0 - channel.output_level as f32 / 127.0);
+        // Op1 self-feedback: average of the last two op1 outputs, scaled
+        // by 2^(feedback - 6) (so FB=0 → 0, FB=7 → factor 2 — matches the
+        // chip's feedback shifter behaviour).
+        let fb_input = if channel.feedback == 0 {
+            0.0
+        } else {
+            let avg = (channel.op0_fb_prev + channel.op0_fb_prev2) * 0.5;
+            let shift = (channel.feedback as i32) - 6;
+            if shift >= 0 {
+                avg * (1u32 << shift) as f32
+            } else {
+                avg / ((1u32 << -shift) as f32)
+            }
+        };
 
-        // Apply panning
-        let left = if channel.left_enable { scaled_output } else { 0.0 };
-        let right = if channel.right_enable { scaled_output } else { 0.0 };
+        let op0 = Self::op_sample(&channel.operators[0], fb_input);
+        // Advance feedback history.
+        channel.op0_fb_prev2 = channel.op0_fb_prev;
+        channel.op0_fb_prev = op0;
 
+        // YM2612 algorithms — operator routing & carrier selection.
+        // See "YM2612 manual" / vgmrips wiki for the canonical diagram.
+        let output = match channel.algorithm & 0x07 {
+            0 => {
+                // op1 → op2 → op3 → op4; output = op4
+                let op1 = Self::op_sample(&channel.operators[1], op0 * MOD_SCALE);
+                let op2 = Self::op_sample(&channel.operators[2], op1 * MOD_SCALE);
+                Self::op_sample(&channel.operators[3], op2 * MOD_SCALE)
+            }
+            1 => {
+                // (op1 + op2) → op3 → op4; output = op4
+                let op1 = Self::op_sample(&channel.operators[1], 0.0);
+                let op2 = Self::op_sample(&channel.operators[2], (op0 + op1) * MOD_SCALE);
+                Self::op_sample(&channel.operators[3], op2 * MOD_SCALE)
+            }
+            2 => {
+                // op2 → op3, op1 → op4 mod; op3 → op4 mod; output = op4
+                // i.e. op4 mod = op1 + op3-chain
+                let op1 = Self::op_sample(&channel.operators[1], 0.0);
+                let op2 = Self::op_sample(&channel.operators[2], op1 * MOD_SCALE);
+                Self::op_sample(&channel.operators[3], (op0 + op2) * MOD_SCALE)
+            }
+            3 => {
+                // op1 → op2, op2 + op3 → op4; output = op4
+                let op1 = Self::op_sample(&channel.operators[1], op0 * MOD_SCALE);
+                let op2 = Self::op_sample(&channel.operators[2], 0.0);
+                Self::op_sample(&channel.operators[3], (op1 + op2) * MOD_SCALE)
+            }
+            4 => {
+                // op1 → op2, op3 → op4; output = op2 + op4
+                let op1 = Self::op_sample(&channel.operators[1], op0 * MOD_SCALE);
+                let op2 = Self::op_sample(&channel.operators[2], 0.0);
+                let op3 = Self::op_sample(&channel.operators[3], op2 * MOD_SCALE);
+                op1 + op3
+            }
+            5 => {
+                // op1 → op2, op1 → op3, op1 → op4; output = op2 + op3 + op4
+                let m = op0 * MOD_SCALE;
+                let op1 = Self::op_sample(&channel.operators[1], m);
+                let op2 = Self::op_sample(&channel.operators[2], m);
+                let op3 = Self::op_sample(&channel.operators[3], m);
+                op1 + op2 + op3
+            }
+            6 => {
+                // op1 → op2; op3 and op4 free; output = op2 + op3 + op4
+                let op1 = Self::op_sample(&channel.operators[1], op0 * MOD_SCALE);
+                let op2 = Self::op_sample(&channel.operators[2], 0.0);
+                let op3 = Self::op_sample(&channel.operators[3], 0.0);
+                op1 + op2 + op3
+            }
+            7 | _ => {
+                // All four operators parallel carriers; output = sum
+                let op1 = Self::op_sample(&channel.operators[1], 0.0);
+                let op2 = Self::op_sample(&channel.operators[2], 0.0);
+                let op3 = Self::op_sample(&channel.operators[3], 0.0);
+                op0 + op1 + op2 + op3
+            }
+        };
+
+        // Output level (post-mix attenuation, 0 = unity).
+        let scaled = output * (1.0 - channel.output_level as f32 / 127.0);
+
+        let left = if channel.left_enable { scaled } else { 0.0 };
+        let right = if channel.right_enable { scaled } else { 0.0 };
         (left, right)
     }
 
-    /// Get output from a single operator
-    fn get_operator_output(&self, op: &FmOperator) -> f32 {
+    /// Sample a single operator given a phase-modulation input (radians).
+    /// Output is `sin(phase + mod) * envelope * 0.5`. An off-key operator
+    /// returns 0; a fully-attenuated operator (envelope_level=127) also
+    /// returns 0, so a muted modulator simply hands a zero offset to the
+    /// next operator in the chain.
+    fn op_sample(op: &FmOperator, mod_input: f32) -> f32 {
         if !op.key_on {
             return 0.0;
         }
-
-        // Extract 12-bit sine index from upper bits of 32-bit accumulator
+        // 12-bit sine index → radians.
         let phase_idx = (op.phase >> 20) & 0xFFF;
-        let phase_f = phase_idx as f32 / 4096.0 * 2.0 * std::f32::consts::PI;
-        let sine = phase_f.sin();
-
-        // Apply envelope (0=loud, 127=silent)
+        let base = phase_idx as f32 * (2.0 * std::f32::consts::PI / 4096.0);
+        let phase = base + mod_input;
+        let sine = phase.sin();
         let envelope = 1.0 - op.envelope_level as f32 / 127.0;
-
         sine * envelope * 0.5
     }
 
