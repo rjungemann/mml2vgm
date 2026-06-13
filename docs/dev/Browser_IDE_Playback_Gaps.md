@@ -65,6 +65,27 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### S. Dead encoding option dropped
+`CompileOptions.encoding` defaulted to `"utf-8-bom"` and was never read
+anywhere in the compile path. The lexer accepted both BOMed and
+non-BOMed sources via `normalize_source`'s unconditional
+`source.strip_prefix('\u{FEFF}')`, so the option value had zero
+behavioural effect. Removed the field from:
+
+- `mml2vgm-rs/src/lib.rs` — struct field + `Default` impl + the
+  `default_encoding()` helper.
+- `browser-ide/src/types/index.ts` — TS `CompileOptions.encoding?` shape.
+
+`#[serde(default)]` on neighbouring fields keeps options JSON
+backward-compatible: any existing caller that still includes
+`"encoding": "utf-8-bom"` deserialises fine (serde just ignores the
+unknown key now). BOM handling stays — `normalize_source` keeps its
+`strip_prefix('\u{FEFF}')` since that's the actual desired behaviour;
+it just doesn't need an option string to switch on.
+
+The `Document.encoding` field (UI display: "UTF-8" in the status bar)
+is a separate concept and stays unchanged.
+
 ### R. CompileInfo.chips_used populated from VGM header
 `info_from_vgm` filled the rest of `CompileInfo` (part count, command
 count, duration) but left `chips_used` at `Vec::default()` (empty), so the
@@ -395,9 +416,7 @@ clocks set even though only YM2612 + SN76489 are referenced). The fix
 belongs in `extract_chips` / header initialisation in
 `mml2vgm-rs/src/compiler/codegen/vgm.rs`, not in the info extractor.
 
-### 11. Compile encoding always sends `"utf-8-bom"`
-The C# tool emitted BOMs; the Rust parser ought to consume them transparently.
-Confirm `"utf-8"` produces identical output and drop the BOM dance.
+### 11. ✅ Dead encoding option dropped — DONE (see resolved §S)
 
 ---
 

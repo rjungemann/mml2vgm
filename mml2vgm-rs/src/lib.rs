@@ -512,10 +512,6 @@ pub struct CompileOptions {
     #[serde(default)]
     pub compression: u8,
 
-    /// Input file encoding (default: UTF-8 with BOM)
-    #[serde(default = "default_encoding")]
-    pub encoding: String,
-
     /// Search paths for include files
     #[serde(default)]
     pub include_paths: Vec<String>,
@@ -530,10 +526,6 @@ fn default_output_vgm() -> bool {
     true
 }
 
-fn default_encoding() -> String {
-    "utf-8-bom".to_string()
-}
-
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
@@ -544,7 +536,6 @@ impl Default for CompileOptions {
             output_trace: false,
             output_vgm: true,
             compression: 0,
-            encoding: "utf-8-bom".to_string(),
             include_paths: Vec::new(),
             clock_count: 0,
         }

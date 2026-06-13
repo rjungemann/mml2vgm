@@ -78,7 +78,6 @@ export interface CompileOptions {
     debug?: boolean;
     output_trace?: boolean;
     compression?: number; // 0-9
-    encoding?: string;
     include_paths?: string[];
     clock_count?: number;
 }
