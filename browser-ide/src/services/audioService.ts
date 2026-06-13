@@ -819,8 +819,17 @@ export class AudioService {
 
   /**
    * Apply pending VGM register writes up to the target sample index.
+   *
+   * Synchronous on purpose: the inner per-write loop used to `await`
+   * `writeChipRegister`, which inserted a microtask hop between every
+   * register write. With FM init bursts of 30-60 writes per buffer plus
+   * `setTimeout(generateSamples, 0)` getting clamped to ~4ms after a few
+   * nested calls, the producer fell far enough behind the worklet that
+   * the ring buffer kept underrunning — heard as choppy / halting audio.
+   * Now all writes go through `writeChipRegisterSync` which only calls
+   * into WASM and skips the await chain.
    */
-  private async applyPendingVgmCommands(targetSample: number): Promise<void> {
+  private applyPendingVgmCommands(targetSample: number): void {
     if (!this.chipPlayerId || this.vgmCommands.length === 0) {
       this.vgmSampleCursor = targetSample;
       return;
@@ -830,6 +839,7 @@ export class AudioService {
     // When we wrap, we extend `vgmLoopShift` so command timestamps (which are
     // absolute within the VGM) line up with the freshly-rewound cursor.
     const canLoop = this._loop && this.vgmLoopCommandIndex >= 0 && this.vgmLoopSamples > 0;
+    const playerId = this.chipPlayerId;
 
     // Outer loop handles the case where the loop body is shorter than one
     // audio quantum, so we might need to wrap multiple times in one call.
@@ -847,7 +857,7 @@ export class AudioService {
         }
 
         if (this.chips.includes(command.chip)) {
-          await wasmService.writeChipRegister(this.chipPlayerId, command.chip, command.addr, command.data);
+          wasmService.writeChipRegisterSync(playerId, command.chip, command.addr, command.data);
           this.appliedWriteCount += 1;
         } else {
           this.skippedWriteCount += 1;
@@ -1569,11 +1579,18 @@ export class AudioService {
   
   /**
    * Start generating samples from WASM player.
+   *
+   * Synchronous body. There's no benefit to yielding mid-cycle: every step
+   * (apply commands, generate samples, write to ring) is a pure WASM call
+   * + bookkeeping. Yielding only invites unrelated React renders or other
+   * main-thread tasks to interleave between our register writes and our
+   * sample generation, which produced the audible choppiness in
+   * FM-heavy samples.
    */
   private startSampleGeneration(): void {
     if (!this.chipPlayerId) return;
 
-    const generateSamples = async () => {
+    const generateSamples = () => {
       if (!this._isPlaying || this.isProcessing) return;
 
       this.isProcessing = true;
@@ -1584,9 +1601,9 @@ export class AudioService {
           return;
         }
         if (this.vgmCommands.length > 0) {
-          await this.applyPendingVgmCommands(this.vgmSampleCursor + Math.round(this.bufferSize * this._playbackRate));
+          this.applyPendingVgmCommands(this.vgmSampleCursor + Math.round(this.bufferSize * this._playbackRate));
         }
-        const samples = await wasmService.generateSamples(this.chipPlayerId, this.bufferSize);
+        const samples = wasmService.generateSamplesSync(this.chipPlayerId, this.bufferSize);
         
         // Apply volume
         if (this._volume !== 1.0) {
@@ -1653,16 +1670,82 @@ export class AudioService {
         console.error('[AudioService] Sample generation error:', error);
       } finally {
         this.isProcessing = false;
-        
-        // Continue loop
+
         if (this._isPlaying) {
-          setTimeout(generateSamples, 0);
+          // Pace the next cycle to the ring-buffer fill level. The chip
+          // player produces audio much faster than wall-clock; with naive
+          // `setTimeout(0)` (clamped to ~4ms after a few nested calls) the
+          // producer was spinning while the buffer was full, discarding
+          // most generated samples and giving the main thread no breathing
+          // room. Sleep proportionally to how much already-buffered audio
+          // is ahead of the consumer — keep ~150 ms of slack and fire
+          // again when half of that has drained.
+          const delayMs = this.computeProducerDelayMs();
+          setTimeout(generateSamples, delayMs);
         }
       }
     };
-    
+
     // Start the loop
     generateSamples();
+  }
+
+  /**
+   * Estimate how long to sleep before generating the next audio buffer.
+   *
+   * Target steady state: the ring buffer holds roughly `TARGET_FILL_MS` of
+   * already-rendered audio. After a fresh `bufferSize`-frame generation
+   * fill jumps to `TARGET_FILL_MS + bufferMs`; sleep until it drains back
+   * to `TARGET_FILL_MS`, then fire again. That keeps the producer one
+   * buffer-ahead of the consumer rather than racing far ahead (the old
+   * `setTimeout(0)` behaviour, which overshot vgmSampleCursor relative to
+   * wall-clock and made end-of-stream fire prematurely — songs appeared
+   * to "halt" mid-playback).
+   *
+   * Path A (SAB ring): read the actual frame fill from the indices.
+   * Path B (postMessage worklet): can't see the worklet's internal queue,
+   *   so fire at a fixed wall-clock cadence of one bufferSize at a time.
+   * Path C (ScriptProcessor queue): fill = pending floats in `fallbackSampleQueue`.
+   */
+  private computeProducerDelayMs(): number {
+    const TARGET_FILL_MS = 150;
+    const sr = this.sampleRate || 44100;
+    const bufferMs = (this.bufferSize * 1000) / sr;
+
+    let bufferedMs = 0;
+    if (this.usingSharedArrayBuffer && this.sharedRingBufferBytes) {
+      const read = Atomics.load(this.sharedRingBufferBytes, 0);
+      const write = Atomics.load(this.sharedRingBufferBytes, 1);
+      const capacity = this.sharedRingBufferBytes[2];
+      let available = write - read;
+      if (available < 0) available += capacity;
+      const bufferedFrames = available >> 1; // 2 floats per stereo frame
+      bufferedMs = (bufferedFrames * 1000) / sr;
+    } else if (this.audioWorkletNode && 'port' in this.audioWorkletNode) {
+      // Path B — no back-channel from the worklet. Cadence-pace at the
+      // buffer drain rate; the worklet queue caps itself at 8 buffers.
+      return Math.max(0, bufferMs - 5);
+    } else {
+      // Path C — sum up pending queued floats.
+      let frames = 0;
+      for (const buf of this.fallbackSampleQueue) {
+        frames += buf.length >> 1;
+      }
+      bufferedMs = (frames * 1000) / sr;
+    }
+
+    // Steady-state target: fill at TARGET_FILL_MS just before the next gen.
+    // Sleep so the consumer drains down to that level.
+    if (bufferedMs <= TARGET_FILL_MS) {
+      // Underfilled — fire immediately. The browser still clamps `0` to a
+      // few ms, which is plenty given the consumer is real-time.
+      return 0;
+    }
+    // Overfilled — sleep enough to land just at TARGET_FILL_MS.
+    const sleepMs = bufferedMs - TARGET_FILL_MS;
+    // Cap at one buffer's worth so we never miss a refill window if the
+    // consumer briefly speeds up (browser audio thread reschedules).
+    return Math.min(sleepMs, bufferMs);
   }
   
   /**

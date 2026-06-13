@@ -413,7 +413,7 @@ export class WasmService {
     
     /**
      * Write to a chip register.
-     * 
+     *
      * @param playerId - The chip player ID
      * @param chip - The target chip
      * @param addr - Register address
@@ -426,10 +426,36 @@ export class WasmService {
         data: number
     ): Promise<void> {
         await this.ensureInitialized();
-        
+
         const player = this.getChipPlayer(playerId);
         const wasm = this.wasmModule;
         wasm.chip_player_write_register(player, chip, addr, data);
+    }
+
+    /**
+     * Synchronous register write for the hot playback path.
+     *
+     * `applyPendingVgmCommands` can issue tens or hundreds of register
+     * writes per audio buffer; awaiting the async variant once per write
+     * forces a microtask hop between each one, and the producer loop falls
+     * behind the worklet's consume rate (especially with `setTimeout(0)`
+     * being clamped to ~4ms after nested calls). The underlying
+     * `chip_player_write_register` is already synchronous — this just skips
+     * the `await ensureInitialized()` round-trip, which the caller is
+     * expected to have already done (chipPlayerId is non-null only after
+     * createChipPlayer succeeded, which itself awaited init).
+     */
+    public writeChipRegisterSync(
+        playerId: string,
+        chip: SoundChip,
+        addr: number,
+        data: number,
+    ): void {
+        if (!this.wasmModule) {
+            throw new Error('wasmService.writeChipRegisterSync called before init');
+        }
+        const player = this.getChipPlayer(playerId);
+        this.wasmModule.chip_player_write_register(player, chip, addr, data);
     }
     
     /**
@@ -460,12 +486,27 @@ export class WasmService {
         numSamples: number
     ): Promise<Float32Array> {
         await this.ensureInitialized();
-        
+
         const player = this.getChipPlayer(playerId);
         const wasm = this.wasmModule;
         const samples: Float32Array = wasm.chip_player_generate_samples(player, numSamples);
-        
+
         return samples;
+    }
+
+    /**
+     * Synchronous sample generation for the producer hot path. Mirrors
+     * `writeChipRegisterSync`'s rationale: the underlying WASM call is
+     * already synchronous, and the producer loop runs once per audio
+     * buffer — skipping the `await ensureInitialized()` round-trip on
+     * every cycle keeps the loop's per-buffer latency bounded.
+     */
+    public generateSamplesSync(playerId: string, numSamples: number): Float32Array {
+        if (!this.wasmModule) {
+            throw new Error('wasmService.generateSamplesSync called before init');
+        }
+        const player = this.getChipPlayer(playerId);
+        return this.wasmModule.chip_player_generate_samples(player, numSamples);
     }
     
     /**

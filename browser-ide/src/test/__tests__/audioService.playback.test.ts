@@ -8,7 +8,9 @@ const { mockWasmService } = vi.hoisted(() => ({
     createChipPlayer: vi.fn(async () => 'chip-player-1'),
     addChipToPlayer: vi.fn(async () => undefined),
     writeChipRegister: vi.fn(async () => undefined),
+    writeChipRegisterSync: vi.fn(() => undefined),
     generateSamples: vi.fn(async () => new Float32Array(4096 * 2)),
+    generateSamplesSync: vi.fn(() => new Float32Array(4096 * 2)),
     compile: vi.fn(async () => ({
       data: new Uint8Array(),
       partCount: 0,
@@ -150,6 +152,7 @@ describe('AudioService playback duration regression', () => {
     const audibleSample = new Float32Array(4096 * 2);
     audibleSample.fill(0.125);
     mockWasmService.generateSamples.mockImplementation(async () => audibleSample);
+    mockWasmService.generateSamplesSync.mockImplementation(() => audibleSample);
 
     await audioService.playVGM(createMinimalAudibleVgm(), {
       chips: ['SN76489', 'YM2608'],
@@ -187,6 +190,7 @@ describe('AudioService playback duration regression', () => {
       warnings: [],
     });
     mockWasmService.generateSamples.mockImplementation(async () => audibleSample);
+    mockWasmService.generateSamplesSync.mockImplementation(() => audibleSample);
 
     await audioService.playMML(arpeggioSource, ['YM2608', 'SN76489']);
 

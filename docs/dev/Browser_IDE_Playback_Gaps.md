@@ -65,6 +65,68 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### W. Producer hot-path desync & overrun: choppy / halting playback
+User reported `01_fm_basics.gwi` "starts fairly clear and then quickly
+gets more garbled until it seems to halt." Same class of artefact on
+other examples.
+
+Two root causes, in series:
+
+**(1) Async overhead inside the inner loop.** `applyPendingVgmCommands`
+was async and every `wasmService.writeChipRegister` call was `await`ed.
+The underlying WASM call is synchronous; the await chain only existed
+because the wrapper did `await this.ensureInitialized()` at every entry
+point. With FM init bursts of 30-60 register writes at time 0 plus the
+producer's own outer `await wasmService.generateSamples`, each buffer
+cycle inserted dozens of microtask hops where React renders / other
+main-thread tasks could interleave between our register writes and our
+sample generation. The chip emulator effectively saw register state
+change in the middle of producing a buffer.
+
+**(2) Producer racing past wall-clock.** The cycle finished with
+`setTimeout(generateSamples, 0)`. Browsers clamp nested-timeout zeros
+to ~4 ms, so the producer fired ~250 cycles/s, generating ~93 ms of
+audio per call → ~23× real-time. `vgmSampleCursor` advanced by
+`bufferSize` every cycle regardless of how much wall-clock had
+elapsed, so the cursor reached `vgmTotalSamples` after ~0.4 s of
+wall-clock for a 10 s song. `applyPendingVgmCommands` then emitted
+`onEnd`, flipped `_isPlaying = false`, and the producer stopped. The
+ring buffer drained whatever was queued (≤ 1 s) and then went silent
+— exactly the "starts clear then halts" pattern the user described.
+The intermediate "garbled" period is the over-generation feedback:
+samples were being thrown away when the ring filled, but cursor and
+register-write timing still advanced, so the surviving samples
+represented increasingly stale chip state.
+
+**Fixes:**
+
+1. `wasmService.writeChipRegisterSync(playerId, chip, addr, data)` and
+   `wasmService.generateSamplesSync(playerId, numSamples)` — bypass the
+   `await ensureInitialized()` chain. Both are safe to call after a
+   successful `createChipPlayer`, which already awaited init.
+
+2. `applyPendingVgmCommands` is now synchronous and uses
+   `writeChipRegisterSync`. `startSampleGeneration`'s producer body is
+   also fully synchronous; `await` removed.
+
+3. `computeProducerDelayMs()` paces the next cycle to the ring-buffer
+   fill level. Targets ~150 ms steady-state fill: sleep until the
+   consumer drains to that level, then fire to refill. Cap the sleep
+   at one bufferSize (~93 ms) so a brief consumer speed-up never starves
+   us. Underfilled → fire immediately. Path B (postMessage worklet)
+   has no fill back-channel so it cadence-paces at `bufferMs - 5 ms`;
+   Path C reads the in-process queue directly.
+
+Net effect: producer advances `vgmSampleCursor` at roughly wall-clock
+rate, end-of-stream fires when the song genuinely ends rather than
+0.4 s in, and the chip emulator sees register writes applied between
+buffers instead of mid-buffer.
+
+**Test fixtures:** `audioService.playback.test.ts` mock service got
+`writeChipRegisterSync` and `generateSamplesSync` entries; the
+`mockImplementation` calls now stamp both the async and sync variants.
+146 tests pass.
+
 ### V. Parser allocation deferral (measurement-gated)
 Measured against every `browser-ide/public/samples/*.gwi` file: the
 largest emits 1,087 register-write commands (`35_ensemble`), with most
