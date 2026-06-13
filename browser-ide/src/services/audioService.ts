@@ -65,6 +65,22 @@ interface ParsedVgmCommand {
   data: number;
 }
 
+interface ParsedVgmStream {
+  commands: ParsedVgmCommand[];
+  /** Total length in samples (header field 0x18). 0 if absent. */
+  totalSamples: number;
+  /** Length of the loop body in samples (header field 0x20). 0 = no loop. */
+  loopSamples: number;
+  /**
+   * Index into `commands` of the first command at or after the loop point.
+   * `-1` if the VGM declares no loop (header field `0x1C` is zero) or if
+   * the loop offset points past end of stream.
+   */
+  loopCommandIndex: number;
+  /** Stream-time of `commands[loopCommandIndex]`, in samples. */
+  loopSampleStart: number;
+}
+
 /**
  * Inspect a VGM byte stream's header and return the list of chips it declares.
  * Each chip occupies one little-endian u32 clock field at a fixed offset;
@@ -228,6 +244,22 @@ export class AudioService {
   private vgmCommands: ParsedVgmCommand[] = [];
   private nextVgmCommandIndex = 0;
   private vgmSampleCursor = 0;
+  /** Total samples reported by the VGM header (0 if absent). */
+  private vgmTotalSamples = 0;
+  /** Length of the VGM loop body in samples (0 = no loop). */
+  private vgmLoopSamples = 0;
+  /** Index in `vgmCommands` of the loop entry, or -1 if no loop. */
+  private vgmLoopCommandIndex = -1;
+  /** Stream-time of the loop entry command, in samples. */
+  private vgmLoopSampleStart = 0;
+  /**
+   * Number of samples by which the stream cursor has been shifted backward to
+   * account for loop wraps. `streamPosition = targetSample - vgmLoopShift`.
+   * Lets the audio thread keep advancing `targetSample` monotonically while
+   * the VGM stream replays the loop body.
+   */
+  private vgmLoopShift = 0;
+  private vgmLoopCount = 0;
   private appliedWriteCount = 0;
   private skippedWriteCount = 0;
   private generatedBufferCount = 0;
@@ -242,6 +274,12 @@ export class AudioService {
     this.vgmCommands = [];
     this.nextVgmCommandIndex = 0;
     this.vgmSampleCursor = 0;
+    this.vgmTotalSamples = 0;
+    this.vgmLoopSamples = 0;
+    this.vgmLoopCommandIndex = -1;
+    this.vgmLoopSampleStart = 0;
+    this.vgmLoopShift = 0;
+    this.vgmLoopCount = 0;
     this.appliedWriteCount = 0;
     this.skippedWriteCount = 0;
     this.generatedBufferCount = 0;
@@ -371,19 +409,43 @@ export class AudioService {
 
   /**
    * Parse VGM command stream into register writes with sample timestamps.
+   *
+   * Also extracts the looping metadata from the header (offsets 0x18, 0x1C,
+   * 0x20) so the playback loop can wrap back to the loop point when the VGM
+   * ends. See VGM 1.71 spec section 3 ("Header").
    */
-  private parseVgmCommands(data: Uint8Array): ParsedVgmCommand[] {
+  private parseVgmStream(data: Uint8Array): ParsedVgmStream {
+    const empty: ParsedVgmStream = {
+      commands: [],
+      totalSamples: 0,
+      loopSamples: 0,
+      loopCommandIndex: -1,
+      loopSampleStart: 0,
+    };
     if (!data || data.length < 0x40) {
-      return [];
+      return empty;
     }
 
+    const readU32 = (off: number): number => {
+      if (off + 4 > data.length) return 0;
+      return (data[off] | (data[off + 1] << 8) | (data[off + 2] << 16) | (data[off + 3] << 24)) >>> 0;
+    };
+
     const commands: ParsedVgmCommand[] = [];
-    const dataOffset = (data[0x34] | (data[0x35] << 8) | (data[0x36] << 16) | (data[0x37] << 24)) >>> 0;
+    const dataOffset = readU32(0x34);
     let offset = dataOffset === 0 ? 0x40 : (0x34 + dataOffset);
     if (offset >= data.length) {
       offset = 0x40;
     }
 
+    const totalSamples = readU32(0x18);
+    const loopSamples = readU32(0x20);
+    // Header 0x1C: loop offset RELATIVE TO 0x1C. 0 = no loop.
+    const loopRel = readU32(0x1C);
+    const loopAbsByte = loopRel === 0 ? -1 : (0x1C + loopRel);
+
+    let loopCommandIndex = -1;
+    let loopSampleStart = 0;
     let currentTime = 0;
     let snLatchedAddr = 0x80;
 
@@ -397,6 +459,15 @@ export class AudioService {
     };
 
     while (offset < data.length) {
+      // Loop-point detection: when our read cursor first reaches or crosses
+      // the loop-start byte, mark the NEXT command we'll push as the loop
+      // entry. This is checked before consuming each opcode so the marker
+      // lands on the command itself, not on a preceding wait.
+      if (loopAbsByte >= 0 && loopCommandIndex === -1 && offset >= loopAbsByte) {
+        loopCommandIndex = commands.length;
+        loopSampleStart = currentTime;
+      }
+
       const cmd = data[offset++];
 
       if (cmd >= 0x70 && cmd <= 0x7f) {
@@ -491,11 +562,11 @@ export class AudioService {
           currentTime += 882;
           break;
         case 0x66:
-          return commands;
+          return { commands, totalSamples, loopSamples, loopCommandIndex, loopSampleStart };
         case 0x67: {
           // Data block: 0x67 0x66 tt ss ss ss ss [data]
-          if (offset + 6 > data.length) return commands;
-          if (data[offset] !== 0x66) return commands;
+          if (offset + 6 > data.length) return { commands, totalSamples, loopSamples, loopCommandIndex, loopSampleStart };
+          if (data[offset] !== 0x66) return { commands, totalSamples, loopSamples, loopCommandIndex, loopSampleStart };
           const size = (
             data[offset + 2] |
             (data[offset + 3] << 8) |
@@ -510,11 +581,30 @@ export class AudioService {
           break;
         default:
           // Unknown command: stop to avoid stream desync.
-          return commands;
+          return finalizeStream();
       }
     }
 
-    return commands;
+    return finalizeStream();
+
+    function finalizeStream(): ParsedVgmStream {
+      // A loop offset that lands past the last command is meaningless —
+      // collapse it to "no loop" so the playback loop doesn't spin on an
+      // unreachable target.
+      let finalLoopIdx = loopCommandIndex;
+      let finalLoopStart = loopSampleStart;
+      if (finalLoopIdx >= commands.length) {
+        finalLoopIdx = -1;
+        finalLoopStart = 0;
+      }
+      return {
+        commands,
+        totalSamples,
+        loopSamples,
+        loopCommandIndex: finalLoopIdx,
+        loopSampleStart: finalLoopStart,
+      };
+    }
   }
 
   /**
@@ -526,20 +616,60 @@ export class AudioService {
       return;
     }
 
-    while (this.nextVgmCommandIndex < this.vgmCommands.length) {
-      const command = this.vgmCommands[this.nextVgmCommandIndex];
-      if (command.timeSamples > targetSample) {
+    // Stream position is wall-clock target minus accumulated loop shift.
+    // When we wrap, we extend `vgmLoopShift` so command timestamps (which are
+    // absolute within the VGM) line up with the freshly-rewound cursor.
+    const canLoop = this._loop && this.vgmLoopCommandIndex >= 0 && this.vgmLoopSamples > 0;
+
+    // Outer loop handles the case where the loop body is shorter than one
+    // audio quantum, so we might need to wrap multiple times in one call.
+    // The chip player itself never resets — register state carries through.
+    // Safety cap so a degenerate VGM (e.g. zero-length loop body that slipped
+    // past the parser check) can't spin the JS thread forever.
+    let safety = 8;
+    while (safety-- > 0) {
+      const streamPosition = targetSample - this.vgmLoopShift;
+
+      while (this.nextVgmCommandIndex < this.vgmCommands.length) {
+        const command = this.vgmCommands[this.nextVgmCommandIndex];
+        if (command.timeSamples > streamPosition) {
+          break;
+        }
+
+        if (this.chips.includes(command.chip)) {
+          await wasmService.writeChipRegister(this.chipPlayerId, command.chip, command.addr, command.data);
+          this.appliedWriteCount += 1;
+        } else {
+          this.skippedWriteCount += 1;
+        }
+
+        this.nextVgmCommandIndex += 1;
+      }
+
+      // Did we just consume the last command, or pass the declared total?
+      const reachedEnd =
+        this.nextVgmCommandIndex >= this.vgmCommands.length ||
+        (this.vgmTotalSamples > 0 && streamPosition >= this.vgmTotalSamples);
+
+      if (!reachedEnd) {
         break;
       }
 
-      if (this.chips.includes(command.chip)) {
-        await wasmService.writeChipRegister(this.chipPlayerId, command.chip, command.addr, command.data);
-        this.appliedWriteCount += 1;
-      } else {
-        this.skippedWriteCount += 1;
+      if (canLoop) {
+        // Rewind the stream to the loop entry. Bumping `vgmLoopShift` keeps
+        // `targetSample` monotonic so wall-clock time tracking stays sane.
+        this.vgmLoopShift += this.vgmLoopSamples;
+        this.nextVgmCommandIndex = this.vgmLoopCommandIndex;
+        this.vgmLoopCount += 1;
+        continue; // process commands at the new (rewound) position
       }
 
-      this.nextVgmCommandIndex += 1;
+      // Non-looping end-of-stream: emit once.
+      if (this._isPlaying) {
+        this.emitEnd();
+        this._isPlaying = false;
+      }
+      break;
     }
 
     this.vgmSampleCursor = targetSample;
@@ -1042,11 +1172,22 @@ export class AudioService {
       // Create chip player
       await this.createChipPlayer(chipsToUse, this.sampleRate);
 
-      // Parse VGM commands and reset playback cursor.
-      this.vgmCommands = this.parseVgmCommands(data);
+      // Parse VGM commands + loop metadata; reset playback cursor.
+      const stream = this.parseVgmStream(data);
+      this.vgmCommands = stream.commands;
+      this.vgmTotalSamples = stream.totalSamples;
+      this.vgmLoopSamples = stream.loopSamples;
+      this.vgmLoopCommandIndex = stream.loopCommandIndex;
+      this.vgmLoopSampleStart = stream.loopSampleStart;
+      this.vgmLoopShift = 0;
+      this.vgmLoopCount = 0;
       this.nextVgmCommandIndex = 0;
       this.vgmSampleCursor = 0;
-      console.log('[AudioService] Parsed VGM commands:', this.vgmCommands.length);
+      console.log('[AudioService] Parsed VGM stream:',
+        'commands=', this.vgmCommands.length,
+        'totalSamples=', this.vgmTotalSamples,
+        'loopSamples=', this.vgmLoopSamples,
+        'loopCmdIdx=', this.vgmLoopCommandIndex);
       if (this.vgmCommands.length === 0) {
         throw new Error(
           'Compiled VGM contains no playable register-write commands. Check MML part/channel syntax (for example, use @0/@1 instead of legacy labels).'
@@ -1082,12 +1223,17 @@ export class AudioService {
   public async createChipPlayer(chips: SoundChip[], sampleRate: number = 44100): Promise<string> {
     this.chips = chips;
     this.chipPlayerId = await wasmService.createChipPlayer(sampleRate);
-    
+
     // Add all chips
     for (const chip of chips) {
       await wasmService.addChipToPlayer(this.chipPlayerId, chip);
     }
-    
+
+    // Apply any pre-existing mixer state (volume/mute/solo) to the new player.
+    // Without this, sliders the user moved before pressing Play silently revert
+    // to 1.0 when a fresh chip player is instantiated.
+    this.pushEffectiveChipGains();
+
     return this.chipPlayerId;
   }
   
@@ -1508,37 +1654,59 @@ export class AudioService {
    */
   public setChipVolume(chip: SoundChip, volume: number): void {
     this.chipVolumes.set(chip, Math.max(0, Math.min(1, volume)));
-    console.log(`[AudioService] Chip volume set: ${chip}=${volume}`);
+    this.pushEffectiveChipGains();
   }
-  
+
   /**
    * Get volume for a specific chip.
    */
   public getChipVolume(chip: SoundChip): number {
-    return this.chipVolumes.get(chip) || 1.0;
+    return this.chipVolumes.get(chip) ?? 1.0;
   }
-  
+
   /**
    * Set mute state for a specific chip.
    */
   public setChipMuted(chip: SoundChip, muted: boolean): void {
     this.chipMuteStates.set(chip, muted);
-    console.log(`[AudioService] Chip muted: ${chip}=${muted}`);
+    this.pushEffectiveChipGains();
   }
-  
+
   /**
    * Get mute state for a specific chip.
    */
   public isChipMuted(chip: SoundChip): boolean {
     return this.chipMuteStates.get(chip) || false;
   }
-  
+
   /**
    * Set solo state for a specific chip.
+   *
+   * Solo is global across chips: if any chip is soloed, every non-soloed chip
+   * is silenced. Pushing gains after every flip keeps the chip player's mixer
+   * in sync.
    */
   public setChipSolo(chip: SoundChip, solo: boolean): void {
     this.chipSoloStates.set(chip, solo);
-    console.log(`[AudioService] Chip solo: ${chip}=${solo}`);
+    this.pushEffectiveChipGains();
+  }
+
+  /**
+   * Recompute each active chip's effective gain (mute/solo/volume combined)
+   * and push it to the WASM chip player. No-op if no chip player exists.
+   *
+   * Safe to call from React event handlers (slider drags, button clicks) —
+   * the WASM call runs on the JS main thread and is a small map update.
+   */
+  private pushEffectiveChipGains(): void {
+    if (!this.chipPlayerId) return;
+    for (const chip of this.chips) {
+      const gain = this.getEffectiveChipVolume(chip);
+      // Best-effort — log but don't throw if a stale chip slips through.
+      wasmService.setChipGain(this.chipPlayerId, chip, gain).catch(err => {
+        console.warn(`[AudioService] setChipGain failed for ${chip}:`, err);
+      });
+    }
   }
   
   /**

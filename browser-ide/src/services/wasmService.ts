@@ -415,6 +415,22 @@ export class WasmService {
     }
     
     /**
+     * Set the linear mix gain for a chip on the chip player.
+     * `gain = 1.0` is unity, `0.0` mutes (emulator still clocked).
+     */
+    public async setChipGain(
+        playerId: string,
+        chip: SoundChip,
+        gain: number,
+    ): Promise<void> {
+        await this.ensureInitialized();
+
+        const player = this.getChipPlayer(playerId);
+        const wasm = this.wasmModule;
+        wasm.chip_player_set_chip_gain(player, chip, gain);
+    }
+
+    /**
      * Generate audio samples from a chip player.
      * 
      * @param playerId - The chip player ID

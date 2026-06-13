@@ -477,6 +477,41 @@ pub fn chip_player_write_register(
     Ok(())
 }
 
+/// Set the linear mix gain for a chip in the player.
+///
+/// `gain = 1.0` is unity, `0.0` mutes the chip (its emulator is still clocked,
+/// so envelopes/timers stay coherent when the gain is restored). Values are
+/// clamped to `[0.0, 4.0]` to bound speaker risk on runaway sliders.
+#[wasm_bindgen(catch)]
+pub fn chip_player_set_chip_gain(
+    player: &JsChipPlayer,
+    chip_name: &str,
+    gain: f32,
+) -> Result<(), JsValue> {
+    let chip: SoundChip = chip_name.parse().map_err(|e| {
+        JsValue::from_str(&format!("Invalid chip name: {}", e))
+    })?;
+
+    let mut player_guard = player.player.lock().unwrap();
+    player_guard.set_chip_gain(chip, gain);
+    Ok(())
+}
+
+/// Get the linear mix gain for a chip. Returns `1.0` if no explicit gain
+/// has been set.
+#[wasm_bindgen(catch)]
+pub fn chip_player_get_chip_gain(
+    player: &JsChipPlayer,
+    chip_name: &str,
+) -> Result<f32, JsValue> {
+    let chip: SoundChip = chip_name.parse().map_err(|e| {
+        JsValue::from_str(&format!("Invalid chip name: {}", e))
+    })?;
+
+    let player_guard = player.player.lock().unwrap();
+    Ok(player_guard.get_chip_gain(chip))
+}
+
 /// Generate audio samples from the chip player
 ///
 /// # Arguments

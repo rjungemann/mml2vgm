@@ -22,6 +22,13 @@ pub enum ChipPlayerState {
 /// Chip player for real-time emulation
 pub struct ChipPlayer {
     chips: HashMap<SoundChip, Box<dyn SoundChipEmulator>>,
+    /// Per-chip linear gain applied during mixing. Defaults to 1.0 for any
+    /// chip without an explicit entry. 0.0 mutes the chip (its emulator is
+    /// still clocked so envelopes/timers stay coherent if the gain comes back).
+    chip_gains: HashMap<SoundChip, f32>,
+    /// Scratch buffer reused across mixing iterations to avoid per-call
+    /// allocation. Same length as `sample_buffer` (stereo-interleaved).
+    chip_scratch: Vec<f32>,
     sample_rate: u32,
     state: ChipPlayerState,
     audio_backend: Option<Box<dyn AudioBackend>>,
@@ -34,6 +41,8 @@ impl ChipPlayer {
     pub fn new() -> Self {
         Self {
             chips: HashMap::new(),
+            chip_gains: HashMap::new(),
+            chip_scratch: Vec::with_capacity(4096 * 2),
             sample_rate: 44100,
             state: ChipPlayerState::Stopped,
             audio_backend: None,
@@ -211,6 +220,19 @@ impl ChipPlayer {
         self.state
     }
 
+    /// Set the linear gain applied to a chip's output during mixing.
+    /// `gain = 1.0` is unity, `0.0` mutes. Values are clamped to a sane
+    /// range so a runaway slider can't blow speakers.
+    pub fn set_chip_gain(&mut self, chip: SoundChip, gain: f32) {
+        self.chip_gains.insert(chip, gain.clamp(0.0, 4.0));
+    }
+
+    /// Get the linear gain for a chip. Returns 1.0 if no explicit gain was
+    /// set (the default).
+    pub fn get_chip_gain(&self, chip: SoundChip) -> f32 {
+        self.chip_gains.get(&chip).copied().unwrap_or(1.0)
+    }
+
     /// Generate the next batch of samples
     pub fn generate_samples(&mut self, sample_count: usize) -> MmlResult<Vec<f32>> {
         // When stopped, still generate samples so WASM callers (which manage
@@ -221,27 +243,54 @@ impl ChipPlayer {
             return Ok(vec![0.0; sample_count * 2]); // Return silence when paused
         }
 
+        let total = sample_count * 2; // stereo interleaved
         self.sample_buffer.clear();
-        self.sample_buffer.resize(sample_count * 2, 0.0); // Stereo samples
+        self.sample_buffer.resize(total, 0.0);
 
-        // Collect mutable references to all chip emulators
-        let mut chip_refs: Vec<&mut dyn SoundChipEmulator> = self
-            .chips
-            .values_mut()
-            .map(|b| b.as_mut() as &mut dyn SoundChipEmulator)
-            .collect();
-
-        if chip_refs.is_empty() {
+        if self.chips.is_empty() {
             self.position += sample_count as u64;
             return Ok(self.sample_buffer.clone());
         }
 
-        // Generate and mix samples from all chips
-        for chip in &mut chip_refs {
-            chip.generate_samples(&mut self.sample_buffer, self.sample_rate);
+        // Each chip's `generate_samples` *overwrites* the buffer it's given
+        // (rather than accumulating), so summing chips requires rendering
+        // each into a private scratch buffer and mixing it in. The scratch
+        // buffer is reused across iterations to avoid per-call allocation.
+        if self.chip_scratch.len() < total {
+            self.chip_scratch.resize(total, 0.0);
+        }
+        let scratch = &mut self.chip_scratch[..total];
+
+        for (chip_type, emulator) in &mut self.chips {
+            let gain = self
+                .chip_gains
+                .get(chip_type)
+                .copied()
+                .unwrap_or(1.0);
+
+            // Zero the scratch buffer so chip writes start from silence.
+            for v in scratch.iter_mut() {
+                *v = 0.0;
+            }
+            emulator.generate_samples(scratch, self.sample_rate);
+
+            // Skip the mix-in when muted, but keep the emulator clocked above
+            // so envelopes/timers don't desync when the gain comes back.
+            if gain == 0.0 {
+                continue;
+            }
+            if gain == 1.0 {
+                for (dst, src) in self.sample_buffer.iter_mut().zip(scratch.iter()) {
+                    *dst += *src;
+                }
+            } else {
+                for (dst, src) in self.sample_buffer.iter_mut().zip(scratch.iter()) {
+                    *dst += *src * gain;
+                }
+            }
         }
 
-        // Clamp values to prevent clipping
+        // Clamp to prevent clipping when multiple chips overlap loudly.
         for sample in &mut self.sample_buffer {
             *sample = sample.clamp(-1.0, 1.0);
         }
