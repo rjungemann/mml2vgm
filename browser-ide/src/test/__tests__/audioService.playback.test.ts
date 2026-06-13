@@ -21,6 +21,8 @@ const { mockWasmService } = vi.hoisted(() => ({
     stopVgm: vi.fn(async () => undefined),
     destroyVgmPlayer: vi.fn(() => undefined),
     destroyChipPlayer: vi.fn(() => undefined),
+    // Per-chip mixer gain (added when mute/solo/volume were wired through).
+    setChipGain: vi.fn(async () => undefined),
   },
 }));
 
@@ -65,24 +67,32 @@ class MockAudioContext {
   }));
 }
 
+/**
+ * Builds a VGM long enough that the producer loop must run for many buffer
+ * cycles before `applyPendingVgmCommands` exhausts the stream. Used to catch
+ * producer-side regressions where playback would stall after a single buffer.
+ *
+ * Stream layout: 256 iterations of `{SN76489 write; wait 4000 samples}`, so
+ * the total stream length is ~1M samples (~23s at 44.1kHz). The
+ * `runOnlyPendingTimersAsync` loop in the tests fires the producer at a
+ * higher rate than wall-clock would (each await resolves many setTimeouts),
+ * so the stream needs significant slack above the nominal "8 buffers × 92ms"
+ * window the assertion checks.
+ */
 const createMinimalAudibleVgm = (): Uint8Array => {
-  const data = new Uint8Array(0x50);
-  data[0] = 0x56; // 'V'
-  data[1] = 0x67; // 'g'
-  data[2] = 0x6d; // 'm'
-  data[3] = 0x20; // ' '
-  // data offset = 0 -> stream starts at 0x40.
+  const stream: number[] = [];
+  for (let i = 0; i < 256; i++) {
+    stream.push(0x50, 0x90 | (i & 0x0f));   // SN76489 attenuation write
+    stream.push(0x61, 0xa0, 0x0f);          // wait 4000 samples (0x0fa0)
+  }
+  stream.push(0x66);                         // end of data
 
-  let offset = 0x40;
-  data[offset++] = 0x50; // SN76489 write
-  data[offset++] = 0x90; // channel 0 volume = 0 (loud)
-  data[offset++] = 0x61; // wait n samples
-  data[offset++] = 0x10;
-  data[offset++] = 0x00;
-  data[offset++] = 0x50; // SN76489 write
-  data[offset++] = 0x80; // tone latch
-  data[offset++] = 0x66; // end of data
-
+  const data = new Uint8Array(0x40 + stream.length);
+  data[0] = 0x56; data[1] = 0x67; data[2] = 0x6d; data[3] = 0x20; // 'Vgm '
+  // data offset (header 0x34) = 0 → stream starts at 0x40.
+  for (let i = 0; i < stream.length; i++) {
+    data[0x40 + i] = stream[i];
+  }
   return data;
 };
 

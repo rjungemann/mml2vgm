@@ -156,6 +156,43 @@ const mergeChips = (a: SoundChip[], b: SoundChip[]): SoundChip[] => {
   return out;
 };
 
+/**
+ * Number of operand bytes for each VGM command opcode, per VGM 1.71 §4.
+ *
+ * Returns:
+ *   ≥ 0 — fixed operand byte count; advance `offset` by this much after the opcode.
+ *   -1  — variable-length (`0x67` data blocks); caller handles.
+ *
+ * Used by the parser default branch so unknown opcodes no longer truncate the
+ * stream — we consume them silently with the right byte count, keeping the
+ * cursor in sync with the wait commands that follow.
+ *
+ * Single-byte opcodes (0x62-0x66, 0x70-0x7F, 0x80-0x8F) return 0.
+ */
+const vgmOperandSize = (cmd: number): number => {
+  if (cmd >= 0x30 && cmd <= 0x3F) return 1;            // reserved 1-byte commands
+  if (cmd >= 0x40 && cmd <= 0x4E) return 2;            // reserved 2-byte commands (VGM 1.60+)
+  if (cmd === 0x4F) return 1;                          // Game Gear PSG stereo
+  if (cmd === 0x50) return 1;                          // SN76489 write (PSG, single byte)
+  if (cmd >= 0x51 && cmd <= 0x5F) return 2;            // FM-family chip writes (YM2413/2612/...)
+  if (cmd === 0x61) return 2;                          // wait n samples
+  if (cmd === 0x62 || cmd === 0x63) return 0;          // wait 735 / 882
+  if (cmd === 0x64) return 4;                          // override wait length
+  if (cmd === 0x66) return 0;                          // end of stream
+  if (cmd === 0x67) return -1;                         // data block — variable length
+  if (cmd === 0x68) return 11;                         // PCM RAM write
+  if (cmd >= 0x70 && cmd <= 0x7F) return 0;            // short wait
+  if (cmd >= 0x80 && cmd <= 0x8F) return 0;            // YM2612 DAC write + short wait
+  if (cmd === 0x90 || cmd === 0x91 || cmd === 0x95) return 4;  // DAC stream setup / set data / start fast
+  if (cmd === 0x92) return 5;                          // DAC stream set frequency
+  if (cmd === 0x93) return 10;                         // DAC stream start
+  if (cmd === 0x94) return 1;                          // DAC stream stop
+  if (cmd >= 0xA0 && cmd <= 0xBF) return 2;            // AY8910 (A0) + reserved/console 2-byte chips
+  if (cmd >= 0xC0 && cmd <= 0xDF) return 3;            // Sega PCM / K051649 / C140 etc. (3-byte)
+  if (cmd >= 0xE0 && cmd <= 0xFF) return 4;            // PCM seek / C352 / reserved 4-byte
+  return -1;                                           // truly unknown — caller bails
+};
+
 const decodeSn76489Write = (value: number, latchedAddr: number): { addr: number; data: number; nextLatchedAddr: number } => {
   if ((value & 0x80) !== 0) {
     const nextLatchedAddr = 0x80 | ((value >> 4) & 0x07);
@@ -211,8 +248,8 @@ export class AudioService {
   private _pauseTime = 0;
   private _currentTime = 0;
   
-  // VGM player state
-  private vgmPlayerId: string | null = null;
+  // Original VGM byte stream (kept for diagnostics / re-parse). All actual
+  // playback runs through the chip player and `vgmCommands` queue.
   private vgmData: Uint8Array | null = null;
   
   // Chip player state
@@ -579,9 +616,160 @@ export class AudioService {
         case 0x00:
           // Padding/no-op in some generated streams.
           break;
-        default:
-          // Unknown command: stop to avoid stream desync.
-          return finalizeStream();
+
+        // YM2612 DAC write + short wait: `8n` (where n = wait samples).
+        // The DAC byte comes from a previously-loaded data block at an
+        // internal cursor; without PCM-data-block support we can't emit
+        // the YM2612 register-0x2A write, but we still advance time so
+        // the rest of the stream stays in sync.
+        case 0x80: case 0x81: case 0x82: case 0x83:
+        case 0x84: case 0x85: case 0x86: case 0x87:
+        case 0x88: case 0x89: case 0x8A: case 0x8B:
+        case 0x8C: case 0x8D: case 0x8E: case 0x8F:
+          currentTime += cmd & 0x0F;
+          break;
+
+        // AY8910 register write.
+        case 0xA0: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('AY8910', addr, regData);
+          break;
+        }
+
+        // RF5C164 register write.
+        case 0xB1: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('RF5C164', addr, regData);
+          break;
+        }
+
+        // GameBoy DMG register write (offset from 0xFF10).
+        case 0xB3: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('DMG', addr, regData);
+          break;
+        }
+
+        // NES APU register write.
+        case 0xB4: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('NES', addr, regData);
+          break;
+        }
+
+        // VRC6 register write. Note: per strict VGM 1.71 spec 0xB6 is
+        // uPD7759, but the Rust codegen uses this opcode for VRC6 — we
+        // mirror that mapping so browser playback consumes what the
+        // compiler emits.
+        case 0xB6: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('VRC6', addr, regData);
+          break;
+        }
+
+        // HuC6280 register write.
+        case 0xB9: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('HuC6280', addr, regData);
+          break;
+        }
+
+        // K053260 register write.
+        case 0xBA: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('K053260', addr, regData);
+          break;
+        }
+
+        // POKEY register write.
+        case 0xBB: {
+          if (offset + 2 > data.length) break;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('POKEY', addr, regData);
+          break;
+        }
+
+        // 3-byte chip writes: opcode + (port|addr_hi) + addr_lo + data.
+        // The chip player's writeRegister API is 8-bit addr + 8-bit data,
+        // so we lose the high byte / port info. The chip register file is
+        // still hit at the low-address portion, which keeps simple
+        // single-port songs audible; multi-port/wide-addr files will
+        // sound wrong until the player API grows a 16-bit address path.
+        case 0xC4: {
+          // QSound: data is 16-bit (hi, lo), addr is 8-bit. The codegen
+          // emits (data_hi, data_lo, addr) per VGM 1.71. We push the
+          // 8-bit address with the low data byte.
+          if (offset + 3 > data.length) break;
+          /* const dataHi = */ offset++;
+          const dataLo = data[offset++];
+          const addr = data[offset++];
+          push('QSound', addr, dataLo);
+          break;
+        }
+        case 0xD1: {
+          // YMF271: port, addr, data.
+          if (offset + 3 > data.length) break;
+          /* const port = */ offset++;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('YMF271', addr, regData);
+          break;
+        }
+        case 0xD2: {
+          // K051649 (SCC): port, addr, data.
+          if (offset + 3 > data.length) break;
+          /* const port = */ offset++;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('K051649', addr, regData);
+          break;
+        }
+        case 0xD3: {
+          // K054539: addr_hi (always 0 for low 256 regs), addr_lo, data.
+          if (offset + 3 > data.length) break;
+          /* const addrHi = */ offset++;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('K054539', addr, regData);
+          break;
+        }
+        case 0xD4: {
+          // C140: addr_hi, addr_lo, data.
+          if (offset + 3 > data.length) break;
+          /* const addrHi = */ offset++;
+          const addr = data[offset++];
+          const regData = data[offset++];
+          push('C140', addr, regData);
+          break;
+        }
+
+        default: {
+          // Unknown opcode — consume the right number of operand bytes so
+          // the stream cursor stays in sync, but don't emit a register
+          // write. Returning -1 from the size table means we genuinely
+          // can't recover (e.g. a corrupted byte): bail in that case.
+          const operandSize = vgmOperandSize(cmd);
+          if (operandSize < 0) {
+            return finalizeStream();
+          }
+          offset += operandSize;
+          break;
+        }
       }
     }
 
@@ -1007,11 +1195,11 @@ export class AudioService {
         }
       }
       
-      // Setup message handler
+      // The producer loop (`startSampleGeneration`) self-reschedules via
+      // `setTimeout`, so there's nothing for the worklet to ask for here —
+      // any unsolicited message goes to the debug log only.
       this.audioWorkletNode.port.onmessage = (e) => {
-        if (e.data.type === 'needSamples') {
-          this.generateMoreSamples(e.data.count);
-        }
+        console.debug('[AudioService] AudioWorklet message:', e.data);
       };
       
       // Setup error handler
@@ -1107,9 +1295,8 @@ export class AudioService {
             }
           }
         }
-        
-        // Request more samples
-        this.generateMoreSamples(samplesNeeded * 2);
+        // The producer loop already self-reschedules in startSampleGeneration;
+        // no explicit request needed here.
       };
       
       this.audioWorkletNode.connect(this.audioContext.destination);
@@ -1298,30 +1485,22 @@ export class AudioService {
    * Start generating samples from WASM player.
    */
   private startSampleGeneration(): void {
-    if (!this.chipPlayerId && !this.vgmPlayerId) return;
-    
+    if (!this.chipPlayerId) return;
+
     const generateSamples = async () => {
       if (!this._isPlaying || this.isProcessing) return;
-      
+
       this.isProcessing = true;
-      
+
       try {
-        // Generate samples from the appropriate player
-        let samples: Float32Array;
-        
-        if (this.vgmPlayerId) {
-          // VGM player doesn't have direct sample generation - need to use chip player
-          // For VGM playback, we use the chip player approach
-          samples = new Float32Array(this.bufferSize * this.outputChannels);
-        } else if (this.chipPlayerId) {
-          if (this.vgmCommands.length > 0) {
-            await this.applyPendingVgmCommands(this.vgmSampleCursor + Math.round(this.bufferSize * this._playbackRate));
-          }
-          samples = await wasmService.generateSamples(this.chipPlayerId, this.bufferSize);
-        } else {
+        if (!this.chipPlayerId) {
           this.isProcessing = false;
           return;
         }
+        if (this.vgmCommands.length > 0) {
+          await this.applyPendingVgmCommands(this.vgmSampleCursor + Math.round(this.bufferSize * this._playbackRate));
+        }
+        const samples = await wasmService.generateSamples(this.chipPlayerId, this.bufferSize);
         
         // Apply volume
         if (this._volume !== 1.0) {
@@ -1346,8 +1525,17 @@ export class AudioService {
         this.captureWaveformSamples(samples);
         if (!this.emittedSilenceWarning && this.silentBufferCount > 25) {
           this.emittedSilenceWarning = true;
-          console.warn('[AudioService] Generated samples remain silent. VGM command rendering to chip registers is likely not implemented yet.');
-          this.emitError(new Error('Playback is running but generated audio is silent.'));
+          const diag = this.diagnoseSilence();
+          console.warn(
+            '[AudioService] Generated samples have been silent for >25 buffers.\n' +
+            `  chips in player:    ${this.chips.join(', ') || '(none)'}\n` +
+            `  register writes:    ${this.appliedWriteCount} applied, ${this.skippedWriteCount} skipped\n` +
+            `  vgm commands total: ${this.vgmCommands.length}\n` +
+            `  vgm sample cursor:  ${this.vgmSampleCursor} / ${this.vgmTotalSamples || '?'}\n` +
+            `  audio context:      ${this.audioContext?.state ?? 'no context'}\n` +
+            `  likely cause:       ${diag}`
+          );
+          this.emitError(new Error(`Playback running but audio is silent (${diag}).`));
         }
         
         // If using SharedArrayBuffer, write directly to the ring buffer
@@ -1381,16 +1569,6 @@ export class AudioService {
     
     // Start the loop
     generateSamples();
-  }
-  
-  /**
-   * Generate more samples when requested by AudioWorklet.
-   */
-  private generateMoreSamples(count: number): void {
-    if (!this._isPlaying || this.isProcessing) return;
-    
-    // Trigger sample generation
-    this.startSampleGeneration();
   }
   
   /**
@@ -1471,13 +1649,7 @@ export class AudioService {
       this.animationFrameId = null;
     }
     
-    // Stop WASM players
-    if (this.vgmPlayerId) {
-      wasmService.stopVgm(this.vgmPlayerId).catch(console.error);
-      wasmService.destroyVgmPlayer(this.vgmPlayerId);
-      this.vgmPlayerId = null;
-    }
-    
+    // Stop WASM player
     if (this.chipPlayerId) {
       wasmService.destroyChipPlayer(this.chipPlayerId);
       this.chipPlayerId = null;
@@ -1584,6 +1756,44 @@ export class AudioService {
    */
   public isPlaying(): boolean {
     return this._isPlaying;
+  }
+
+  /**
+   * Make a best-guess at why generated samples are coming out as silence.
+   *
+   * Checked in priority order — the first matching cause "wins". Each branch
+   * uses observable state (chip list, write counters, audio context state,
+   * VGM stream length) rather than assumptions about codegen, so the message
+   * stays accurate as the rest of the pipeline evolves.
+   */
+  private diagnoseSilence(): string {
+    if (!this.audioContext) {
+      return 'no AudioContext (init() never ran)';
+    }
+    if (this.audioContext.state !== 'running') {
+      return `AudioContext is ${this.audioContext.state} — needs a user gesture (resume on a button click)`;
+    }
+    if (this.vgmCommands.length === 0) {
+      return 'VGM stream contained zero register-write commands — check that the MML actually emitted notes';
+    }
+    if (this.chips.length === 0) {
+      return 'no chips registered with the chip player — header detection found none and no fallback was applied';
+    }
+    if (this.appliedWriteCount === 0 && this.skippedWriteCount > 0) {
+      const skippedChips = new Set<SoundChip>();
+      for (const cmd of this.vgmCommands) {
+        if (!this.chips.includes(cmd.chip)) skippedChips.add(cmd.chip);
+      }
+      const list = Array.from(skippedChips).join(', ') || '?';
+      return `every register write was skipped — VGM targets chips not in the player (${list}); active player chips are [${this.chips.join(', ')}]`;
+    }
+    if (this.nextVgmCommandIndex >= this.vgmCommands.length && !this._loop) {
+      return 'reached end of VGM stream with loop disabled — playback finished, this is expected';
+    }
+    if (this.appliedWriteCount > 0) {
+      return 'register writes are reaching the chip player but it is rendering silence — check chip emulator state (instrument loaded? key-on issued? volume non-zero?)';
+    }
+    return 'unable to attribute — see chips / write counts above';
   }
 
   /**
@@ -1824,12 +2034,7 @@ export class AudioService {
     this.sampleQueue = [];
     this.sampleBuffer = null;
     
-    // Cleanup WASM players
-    if (this.vgmPlayerId) {
-      wasmService.destroyVgmPlayer(this.vgmPlayerId);
-      this.vgmPlayerId = null;
-    }
-    
+    // Cleanup WASM player
     if (this.chipPlayerId) {
       wasmService.destroyChipPlayer(this.chipPlayerId);
       this.chipPlayerId = null;

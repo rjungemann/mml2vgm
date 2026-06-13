@@ -192,6 +192,11 @@ export function registerMmlLanguage(
         // Bar line — informational, ignored by compiler.
         [/\|/, 'delimiter.bar'],
 
+        // Loop marker — declares the VGM loop point. Codegen populates
+        // header offsets 0x1C/0x20 from this; player wraps back when end of
+        // stream is reached with looping enabled.
+        [/\$/, 'keyword.loopMarker'],
+
         // Hex / decimal numbers (for raw register writes etc.).
         [/\$[0-9a-fA-F]+/, 'number.hex'],
         [/0[xX][0-9a-fA-F]+/, 'number.hex'],

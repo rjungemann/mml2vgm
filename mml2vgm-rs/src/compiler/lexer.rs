@@ -125,6 +125,11 @@ pub enum Token {
     // Special
     /// Bar line: |
     Bar,
+    /// Loop marker: $ — declares the VGM loop point inside a part body.
+    /// All parts that include a `$` should place it at the same musical
+    /// position; codegen uses the latest marker time to set the VGM header's
+    /// loop offset (header 0x1C) and loop sample count (0x20).
+    LoopMarker,
     /// Comment
     Comment(String),
     /// Whitespace
@@ -353,6 +358,7 @@ impl<'a> Lexer<'a> {
             ']' => { self.advance(); Ok(Token::RightBracket) }
             '(' => { self.advance(); Ok(Token::LeftParen) }
             ')' => { self.advance(); Ok(Token::RightParen) }
+            '$' => { self.advance(); Ok(Token::LoopMarker) }
             
             // Rest
             'r' | 'R' => {

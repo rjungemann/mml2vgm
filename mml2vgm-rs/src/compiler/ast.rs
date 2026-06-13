@@ -393,6 +393,10 @@ pub enum MmlNode {
     Loop(Loop),
     /// Bar line
     Bar,
+    /// Loop marker (`$`) — declares the VGM loop point inside a part body.
+    /// Has no audible effect on its own; consumed by codegen to populate the
+    /// VGM header's loop offset/sample fields.
+    LoopMarker,
     /// Part definition
     PartDefinition(PartDefinition),
     /// Metadata

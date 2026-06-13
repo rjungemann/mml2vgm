@@ -258,6 +258,10 @@ pub struct VgmGenerator {
     source_map: SourceMap,
     /// Current part name being processed
     current_part_name: String,
+    /// Sample time of the latest `$` (LoopMarker) seen across all parts.
+    /// `None` means no part declared a loop marker; codegen leaves the VGM
+    /// header's loop offset/sample fields at zero.
+    loop_time: Option<u64>,
 }
 
 impl VgmGenerator {
@@ -304,6 +308,7 @@ impl VgmGenerator {
             time_checkpoints: BTreeSet::new(),
             source_map: SourceMap::default(),
             current_part_name: String::new(),
+            loop_time: None,
         };
 
         generator.header.version = 0x00000171;
@@ -867,6 +872,13 @@ impl VgmGenerator {
         }
         self.suppress_waits = false;
 
+        // Make sure the wait-splitter places an event boundary AT the loop
+        // time, so a single long wait doesn't straddle the loop point and
+        // leave the loop-offset scan landing inside an opaque wait chunk.
+        if let Some(lt) = self.loop_time {
+            self.time_checkpoints.insert(lt);
+        }
+
         // Collect and sort write commands emitted by all parts
         let mut part_cmds: Vec<VgmCommand> = self.commands.drain(init_len..).collect();
         // Filter out any waits (shouldn't exist, but guard just in case)
@@ -1291,6 +1303,18 @@ impl VgmGenerator {
                 }
             }
             MmlNode::Bar => {}
+            MmlNode::LoopMarker => {
+                // Record the latest `$` time across all parts. Codegen uses
+                // the maximum so the loop point only triggers after every
+                // part with a marker has completed its pre-loop intro;
+                // parts without a marker keep their pre-loop chip state
+                // when playback wraps.
+                let candidate = *time;
+                self.loop_time = Some(match self.loop_time {
+                    Some(existing) if existing >= candidate => existing,
+                    _ => candidate,
+                });
+            }
             MmlNode::ChipCommand { chip: _, command, args } => {
                 // Route to appropriate chip command handler
                 self.handle_chip_command(command, args, state, *time)?;
@@ -3085,6 +3109,35 @@ impl VgmGenerator {
         }
         self.header.total_samples = total_samples;
         self.header.data_offset = 0x100;
+
+        // VGM loop fields: only populated if a `$` marker was seen in the AST.
+        // Locate the first non-wait command at-or-after `loop_time`, compute
+        // its byte offset from the start of the file (header is 0x100 bytes),
+        // and store the offset as relative-to-0x1C per VGM 1.71 §3.
+        self.header.loop_offset = 0;
+        self.header.loop_samples = 0;
+        if let Some(loop_time) = self.loop_time {
+            const HEADER_BYTES: u64 = 0x100;
+            let mut cursor: u64 = HEADER_BYTES;
+            let mut found: Option<u64> = None;
+            for cmd in &self.commands {
+                let is_wait = matches!(
+                    cmd.command_type,
+                    VgmCommandType::Wait | VgmCommandType::Wait1 | VgmCommandType::Wait2
+                );
+                if !is_wait && cmd.time >= loop_time {
+                    found = Some(cursor);
+                    break;
+                }
+                cursor += 1 + cmd.data.len() as u64;
+            }
+            if let Some(byte_offset) = found {
+                // Stored value is offset relative to the field at 0x1C.
+                let rel = byte_offset.saturating_sub(0x1C);
+                self.header.loop_offset = rel.min(u32::MAX as u64) as u32;
+                self.header.loop_samples = total_samples.saturating_sub(loop_time.min(u32::MAX as u64) as u32);
+            }
+        }
     }
 
     fn emit_note_event(

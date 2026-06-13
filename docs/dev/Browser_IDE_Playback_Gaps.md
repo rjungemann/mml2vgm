@@ -65,6 +65,117 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### N. Dead vgmPlayerId / generateMoreSamples paths removed
+- `vgmPlayerId` field deleted along with all three `if (this.vgmPlayerId)`
+  branches in `startSampleGeneration`, `stop`, and `destroy`. The field was
+  declared null and never assigned anything else, so all three checks
+  were unreachable — the producer's "generate a silent buffer if VGM
+  player exists" branch in particular would have been a foot-gun the
+  moment anyone wired up an actual VGM player.
+- `generateMoreSamples(count)` method removed. It ignored its `count` arg
+  and just re-triggered the already-self-rescheduling
+  `startSampleGeneration`. Its two call sites — the worklet's
+  `needSamples` message handler and the ScriptProcessor fallback's
+  per-buffer trigger — were also removed. The producer's
+  `setTimeout(generateSamples, 0)` keeps the loop alive without help.
+
+**Side fixes surfaced by `audioService.playback.test.ts`:**
+- The `wasmService` mock didn't have `setChipGain` (added in §H), so the
+  `createChipPlayer → pushEffectiveChipGains` call synchronously threw,
+  killing `playMML` before `compile` ran. Added the mock entry.
+- `createMinimalAudibleVgm()` built a stream with two register writes;
+  the §J end-of-stream detection (added two passes ago) correctly stopped
+  playback after one buffer, breaking the "stays audible for >0.5s"
+  assertions. Extended the helper to emit 256 writes spaced 4000 samples
+  apart — well over the producer's 130-buffer churn during the test's
+  fake-timer window. Test now passes.
+
+### M. Silence warning now reports the actual cause
+Replaced the misleading "VGM command rendering to chip registers is likely
+not implemented yet" text (which had been wrong since §A landed and is now
+wrong for a different reason: every layer it indicted is working). The
+warning still fires after 25 consecutive silent buffers, but now prints:
+
+- the active chip set,
+- applied vs. skipped register-write counts,
+- VGM command count and sample-cursor / total,
+- AudioContext state,
+- a one-line `likely cause` derived from those observables.
+
+`diagnoseSilence()` picks the highest-priority matching cause from a
+checked-in-order list:
+1. no AudioContext,
+2. AudioContext suspended / interrupted (needs user gesture),
+3. zero register-write commands in the parsed stream,
+4. no chips registered with the player,
+5. every command skipped because chip-detection didn't include the
+   needed chip (lists the skipped chip names and what IS active),
+6. reached end-of-stream with loop disabled (the "expected silence" case),
+7. writes are landing but chip is rendering silence (instrument /
+   key-on / volume problem inside the chip emulator).
+
+The fallback "unable to attribute" branch only fires when the observable
+state doesn't match any of the known patterns — which should be the cue
+to add a new pattern rather than to ignore the message.
+
+### L. VGM parser handles all VGM 1.71 opcodes
+`parseVgmStream` no longer truncates the stream on unknown opcodes. Added:
+
+- A `vgmOperandSize(cmd)` helper that returns the operand byte count for
+  every command in the VGM 1.71 opcode table (single-byte commands → 0,
+  PSG/FM family by sub-range, DAC stream control 0x90-0x95 by exact code,
+  2-byte 0xA0-0xBF, 3-byte 0xC0-0xDF, 4-byte 0xE0-0xFF, `0x67` data block
+  flagged as variable-length so the caller's existing branch handles it).
+- Explicit register-write emission for the chips the Rust codegen actually
+  produces opcodes for: `0xA0` AY8910, `0xB1` RF5C164, `0xB3` DMG, `0xB4`
+  NES, `0xB6` VRC6 (mirroring the codegen's deviation from strict
+  spec — strict 0xB6 is uPD7759), `0xB9` HuC6280, `0xBA` K053260, `0xBB`
+  POKEY, `0xC4` QSound, `0xD1` YMF271, `0xD2` K051649, `0xD3` K054539,
+  `0xD4` C140. 3-byte forms drop the high-byte/port info to fit the
+  chip-player's 8-bit `(addr, data)` API; single-port songs play
+  correctly, multi-port/wide-addr files lose precision (tracked separately
+  if it ever becomes an audible issue).
+- `0x80-0x8F` (YM2612 DAC + short wait) now advances `currentTime` by
+  `cmd & 0x0F` samples. The DAC byte itself still isn't pushed (we'd need
+  PCM-data-block cursor tracking for that), but the stream stays in sync
+  so non-DAC writes after a DAC burst no longer mistime.
+- Default branch consumes `vgmOperandSize(cmd)` bytes silently instead of
+  bailing. Only a truly out-of-range value (which can't happen for a
+  valid VGM byte but is possible on a corrupted stream) returns the
+  partial result.
+
+Off-by-one fix surfaced while testing: the size table initially had
+`0x50-0x5F → 2` but per spec `0x50` (SN76489) is single-operand. Caught
+by a synthetic parser pass over `hello_world.vgm`, `05_loops.vgm`, and
+the `$`-using `loop_test.vgm` — all three now parse end-to-end with no
+bail (verified opcode histograms match the codegen's reported command
+counts).
+
+### K. Rust codegen emits VGM loop offsets from `$` markers
+Pairs with §J/§2. Added `Token::LoopMarker` to the lexer (recognises `$`),
+`MmlNode::LoopMarker` to the AST, and a parser arm inside the part-body
+dispatcher. VGM codegen records the latest `$`-marker time across all
+parts (`VgmGenerator::loop_time`), seeds `time_checkpoints` with that
+value so the wait-splitter creates a clean event boundary, then in
+`calculate_header` scans the merged command stream for the first non-wait
+command at or after `loop_time` and writes:
+- `0x1C` (loop_offset) = `byte_offset - 0x1C` per VGM 1.71 §3,
+- `0x20` (loop_samples) = `total_samples - loop_time`.
+
+Files without a `$` marker keep both fields at zero (verified
+byte-identical to pre-change output for `hello_world.gwi` and
+`05_loops.gwi`). All 25 existing `vgm_codegen_accuracy` tests pass.
+
+Editor highlighting: Monarch rule + theme entry for `keyword.loopMarker`
+so `$` shows up distinctly in the part-track lane (purple in both dark
+and light themes).
+
+End-to-end check on a hand-written `'B1 T120 v100 l4 o4 c d $ e f`:
+total_samples = 88200 (2 s), loop_offset = 0xF6 (loop body starts at file
+byte 0x112, which is the first SN76489 register write after the
+intro wait), loop_samples = 44100 (1 s). The browser playback path from
+§J consumes those fields and wraps correctly.
+
 ### J. VGM loop-point handling on the browser side
 `parseVgmCommands` (renamed `parseVgmStream`) now reads header fields 0x18
 (total samples), 0x1C (loop offset relative to 0x1C), and 0x20 (loop
@@ -135,45 +246,13 @@ around the real C# dialect with a state-based tokenizer; theme extended.
 
 ### 2. ✅ VGM loop-point handling (browser side) — DONE (see resolved §J)
 
-### 3. VGM parser bails on unhandled commands
-`default: return commands;` truncates the command stream on any unknown opcode.
-Hello World only uses `0x50`, `0x52`, `0x61`, but real files will hit:
+### 3. ✅ VGM parser handles all 1.71 opcodes — DONE (see resolved §L)
 
-| Opcode  | Bytes | Meaning                                  | Frequency |
-|---------|-------|------------------------------------------|-----------|
-| `0x4F`  | 1     | Game Gear PSG stereo                     | rare      |
-| `0x80-0x8F` | 0   | YM2612 DAC write + short wait (0-15)     | **any FM PCM** |
-| `0xE0`  | 4     | PCM data block seek                      | **any sample using PCM** |
-| `0x90-0x95` | varies | DAC stream control                    | sample-heavy songs |
-| `0x30-0x3F` | 1   | Reserved single-byte (consume 1 data)    | future-proofing |
-| `0x68`  | 11    | PCM RAM write                            | uncommon |
-| `0xA0-0xAF` | 2   | AY8910 write                             | only AY files |
+### 4. ✅ Silence warning copy reflects current causes — DONE (see resolved §M)
 
-The `0x80-0x8F` family hides a wait of `n` samples (where `n = cmd & 0x0F`)
-plus a DAC write of `2A` (YM2612 register `0x2A`, port 0), which is what
-makes 8-bit DAC samples on the Genesis sing. Forgetting it makes PCM-heavy
-demos sound like glitchy silence.
+### 5. ✅ Dead vgmPlayerId branch removed — DONE (see resolved §N)
 
-### 4. Stale "Generated samples remain silent" warning
-Now misleading. The warning fires when 25+ buffers in a row have peak
-amplitude < 1e-6. Text should point at the real causes today:
-- Chip detected from header isn't in the player set,
-- All YM2612 writes routed to a chip that isn't `'YM2612'`,
-- VGM stream truncated at byte 0,
-- AudioContext suspended without user gesture.
-
-### 5. Dead `vgmPlayerId` branch in `startSampleGeneration`
-```ts
-if (this.vgmPlayerId) {
-  samples = new Float32Array(this.bufferSize * this.outputChannels);  // ← silence
-} else if (this.chipPlayerId) { ... }
-```
-Either delete (we only use the chip player path) or wire to a real VGM
-player. Today: foot-gun waiting for someone to set `vgmPlayerId`.
-
-### 6. `generateMoreSamples(count)` is dead
-Only called by the ScriptProcessor fallback; `count` ignored; just kicks the
-already-self-rescheduling `startSampleGeneration`. Remove.
+### 6. ✅ Dead generateMoreSamples removed — DONE (see resolved §N)
 
 ### 7. ScriptProcessor fallback is broken end-to-end
 `setupScriptProcessorNode` uses `createScriptProcessor` and writes into
@@ -208,21 +287,7 @@ Confirm `"utf-8"` produces identical output and drop the BOM dance.
 
 ---
 
-### 14. Rust codegen never emits VGM loop offsets
-The browser-side loop-back path from §J/§2 is dormant because
-`mml2vgm-rs/src/compiler/codegen/vgm.rs` emits header bytes `0x1C` (loop
-offset) and `0x20` (loop sample count) as zero for every output. C# MML's
-`(...)N` finite repeats get fully unrolled into the command stream.
-
-For looping playback to actually trigger, the compiler needs an "infinite
-loop"-style directive (or a `L` / `/` / `:` marker per common MML
-conventions) that maps to:
-1. A non-zero `0x1C` set to `(loop_body_first_byte - 0x1C)`,
-2. `0x20` set to the loop body's sample length,
-3. Optionally `0x18` (total samples) recalculated.
-
-Trivially testable end-to-end once added: a Hello World variant with a
-two-bar loop should keep playing past the 6-second mark in the browser.
+### 14. ✅ Rust codegen emits VGM loop offsets — DONE (see resolved §K)
 
 ## 📝 Lower priority / cosmetic
 

@@ -1750,6 +1750,14 @@ impl Parser {
                     self.advance();
                     Ok(Some(MmlNode::Bar))
                 }
+
+                Token::LoopMarker => {
+                    // `$` marks the VGM loop point. It's a no-op for note
+                    // emission; codegen consumes the marker to populate the
+                    // VGM header's loop offset and loop sample count.
+                    self.advance();
+                    Ok(Some(MmlNode::LoopMarker))
+                }
                 
                 Token::AtSign => {
                     let span_start = self.current_position();

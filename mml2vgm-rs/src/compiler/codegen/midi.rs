@@ -482,6 +482,12 @@ impl MidiGenerator {
                 MmlNode::Bar => {
                     // Bar line - no action needed for MIDI
                 }
+                MmlNode::LoopMarker => {
+                    // MIDI files don't have an equivalent of VGM's loop offset
+                    // field; loop semantics are typically handled by the
+                    // player (e.g. CC#111 RPG-Maker convention). Drop the
+                    // marker silently.
+                }
                 MmlNode::PartDefinition(_) => {
                     // Nested part definition - skip
                 }

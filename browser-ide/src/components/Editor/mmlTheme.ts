@@ -55,6 +55,7 @@ function getThemeRules(base: string): monaco.editor.ITokenThemeRule[] {
     { token: 'delimiter', foreground: 'd4d4d4' },
     { token: 'delimiter.loop', foreground: 'c586c0', fontStyle: 'bold' },
     { token: 'delimiter.bar', foreground: '808080' },
+    { token: 'keyword.loopMarker', foreground: 'c586c0', fontStyle: 'bold' },
     { token: 'operator', foreground: 'd4d4d4' },
     { token: 'white', foreground: 'd4d4d4' },
   ];
@@ -99,6 +100,7 @@ function getThemeRules(base: string): monaco.editor.ITokenThemeRule[] {
     { token: 'delimiter', foreground: '24292e' },
     { token: 'delimiter.loop', foreground: 'a626a4', fontStyle: 'bold' },
     { token: 'delimiter.bar', foreground: '959da5' },
+    { token: 'keyword.loopMarker', foreground: 'a626a4', fontStyle: 'bold' },
     { token: 'operator', foreground: 'd73a49' },
     { token: 'white', foreground: '24292e' },
   ];
