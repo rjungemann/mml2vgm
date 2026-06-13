@@ -65,6 +65,81 @@ interface ParsedVgmCommand {
   data: number;
 }
 
+/**
+ * Inspect a VGM byte stream's header and return the list of chips it declares.
+ * Each chip occupies one little-endian u32 clock field at a fixed offset;
+ * a nonzero value (with the high bit ignored, which marks dual-chip use)
+ * indicates the chip is present.
+ *
+ * Only chips that also exist in the `SoundChip` union are reported — anything
+ * else the chip player can't simulate anyway.
+ */
+const VGM_CHIP_CLOCK_OFFSETS: Array<{ offset: number; minVersion: number; chip: SoundChip }> = [
+  { offset: 0x0C, minVersion: 0x100, chip: 'SN76489' },
+  { offset: 0x10, minVersion: 0x100, chip: 'YM2413' },
+  { offset: 0x2C, minVersion: 0x110, chip: 'YM2612' },
+  { offset: 0x30, minVersion: 0x110, chip: 'YM2151' },
+  { offset: 0x38, minVersion: 0x151, chip: 'SegaPCM' },
+  { offset: 0x40, minVersion: 0x151, chip: 'RF5C164' },
+  { offset: 0x44, minVersion: 0x151, chip: 'YM2203' },
+  { offset: 0x48, minVersion: 0x151, chip: 'YM2608' },
+  { offset: 0x4C, minVersion: 0x151, chip: 'YM2610B' },
+  { offset: 0x50, minVersion: 0x151, chip: 'YM3812' },
+  { offset: 0x54, minVersion: 0x151, chip: 'YM3526' },
+  { offset: 0x58, minVersion: 0x151, chip: 'Y8950' },
+  { offset: 0x5C, minVersion: 0x151, chip: 'YMF262' },
+  { offset: 0x74, minVersion: 0x161, chip: 'AY8910' },
+  { offset: 0x80, minVersion: 0x161, chip: 'DMG' },
+  { offset: 0x84, minVersion: 0x161, chip: 'NES' },
+  { offset: 0x9C, minVersion: 0x161, chip: 'K054539' },
+  { offset: 0xA0, minVersion: 0x161, chip: 'HuC6280' },
+  { offset: 0xA4, minVersion: 0x161, chip: 'C140' },
+  { offset: 0xAC, minVersion: 0x161, chip: 'K053260' },
+  { offset: 0xB0, minVersion: 0x161, chip: 'POKEY' },
+  { offset: 0xB4, minVersion: 0x161, chip: 'QSound' },
+  { offset: 0xC4, minVersion: 0x171, chip: 'C352' },
+  { offset: 0xE0, minVersion: 0x171, chip: 'VRC6' },
+];
+
+const detectChipsFromVgmHeader = (data: Uint8Array): SoundChip[] => {
+  if (data.length < 0x40) return [];
+  // Magic check: "Vgm "
+  if (data[0] !== 0x56 || data[1] !== 0x67 || data[2] !== 0x6D || data[3] !== 0x20) return [];
+
+  const readU32 = (offset: number): number => {
+    if (offset + 4 > data.length) return 0;
+    return (
+      data[offset] |
+      (data[offset + 1] << 8) |
+      (data[offset + 2] << 16) |
+      (data[offset + 3] << 24)
+    ) >>> 0;
+  };
+
+  const version = readU32(0x08);
+  const found: SoundChip[] = [];
+  for (const { offset, minVersion, chip } of VGM_CHIP_CLOCK_OFFSETS) {
+    if (version < minVersion) continue;
+    // Mask the top bit — VGM uses it as "dual chip" flag.
+    const clock = readU32(offset) & 0x7fffffff;
+    if (clock !== 0) found.push(chip);
+  }
+  return found;
+};
+
+/** Merge two chip lists preserving order and dropping duplicates. */
+const mergeChips = (a: SoundChip[], b: SoundChip[]): SoundChip[] => {
+  const seen = new Set<SoundChip>();
+  const out: SoundChip[] = [];
+  for (const chip of [...a, ...b]) {
+    if (!seen.has(chip)) {
+      seen.add(chip);
+      out.push(chip);
+    }
+  }
+  return out;
+};
+
 const decodeSn76489Write = (value: number, latchedAddr: number): { addr: number; data: number; nextLatchedAddr: number } => {
   if ((value & 0x80) !== 0) {
     const nextLatchedAddr = 0x80 | ((value >> 4) & 0x07);
@@ -627,7 +702,7 @@ export class AudioService {
             this.sharedRingBuffer = null;
             this.sharedRingBufferBytes = null;
             this.channelCount = 0;
-            thisbufferSize = 0;
+            this.bufferSize = 0;
           }
           
           process(inputs, outputs, parameters) {
@@ -657,55 +732,52 @@ export class AudioService {
             const ringBuffer = this.sharedRingBuffer;
             const ringBufferBytes = this.sharedRingBufferBytes;
             const capacity = ringBufferBytes[2];
-            const bufferSize = ringBufferBytes[3];
-            
-            let samplesRead = 0;
-            
-            while (samplesRead < samplesNeeded) {
-              const readIndex = ringBufferBytes[0];
-              const writeIndex = ringBufferBytes[1];
-              
-              // Check if there are samples available
-              if (readIndex === writeIndex) {
-                // Buffer is empty - need to wait for more samples
-                // Use Atomics.wait to efficiently wait for samples
-                Atomics.wait(ringBufferBytes, 1, readIndex);
-                continue;
-              }
-              
-              // Calculate available samples
-              let available = writeIndex - readIndex;
-              if (available < 0) {
-                available += capacity;
-              }
-              
-              if (available === 0) {
-                // Should not happen, but safety check
-                Atomics.wait(ringBufferBytes, 1, readIndex);
-                continue;
-              }
-              
-              // Read samples from ring buffer
-              const samplesToRead = Math.min(available, samplesNeeded - samplesRead);
-              
-              for (let i = 0; i < samplesToRead; i++) {
-                const bufferIndex = (readIndex + i) % capacity;
-                const sample = ringBuffer[bufferIndex];
-                for (let c = 0; c < channelCount; c++) {
-                  output[c][samplesRead + i] = sample;
+
+            // The producer (chip player) writes INTERLEAVED STEREO: every
+            // stereo frame is 2 consecutive floats (L, R). Capacity is always
+            // a multiple of 2 and the producer always writes in pairs, so the
+            // wraparound math stays frame-aligned.
+            const STRIDE = 2;
+
+            // Non-blocking drain. Atomics.wait is forbidden on the AudioWorklet
+            // render thread, so we read what's available, pad the remainder with
+            // silence, and rely on the next process() call to consume more.
+            const readIndex = Atomics.load(ringBufferBytes, 0);
+            const writeIndex = Atomics.load(ringBufferBytes, 1);
+
+            let available = writeIndex - readIndex;
+            if (available < 0) {
+              available += capacity;
+            }
+            const framesAvailable = (available / STRIDE) | 0;
+            const framesToRead = framesAvailable < samplesNeeded ? framesAvailable : samplesNeeded;
+
+            for (let i = 0; i < framesToRead; i++) {
+              const base = (readIndex + i * STRIDE) % capacity;
+              const left = ringBuffer[base];
+              const right = ringBuffer[(base + 1) % capacity];
+              if (channelCount === 1) {
+                output[0][i] = (left + right) * 0.5;
+              } else {
+                output[0][i] = left;
+                output[1][i] = right;
+                for (let c = 2; c < channelCount; c++) {
+                  output[c][i] = (left + right) * 0.5;
                 }
               }
-              
-              // Update read index
-              const newReadIndex = (readIndex + samplesToRead) % capacity;
-              ringBufferBytes[0] = newReadIndex;
-              
-              // Notify producer that space is available
-              Atomics.notify(ringBufferBytes, 1, 1);
-              
-              samplesRead += samplesToRead;
             }
-            
+            for (let i = framesToRead; i < samplesNeeded; i++) {
+              for (let c = 0; c < channelCount; c++) {
+                output[c][i] = 0;
+              }
+            }
+
+            if (framesToRead > 0) {
+              const newReadIndex = (readIndex + framesToRead * STRIDE) % capacity;
+              Atomics.store(ringBufferBytes, 0, newReadIndex);
+              Atomics.notify(ringBufferBytes, 0, 1);
+            }
+
             return true;
           }
         }
@@ -828,73 +900,52 @@ export class AudioService {
 
   /**
    * Write samples to the SharedArrayBuffer ring buffer.
-   * Uses Atomics for thread-safe synchronization with the AudioWorklet.
+   *
+   * Non-blocking: writes only what currently fits, then returns. `Atomics.wait`
+   * is forbidden on the main thread (which is where the sample-generation loop
+   * runs), so back-pressure is handled by the caller — `startSampleGeneration`
+   * reschedules via `setTimeout(generateSamples, 0)`, giving the AudioWorklet
+   * consumer time to drain. Any samples that don't fit this tick are dropped;
+   * with the ring sized at 2× the worklet quantum this only happens if the
+   * consumer has stalled, in which case dropping is the right behaviour.
+   *
+   * Returns the number of samples actually written.
    */
-  private writeSamplesToRingBuffer(samples: Float32Array): void {
+  private writeSamplesToRingBuffer(samples: Float32Array): number {
     if (!this.sharedRingBuffer || !this.sharedRingBufferBytes) {
-      return;
+      return 0;
     }
-    
+
     const ringBuffer = this.sharedRingBuffer;
     const ringBufferBytes = this.sharedRingBufferBytes;
     const capacity = ringBufferBytes[2];
-    
-    const samplesToWrite = Math.min(samples.length, capacity / 2); // Reserve space
-    
-    let samplesWritten = 0;
-    
-    while (samplesWritten < samplesToWrite) {
-      const readIndex = ringBufferBytes[0];
-      const writeIndex = ringBufferBytes[1];
-      
-      // Calculate available space
-      let availableSpace = readIndex - writeIndex;
-      if (availableSpace <= 0) {
-        availableSpace += capacity;
-      }
-      
-      // Wait if buffer is full (less than bufferSize samples available)
-      // Use a threshold to prevent buffer overrun
-      if (availableSpace < this.bufferSize) {
-        // Wait for the consumer to read some samples
-        Atomics.wait(ringBufferBytes, 0, readIndex);
-        continue;
-      }
-      
-      // Calculate how many samples we can write
-      const spaceForSamples = availableSpace - 1; // Leave at least 1 sample gap
-      const samplesThisIteration = Math.min(
-        samplesToWrite - samplesWritten,
-        spaceForSamples
-      );
-      
-      if (samplesThisIteration <= 0) {
-        Atomics.wait(ringBufferBytes, 0, readIndex);
-        continue;
-      }
-      
-      // Write samples to ring buffer
-      for (let i = 0; i < samplesThisIteration; i++) {
-        const bufferIndex = (writeIndex + i) % capacity;
-        const sourceIndex = samplesWritten + i;
-        if (sourceIndex < samples.length) {
-          // For mono to stereo conversion, write same sample to all channels
-          // The samples array contains interleaved stereo, but we handle it simply
-          ringBuffer[bufferIndex] = samples[sourceIndex];
-        } else {
-          ringBuffer[bufferIndex] = 0;
-        }
-      }
-      
-      // Update write index
-      const newWriteIndex = (writeIndex + samplesThisIteration) % capacity;
-      ringBufferBytes[1] = newWriteIndex;
-      
-      // Notify the consumer that new samples are available
-      Atomics.notify(ringBufferBytes, 1, 1);
-      
-      samplesWritten += samplesThisIteration;
+
+    const readIndex = Atomics.load(ringBufferBytes, 0);
+    const writeIndex = Atomics.load(ringBufferBytes, 1);
+
+    let availableSpace = readIndex - writeIndex;
+    if (availableSpace <= 0) {
+      availableSpace += capacity;
     }
+    // Reserve one stereo frame (2 floats) so the buffer-full and buffer-empty
+    // conditions stay distinguishable AND writeIndex stays even (matching the
+    // worklet's stride-2 read). `samples` from the chip player is always an
+    // even-length interleaved-stereo array.
+    const spaceForSamples = Math.max(0, (availableSpace - 2) & ~1);
+    const samplesToWrite = Math.min(samples.length & ~1, spaceForSamples);
+    if (samplesToWrite <= 0) {
+      return 0;
+    }
+
+    for (let i = 0; i < samplesToWrite; i++) {
+      ringBuffer[(writeIndex + i) % capacity] = samples[i];
+    }
+
+    const newWriteIndex = (writeIndex + samplesToWrite) % capacity;
+    Atomics.store(ringBufferBytes, 1, newWriteIndex);
+    Atomics.notify(ringBufferBytes, 1, 1);
+
+    return samplesToWrite;
   }
 
   /**
@@ -970,10 +1021,24 @@ export class AudioService {
         console.warn('[AudioService] VGM command scan found no recognizable register-write commands; continuing playback attempt.');
       }
 
-      // For VGM playback, we use chip player with the chips specified in the VGM
-      // Get chips from VGM header or use provided chips
-      const chipsToUse = options.chips.length > 0 ? options.chips : ['YM2608', 'SN76489'];
-      
+      // Decide which chips the chip player should instantiate.
+      //
+      // Trust the VGM header first — it declares each chip via a nonzero clock
+      // field. The caller's `options.chips` is only used to *augment* the
+      // header-detected set, never to replace it, because a VGM containing
+      // YM2612 writes will be silent if the chip player isn't given a YM2612
+      // (every write to `command.chip='YM2612'` gets skipped in
+      // `applyPendingVgmCommands`).
+      const detectedChips = detectChipsFromVgmHeader(data);
+      const requestedChips = options.chips.length > 0 ? options.chips : [];
+      const chipsToUse = mergeChips(detectedChips, requestedChips);
+      if (chipsToUse.length === 0) {
+        // Last-resort fallback so we still attempt playback if header parsing failed.
+        chipsToUse.push('YM2608', 'SN76489');
+      }
+      console.log('[AudioService] Chips for playback:', chipsToUse,
+        '(detected:', detectedChips, 'requested:', requestedChips, ')');
+
       // Create chip player
       await this.createChipPlayer(chipsToUse, this.sampleRate);
 

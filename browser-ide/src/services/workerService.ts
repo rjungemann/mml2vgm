@@ -14,6 +14,7 @@
  */
 
 import type { CompileOptions, CompileResult } from '@/types';
+import CompilerWorker from '../worker/compilerWorker.ts?worker';
 
 // Message types
 interface WorkerInitMessage {
@@ -186,13 +187,11 @@ export class WorkerManager {
   private async createWorker(): Promise<WorkerEntry> {
     console.log(`[WorkerManager] Creating worker...`);
 
-    // Use the standard Web Worker API with Vite's URL resolution
-    // This approach uses import.meta.url to resolve the worker file location
-    const workerUrl = new URL('../worker/compilerWorker.ts', import.meta.url);
-    console.log(`[WorkerManager] Worker URL:`, workerUrl.toString());
-
-    // Create a worker instance with module type for ES6 import support
-    const worker = new Worker(workerUrl, { type: 'module' });
+    // Use Vite's `?worker` import so the file is bundled and transpiled to JS
+    // at build time. The previous `new URL('...ts', import.meta.url)` pattern
+    // caused Vite to emit the raw .ts source as a static asset in production,
+    // which the browser cannot execute as a module worker.
+    const worker = new CompilerWorker();
     console.log(`[WorkerManager] Worker instance created`);
     
     const entry: WorkerEntry = {

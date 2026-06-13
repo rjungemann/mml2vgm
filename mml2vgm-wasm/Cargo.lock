@@ -757,6 +757,7 @@ dependencies = [
  "anyhow",
  "atty",
  "bitvec",
+ "cc",
  "clap",
  "cpal",
  "env_logger",

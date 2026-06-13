@@ -26,6 +26,7 @@ use super::SoundChipEmulator;
 
 const CLOCK: u32 = 16_934_400;
 
+#[cfg(not(target_arch = "wasm32"))]
 extern "C" {
     fn ymf271_ffi_create(clock: u32) -> *mut c_void;
     fn ymf271_ffi_destroy(chip: *mut c_void);
@@ -35,6 +36,25 @@ extern "C" {
     fn ymf271_ffi_alloc_rom(chip: *mut c_void, rom_size: u32);
     fn ymf271_ffi_write_rom(chip: *mut c_void, offset: u32, length: u32, data: *const u8);
 }
+
+// wasm32-unknown-unknown has no libc, so the libvgm C core is not compiled (see
+// build.rs). Audio playback is a native-only feature; the WASM build only uses
+// the MML compiler. These stubs let the struct compile but panic if invoked.
+#[cfg(target_arch = "wasm32")]
+#[allow(clippy::missing_safety_doc)]
+mod wasm_stubs {
+    use std::os::raw::c_void;
+    const MSG: &str = "YMF271 emulator is not available on wasm32";
+    pub unsafe fn ymf271_ffi_create(_clock: u32) -> *mut c_void { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_destroy(_chip: *mut c_void) {}
+    pub unsafe fn ymf271_ffi_reset(_chip: *mut c_void) { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_write(_chip: *mut c_void, _offset: u8, _data: u8) { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_update(_chip: *mut c_void, _samples: u32, _left: *mut i32, _right: *mut i32) { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_alloc_rom(_chip: *mut c_void, _rom_size: u32) { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_write_rom(_chip: *mut c_void, _offset: u32, _length: u32, _data: *const u8) { panic!("{}", MSG) }
+}
+#[cfg(target_arch = "wasm32")]
+use wasm_stubs::*;
 
 /// YMF271 (OPX) chip emulator backed by the libvgm C core.
 pub struct YMF271 {

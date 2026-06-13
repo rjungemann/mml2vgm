@@ -2591,6 +2591,7 @@ dependencies = [
  "anyhow",
  "atty",
  "bitvec",
+ "cc",
  "clap",
  "cpal",
  "env_logger 0.10.2",

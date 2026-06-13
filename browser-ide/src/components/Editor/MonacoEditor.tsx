@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { Document, EditorSettings, Position, SourceMapEvent } from '@/types';
@@ -36,9 +36,12 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
   const editorRef = useRef<any>(null);
   const monaco = useMonaco();
   const languageId = 'mml';
-  const [currentLineDecorations, setCurrentLineDecorations] = useState<string[]>([]);
-  const [navDecorations, setNavDecorations] = useState<string[]>([]);
-  const [noteEventDecorations, setNoteEventDecorations] = useState<string[]>([]);
+  // Decoration ID arrays are stored in refs, not state — they're internal
+  // bookkeeping for Monaco, not anything React needs to re-render on. Storing
+  // them as state created a `setX` → effect-deps → `setX` infinite loop.
+  const currentLineDecorationsRef = useRef<string[]>([]);
+  const navDecorationsRef = useRef<string[]>([]);
+  const noteEventDecorationsRef = useRef<string[]>([]);
   // Use a ref so that the Monaco completion provider closure always reads the latest value
   const driverIdRef = useRef<string>(driverId ?? document.language ?? 'gwi');
 
@@ -55,7 +58,7 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
     },
     hasSelection: () => {
       if (!editorRef.current) return false;
-      const selection = editorRef.current.getModel()?.getSelection();
+      const selection = editorRef.current.getSelection();
       return selection ? !selection.isEmpty() : false;
     },
     canUndo: () => {
@@ -95,16 +98,12 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
     if (!editorRef.current || !currentPosition) return;
 
     const editor = editorRef.current;
-    const monacoInstance = editor._monaco;
+    const monacoInstance = monaco;
+    if (!monacoInstance) return;
 
-    // Clear previous decorations
-    if (currentLineDecorations.length > 0) {
-      editor.deltaDecorations(currentLineDecorations, []);
-    }
-
-    // Highlight current line
+    // Highlight current line (deltaDecorations replaces previous IDs atomically).
     const lineNumber = currentPosition.line;
-    const decorations = editor.deltaDecorations([], [
+    currentLineDecorationsRef.current = editor.deltaDecorations(currentLineDecorationsRef.current, [
       {
         range: new monacoInstance.Range(lineNumber, 1, lineNumber, 1),
         options: {
@@ -116,8 +115,6 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
       },
     ]);
 
-    setCurrentLineDecorations(decorations);
-
     // Scroll to current line (if auto-scroll is enabled)
     const lineHeight = editor.getOption(monacoInstance.editor.EditorOption.lineHeight);
     const scrollTop = (lineNumber - 1) * lineHeight - editor.getScrollTop();
@@ -127,28 +124,24 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
     if (scrollTop > clientHeight || scrollTop < 0) {
       editor.revealLineInCenter(lineNumber);
     }
-  }, [currentPosition, currentLineDecorations]);
+  }, [currentPosition, monaco]);
 
   // Handle navigation to a specific position (from error list click)
   useEffect(() => {
     if (!editorRef.current || !navigationPosition) return;
 
     const editor = editorRef.current;
-    const monacoInstance = editor._monaco;
+    const monacoInstance = monaco;
+    if (!monacoInstance) return;
 
-    // Clear previous navigation decorations
-    if (navDecorations.length > 0) {
-      editor.deltaDecorations(navDecorations, []);
-    }
-
-    // Set cursor position and reveal line
+    // Set cursor position and reveal line.
     const { line, column } = navigationPosition;
     editor.setPosition({ lineNumber: line, column: column });
     editor.revealLineInCenter(line);
     editor.focus();
 
-    // Add temporary highlight for navigation
-    const decorations = editor.deltaDecorations([], [
+    // Add temporary highlight (deltaDecorations clears the previous batch).
+    navDecorationsRef.current = editor.deltaDecorations(navDecorationsRef.current, [
       {
         range: new monacoInstance.Range(line, column, line, column + 1),
         options: {
@@ -158,34 +151,30 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
       },
     ]);
 
-    setNavDecorations(decorations);
-
-    // Clear navigation after a short delay
     const timer = setTimeout(() => {
-      if (navDecorations.length > 0) {
-        editor.deltaDecorations(navDecorations, []);
-        setNavDecorations([]);
+      if (navDecorationsRef.current.length > 0) {
+        editor.deltaDecorations(navDecorationsRef.current, []);
+        navDecorationsRef.current = [];
       }
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [navigationPosition, navDecorations]);
+  }, [navigationPosition, monaco]);
 
   // Highlight active note events from source map
   useEffect(() => {
     if (!editorRef.current || !activeNoteEvents || activeNoteEvents.length === 0) {
-      // Clear previous note event decorations if no active notes
-      if (noteEventDecorations.length > 0) {
-        editorRef.current?.deltaDecorations(noteEventDecorations, []);
-        setNoteEventDecorations([]);
+      if (noteEventDecorationsRef.current.length > 0) {
+        editorRef.current?.deltaDecorations(noteEventDecorationsRef.current, []);
+        noteEventDecorationsRef.current = [];
       }
       return;
     }
 
     const editor = editorRef.current;
-    const monacoInstance = editor._monaco;
+    const monacoInstance = monaco;
+    if (!monacoInstance) return;
 
-    // Create decorations for each active note event
     const newDecorations = activeNoteEvents.map((event) => ({
       range: new monacoInstance.Range(
         event.line,
@@ -206,10 +195,8 @@ const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>((
       },
     }));
 
-    // Update decorations
-    const newDecorationIds = editor.deltaDecorations(noteEventDecorations, newDecorations);
-    setNoteEventDecorations(newDecorationIds);
-  }, [activeNoteEvents, noteEventDecorations]);
+    noteEventDecorationsRef.current = editor.deltaDecorations(noteEventDecorationsRef.current, newDecorations);
+  }, [activeNoteEvents, monaco]);
 
   // Handle editor mount
   const handleEditorDidMount: OnMount = useCallback((editor, _monaco) => {
