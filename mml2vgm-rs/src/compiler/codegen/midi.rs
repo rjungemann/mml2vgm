@@ -448,6 +448,8 @@ impl MidiGenerator {
                     current_octave = oct.number;
                 }
                 MmlNode::OctaveShift(shift) => {
+                    // Parser already applied Octave-Rev to the AST node
+                    // direction; codegen just follows it.
                     match shift {
                         OctaveShift::Up => current_octave = current_octave.saturating_add(1),
                         OctaveShift::Down => current_octave = current_octave.saturating_sub(1),

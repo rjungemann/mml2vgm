@@ -1209,6 +1209,11 @@ impl VgmGenerator {
                 state.octave = o.number;
             }
             MmlNode::OctaveShift(shift) => match shift {
+                // The parser has already swapped `>`/`<` direction when
+                // `Octave-Rev = TRUE`, so the codegen just follows whatever
+                // the AST node says. Doing the flip again here would
+                // double-invert and put `state.octave` out of sync with the
+                // Note nodes' baked-in octaves.
                 OctaveShift::Up => state.octave = (state.octave + 1).min(8),
                 OctaveShift::Down => state.octave = state.octave.saturating_sub(1),
             },

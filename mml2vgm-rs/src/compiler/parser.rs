@@ -35,6 +35,13 @@ pub struct Parser {
     pending_fm_instrument: Option<(u32, Vec<Vec<u32>>, bool)>,
     /// OPX instrument being accumulated row-by-row: (number, mode, operator_rows, al_row_seen)
     pending_opx_instrument: Option<(u32, OpxMode, Vec<Vec<u32>>)>,
+    /// When true, `>` decreases the current octave and `<` increases it —
+    /// reflecting the song-info header's `Octave-Rev = TRUE` flag (matches
+    /// the C# mml2vgm convention). Notes consume the parser's running
+    /// octave at construction time, so the flip *must* happen here in the
+    /// parser; a codegen-side flip on `MmlNode::OctaveShift` would be too
+    /// late and have no effect on already-emitted `Note` octaves.
+    octave_reversed: bool,
 }
 
 impl Parser {
@@ -50,7 +57,14 @@ impl Parser {
             in_definition_context: false,
             pending_fm_instrument: None,
             pending_opx_instrument: None,
+            octave_reversed: false,
         }
+    }
+
+    /// Set whether `>` / `<` octave shifts are flipped (Octave-Rev = TRUE
+    /// in the song-info header). Call before `parse()`.
+    pub fn set_octave_reversed(&mut self, reversed: bool) {
+        self.octave_reversed = reversed;
     }
 
     /// Get current token (cloned)
@@ -1696,18 +1710,26 @@ impl Parser {
                 
                 Token::GreaterThan => {
                     self.advance();
-                    if self.current_octave < 8 {
-                        self.current_octave += 1;
+                    let shift_up = !self.octave_reversed;
+                    if shift_up {
+                        if self.current_octave < 8 { self.current_octave += 1; }
+                        Ok(Some(MmlNode::OctaveShift(OctaveShift::Up)))
+                    } else {
+                        if self.current_octave > 0 { self.current_octave -= 1; }
+                        Ok(Some(MmlNode::OctaveShift(OctaveShift::Down)))
                     }
-                    Ok(Some(MmlNode::OctaveShift(OctaveShift::Up)))
                 }
-                
+
                 Token::LessThan => {
                     self.advance();
-                    if self.current_octave > 0 {
-                        self.current_octave -= 1;
+                    let shift_up = self.octave_reversed;
+                    if shift_up {
+                        if self.current_octave < 8 { self.current_octave += 1; }
+                        Ok(Some(MmlNode::OctaveShift(OctaveShift::Up)))
+                    } else {
+                        if self.current_octave > 0 { self.current_octave -= 1; }
+                        Ok(Some(MmlNode::OctaveShift(OctaveShift::Down)))
                     }
-                    Ok(Some(MmlNode::OctaveShift(OctaveShift::Down)))
                 }
                 
                 Token::TempoCommand => {

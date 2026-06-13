@@ -46,8 +46,9 @@ impl MmlCompiler {
         // 3. Tokenize (Lexer)
         let tokens = self.lex(&pre.source)?;
 
-        // 4. Parse (Parser)
-        let mut ast = self.parse(tokens)?;
+        // 4. Parse (Parser) — pass the header metadata so flags that affect
+        //    token interpretation (e.g. `Octave-Rev`) take effect.
+        let mut ast = self.parse_with_metadata(tokens, &pre.metadata)?;
 
         // 5. Inject metadata and chip assignments from the header block
         for (k, v) in pre.metadata {
@@ -235,6 +236,24 @@ impl MmlCompiler {
         parser.parse()
     }
 
+    /// Parse with the song-info metadata available, so flags like
+    /// `Octave-Rev` that affect token-stream interpretation can be applied
+    /// during AST construction (notes bake their octave at parse time, so
+    /// the flip has to happen here — codegen is too late).
+    fn parse_with_metadata(
+        &self,
+        tokens: Vec<(crate::compiler::lexer::Token, crate::Position)>,
+        metadata: &HashMap<String, String>,
+    ) -> MmlResult<MmlAst> {
+        let mut parser = Parser::new(tokens);
+        let octave_reversed = metadata
+            .get("Octave-Rev")
+            .map(|v| v.trim().eq_ignore_ascii_case("TRUE"))
+            .unwrap_or(false);
+        parser.set_octave_reversed(octave_reversed);
+        parser.parse()
+    }
+
     /// Generate code for the specified output format
     fn generate_code(&self, ast: &MmlAst) -> MmlResult<Vec<u8>> {
         let (data, _source_map) = self.generate_code_with_sourcemap(ast)?;
@@ -287,8 +306,8 @@ impl MmlCompiler {
         // 1. Tokenize (Lexer)
         let tokens = self.lex(&pre.source)?;
 
-        // 2. Parse (Parser)
-        let mut ast = self.parse(tokens)?;
+        // 2. Parse (Parser) — see compile() for why metadata threads here.
+        let mut ast = self.parse_with_metadata(tokens, &pre.metadata)?;
 
         // Inject metadata and chip assignments from the header block
         for (k, v) in pre.metadata {
@@ -322,7 +341,7 @@ impl MmlCompiler {
         let source = self.normalize_source(source);
         let pre = self.preprocess_song_info(&source);
         let tokens = self.lex(&pre.source)?;
-        let mut ast = self.parse(tokens)?;
+        let mut ast = self.parse_with_metadata(tokens, &pre.metadata)?;
         for (k, v) in pre.metadata {
             ast.metadata.entry(k).or_insert(v);
         }

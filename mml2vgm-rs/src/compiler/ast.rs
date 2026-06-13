@@ -104,7 +104,7 @@ pub struct Octave {
 }
 
 /// Octave shift (relative)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OctaveShift {
     Up,
     Down,

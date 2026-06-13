@@ -65,6 +65,45 @@ and `AudioService.setChipVolume`/`setChipMuted`/`setChipSolo` now push the
 combined effective gain (mute & solo collapse to gain=0) through to the
 chip player on every change and on chip-player creation.
 
+### T. Octave-Rev header flag implemented at parse time
+The `Octave-Rev = TRUE` header in the C# MML dialect swaps the meaning of
+`>` and `<` so that `>` shifts the octave down. The Rust compiler was
+parsing the value into `ast.metadata` but no codepath read it, so
+`Octave-Rev = FALSE` and `Octave-Rev = TRUE` produced byte-identical
+output.
+
+**Where the flip has to happen:** the parser, not the codegen. Notes
+bake their octave at parse time (`Note::new(letter, accidental,
+self.current_octave)`), so codegen sees a fully-resolved octave per
+note — by the time `MmlNode::OctaveShift` reaches the codegen handler,
+the surrounding `Note` octaves have already been decided. A
+codegen-side flip would only desync `state.octave` from the
+already-resolved `Note.octave` values.
+
+**Implementation:**
+- `Parser` gained an `octave_reversed: bool` field + a
+  `set_octave_reversed(bool)` setter.
+- `Token::GreaterThan` and `Token::LessThan` arms now branch on
+  `octave_reversed` and emit `OctaveShift::Up` / `OctaveShift::Down`
+  with directionally-correct `current_octave` updates either way.
+- `MmlCompiler::parse_with_metadata(tokens, &metadata)` reads
+  `metadata["Octave-Rev"]` (`TRUE` case-insensitive) and configures the
+  parser before parsing.
+- All three `compile_from_source*` paths switched to
+  `parse_with_metadata`; `validate_from_source` left on the old
+  `parse()` since it doesn't render notes.
+
+**Verified against a hand-written `'B1 o4 c >c <c`:**
+- `Octave-Rev = FALSE` → middle note at octave 5 (`50 86 50 0d ...`,
+  smaller SN76489 divider).
+- `Octave-Rev = TRUE` → middle note at octave 3 (`50 87 50 35 ...`,
+  larger divider).
+
+Hello World's compiled output is byte-identical to before the change
+(it declares `Octave-Rev = FALSE`, which matches the default). 25
+`vgm_codegen_accuracy` and 37 `parser_regression` tests still pass; the
+pre-existing failing live_player doctest is unrelated.
+
 ### S. Dead encoding option dropped
 `CompileOptions.encoding` defaulted to `"utf-8-bom"` and was never read
 anywhere in the compile path. The lexer accepted both BOMed and
@@ -424,9 +463,7 @@ belongs in `extract_chips` / header initialisation in
 
 ## 📝 Lower priority / cosmetic
 
-### 12. Verify `Octave-Rev` semantics
-`hello_world.gwi` sets `Octave-Rev = FALSE`. Confirm the Rust parser actually
-applies the flag (`>`/`<` swap) and doesn't silently ignore unknown options.
+### 12. ✅ Octave-Rev applied at parse time — DONE (see resolved §T)
 
 ### 13. `parseVgmCommands` allocation profile
 One `ParsedVgmCommand` object per write. Fine for Hello World (111
