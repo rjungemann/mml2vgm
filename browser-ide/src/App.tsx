@@ -172,31 +172,6 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Helper function to create a basic timing map for trace playback
-  // Maps time in milliseconds to source position (line, column)
-  const createTimingMap = (source: string, durationMs: number): Map<number, Position> => {
-    const timingMap = new Map<number, Position>();
-    const lines = source.split('\n');
-    const totalLines = lines.length;
-    
-    if (totalLines === 0 || durationMs <= 0) {
-      return timingMap;
-    }
-    
-    // Create a simple linear mapping: each line is evenly spaced across the duration
-    const msPerLine = durationMs / totalLines;
-    
-    for (let line = 0; line < totalLines; line++) {
-      const timeMs = Math.round(line * msPerLine);
-      timingMap.set(timeMs, { line: line + 1, column: 1 }); // +1 for 1-indexed lines
-    }
-    
-    // Also add end marker
-    timingMap.set(durationMs, { line: totalLines, column: lines[totalLines - 1]?.length || 1 });
-    
-    return timingMap;
-  };
-
   const getBrowserTargetChips = useCallback(() => {
     const browserDefaultTargets = supportedChipInfo
       .filter((chip) => chip.browserCompileDefault)
@@ -632,19 +607,17 @@ export const App: React.FC = () => {
         activeDocumentId
       );
 
-      // Create a basic timing map based on duration
+      // Initialize trace service with the compile result. The trace cursor
+      // is driven by the source-map's per-note (sample_start, sample_end,
+      // line, col) events — no synthetic timing map needed. (The old
+      // `createTimingMap` painted a uniform line-per-second sweep through
+      // the source, which marched the cursor through header / instrument
+      // definition lines that don't actually produce sound.)
       const durationMs = (result.durationSeconds || 0) * 1000;
-      const timingMap = createTimingMap(
-        activeDocument.content,
-        durationMs
-      );
-
-      // Initialize trace service with compile result
       traceService.init({
         data: result.data!,
         partCount: result.partCount,
         duration: durationMs,
-        timingMap,
         sourceMap: result.source_map,
       });
 
@@ -661,7 +634,7 @@ export const App: React.FC = () => {
       const message = error instanceof Error ? error.message : String(error);
       announceRuntimeFeedback(`Play error: ${message}`);
     }
-  }, [activeDocument, activeDocumentId, compile, status, getResult, createTimingMap, defaultCompileOptions, announceRuntimeFeedback, getBrowserTargetChips]);
+  }, [activeDocument, activeDocumentId, compile, status, getResult, defaultCompileOptions, announceRuntimeFeedback, getBrowserTargetChips]);
 
   // Handle play/pause
   const handlePlay = useCallback(() => {

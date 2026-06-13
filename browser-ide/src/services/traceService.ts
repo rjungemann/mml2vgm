@@ -135,6 +135,7 @@ export class TraceService {
     this._pauseTime = 0;
     this._currentPosition = null;
     this._activeParts.clear();
+    this._activeNoteEvents = [];
     this._recentEvents = [];
     
     // Remove audio listener
@@ -244,41 +245,71 @@ export class TraceService {
    */
   private handleTimeUpdate(time: number): void {
     this._currentTime = time;
-    
-    // Update current position from timing map
-    if (this._lastCompileResult?.timingMap) {
-      this.updatePosition(time);
-    }
-    
-    // Update active parts
+
+    // Update active parts AND derive the cursor position from the same scan.
+    // Position must come from the source map (sample-accurate per-note
+    // line/col) — the legacy `timingMap` was a uniform linear sweep across
+    // source lines, which painted the editor cursor through header /
+    // instrument-definition lines that never actually play.
     this.updateActiveParts(time);
-    
-    // Emit position update
+    this.updatePositionFromActiveNotes(time);
+
     if (this._currentPosition) {
       this.emitPositionUpdate(this._currentPosition, time);
     }
   }
-  
+
   /**
-   * Update current position based on time.
+   * Drive the editor cursor from the source-map note events.
+   *
+   * Priority order:
+   *   1. The earliest currently-active note (lowest `sample_start` among
+   *      events with `sample_start <= currentSample < sample_end`). If
+   *      multiple parts have a note ringing simultaneously we pick the
+   *      one that started first — keeps the cursor steady on the
+   *      "lead" voice instead of flickering between parts at every
+   *      time-update.
+   *   2. If nothing is currently active (a rest, or before the first
+   *      note in a part with a delayed entry), fall back to the most
+   *      recent note that has already started — i.e. the last visible
+   *      "where we were" so the cursor doesn't snap back to line 1.
+   *   3. If no note has started yet, leave the position as-is.
+   *
+   * The legacy `timingMap` is ignored entirely — it was a
+   * lines-per-second fiction that didn't track actual playback.
    */
-  private updatePosition(time: number): void {
-    if (!this._lastCompileResult?.timingMap) return;
-    
-    const timingMap = this._lastCompileResult.timingMap;
-    
-    // Find the closest position before or at current time
-    let closestTime = 0;
-    let closestPosition: Position | null = null;
-    
-    for (const [t, pos] of timingMap) {
-      if (t <= time && t > closestTime) {
-        closestTime = t;
-        closestPosition = pos;
+  private updatePositionFromActiveNotes(time: number): void {
+    const sourceMap = this._lastCompileResult?.sourceMap;
+    if (!sourceMap || sourceMap.events.length === 0) return;
+
+    const currentSample = (time * 44100) / 1000;
+
+    let activeWinner: SourceMapEvent | null = null;
+    let pastWinner: SourceMapEvent | null = null;
+
+    for (const event of sourceMap.events) {
+      if (event.sample_start > currentSample) continue; // future
+
+      if (currentSample < event.sample_end) {
+        // Currently ringing.
+        if (!activeWinner || event.sample_start < activeWinner.sample_start) {
+          activeWinner = event;
+        }
+      } else {
+        // Already finished — track the most recent for fallback.
+        if (!pastWinner || event.sample_end > pastWinner.sample_end) {
+          pastWinner = event;
+        }
       }
     }
-    
-    this._currentPosition = closestPosition;
+
+    const chosen = activeWinner ?? pastWinner;
+    if (chosen) {
+      this._currentPosition = {
+        line: chosen.line,
+        column: chosen.col_start,
+      };
+    }
   }
   
   /**
