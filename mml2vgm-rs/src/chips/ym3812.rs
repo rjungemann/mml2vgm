@@ -17,14 +17,18 @@
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+const FREQ_MULT: [f32; 16] = [
+    0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0,
+];
 
 /// Operator slot offset → (channel, operator_index)
 /// OPL2 layout: slots 0-2 = ch0-2 mod, 3-5 = ch0-2 car; 8-10 = ch3-5 mod; etc.
 fn slot_to_ch_op(slot_offset: u8) -> Option<(usize, usize)> {
     let row = (slot_offset / 8) as usize;
     let col = (slot_offset % 8) as usize;
-    if row > 2 || col > 5 { return None; }
+    if row > 2 || col > 5 {
+        return None;
+    }
     if col < 3 {
         Some((row * 3 + col, 0))
     } else {
@@ -38,13 +42,19 @@ struct FmOperator {
     phase_acc: f32,
     total_level: u8,
     mult: u8,
+    #[allow(dead_code)]
     key_on: bool,
 }
 
 impl Default for FmOperator {
     fn default() -> Self {
         // Real OPL hardware: all regs = 0 after reset → TL = 0 (max volume)
-        Self { phase_acc: 0.0, total_level: 0, mult: 1, key_on: false }
+        Self {
+            phase_acc: 0.0,
+            total_level: 0,
+            mult: 1,
+            key_on: false,
+        }
     }
 }
 
@@ -83,15 +93,18 @@ pub struct YM3812 {
     regs: [u8; 0x100],
     channels: [FmChannel; 9],
     rhythm_mode: bool,
+    #[allow(dead_code)]
     accumulated_cycles: f32,
     mod_feedback: [f32; 9],
 }
 
 impl YM3812 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -138,14 +151,24 @@ impl YM3812 {
         self.mod_feedback[ch] = mod_out;
 
         let sample = (output * 0.15).clamp(-1.0, 1.0);
-        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
-        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
+        let left = if self.channels[ch].left_enable {
+            sample
+        } else {
+            0.0
+        };
+        let right = if self.channels[ch].right_enable {
+            sample
+        } else {
+            0.0
+        };
         (left, right)
     }
 
     fn advance_phases(&mut self, sample_rate: u32) {
         for ch in 0..9 {
-            if !self.channels[ch].key_on { continue; }
+            if !self.channels[ch].key_on {
+                continue;
+            }
             let base_freq = self.channel_freq_hz(ch);
             for op in 0..2 {
                 let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
@@ -202,7 +225,8 @@ impl SoundChipEmulator for YM3812 {
                 let prev_key_on = self.channels[ch].key_on;
                 self.channels[ch].key_on = (data & 0x20) != 0;
                 self.channels[ch].block = (data >> 2) & 0x07;
-                self.channels[ch].f_num = (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
+                self.channels[ch].f_num =
+                    (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
                 if !prev_key_on && self.channels[ch].key_on {
                     self.channels[ch].operators[0].phase_acc = 0.0;
                     self.channels[ch].operators[1].phase_acc = 0.0;
@@ -285,12 +309,12 @@ mod tests {
 
     #[test]
     fn test_ym3812_slot_to_ch_op() {
-        assert_eq!(slot_to_ch_op(0), Some((0, 0)));  // ch0 mod
-        assert_eq!(slot_to_ch_op(3), Some((0, 1)));  // ch0 car
-        assert_eq!(slot_to_ch_op(1), Some((1, 0)));  // ch1 mod
-        assert_eq!(slot_to_ch_op(8), Some((3, 0)));  // ch3 mod
+        assert_eq!(slot_to_ch_op(0), Some((0, 0))); // ch0 mod
+        assert_eq!(slot_to_ch_op(3), Some((0, 1))); // ch0 car
+        assert_eq!(slot_to_ch_op(1), Some((1, 0))); // ch1 mod
+        assert_eq!(slot_to_ch_op(8), Some((3, 0))); // ch3 mod
         assert_eq!(slot_to_ch_op(11), Some((3, 1))); // ch3 car
-        assert_eq!(slot_to_ch_op(7), None);          // unused
+        assert_eq!(slot_to_ch_op(7), None); // unused
     }
 
     #[test]

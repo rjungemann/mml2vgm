@@ -3,9 +3,9 @@
 //! Run with: cargo bench --bench compilation_benchmark
 //! Or with detailed output: cargo bench --bench compilation_benchmark -- --verbose
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use mml2vgm::{CompileOptions, OutputFormat};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use mml2vgm::compiler::compiler::MmlCompiler;
+use mml2vgm::{CompileOptions, OutputFormat};
 use std::fs;
 use std::path::Path;
 
@@ -32,23 +32,19 @@ fn benchmark_individual_compilation(c: &mut Criterion) {
     group.sample_size(10); // Reduce sample size since compilation is slow
 
     for filename in examples {
-        if let Ok(mml_content) = fs::read_to_string(
-            format!("../browser-ide/public/samples/{}", filename)
-        ) {
-            group.bench_with_input(
-                BenchmarkId::from_parameter(filename),
-                filename,
-                |b, _| {
-                    b.iter(|| {
-                        let options = CompileOptions {
-                            format: OutputFormat::VGM,
-                            ..Default::default()
-                        };
-                        let compiler = MmlCompiler::new(black_box(options));
-                        compiler.compile_from_source(black_box(&mml_content))
-                    });
-                },
-            );
+        if let Ok(mml_content) =
+            fs::read_to_string(format!("../browser-ide/public/samples/{}", filename))
+        {
+            group.bench_with_input(BenchmarkId::from_parameter(filename), filename, |b, _| {
+                b.iter(|| {
+                    let options = CompileOptions {
+                        format: OutputFormat::VGM,
+                        ..Default::default()
+                    };
+                    let compiler = MmlCompiler::new(black_box(options));
+                    compiler.compile_from_source(black_box(&mml_content))
+                });
+            });
         }
     }
     group.finish();

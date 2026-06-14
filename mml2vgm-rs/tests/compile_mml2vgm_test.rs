@@ -2,10 +2,10 @@
 //!
 //! Run with: cargo test --test compile_mml2vgm_test -- --nocapture
 
+use mml2vgm::compiler::compiler::MmlCompiler;
+use mml2vgm::{CompileOptions, OutputFormat};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use mml2vgm::{CompileOptions, OutputFormat};
-use mml2vgm::compiler::compiler::MmlCompiler;
 
 /// Per-file compile timeout in seconds.
 const TIMEOUT_PER_FILE_SECS: u64 = 10;
@@ -57,7 +57,11 @@ fn compile_c140sample() {
         return;
     }
     let (ok, msg, bytes, elapsed) = compile_file(&path);
-    println!("c140sample.gwi: {} bytes in {:.3}s", bytes, elapsed.as_secs_f64());
+    println!(
+        "c140sample.gwi: {} bytes in {:.3}s",
+        bytes,
+        elapsed.as_secs_f64()
+    );
     assert!(ok, "c140sample.gwi failed: {}", msg);
     assert!(bytes > 0, "c140sample.gwi produced empty output");
 }
@@ -70,7 +74,11 @@ fn compile_ay8910_test() {
         return;
     }
     let (ok, msg, bytes, elapsed) = compile_file(&path);
-    println!("testAY38910.gwi: {} bytes in {:.3}s", bytes, elapsed.as_secs_f64());
+    println!(
+        "testAY38910.gwi: {} bytes in {:.3}s",
+        bytes,
+        elapsed.as_secs_f64()
+    );
     assert!(ok, "testAY38910.gwi failed: {}", msg);
     assert!(bytes > 0);
 }
@@ -83,7 +91,11 @@ fn compile_testcase3_pcm() {
         return;
     }
     let (ok, msg, bytes, elapsed) = compile_file(&path);
-    println!("testcase3/testPCM.gwi: {} bytes in {:.3}s", bytes, elapsed.as_secs_f64());
+    println!(
+        "testcase3/testPCM.gwi: {} bytes in {:.3}s",
+        bytes,
+        elapsed.as_secs_f64()
+    );
     assert!(ok, "testcase3/testPCM.gwi failed: {}", msg);
     assert!(bytes > 0);
 }
@@ -96,7 +108,11 @@ fn compile_testcase4_pcm() {
         return;
     }
     let (ok, msg, bytes, elapsed) = compile_file(&path);
-    println!("testcase4/testPCM.gwi: {} bytes in {:.3}s", bytes, elapsed.as_secs_f64());
+    println!(
+        "testcase4/testPCM.gwi: {} bytes in {:.3}s",
+        bytes,
+        elapsed.as_secs_f64()
+    );
     assert!(ok, "testcase4/testPCM.gwi failed: {}", msg);
     assert!(bytes > 0);
 }
@@ -109,7 +125,11 @@ fn compile_mml2vgm_subdir_sample() {
         return;
     }
     let (ok, msg, bytes, elapsed) = compile_file(&path);
-    println!("mml2vgm/c140sample.gwi: {} bytes in {:.3}s", bytes, elapsed.as_secs_f64());
+    println!(
+        "mml2vgm/c140sample.gwi: {} bytes in {:.3}s",
+        bytes,
+        elapsed.as_secs_f64()
+    );
     assert!(ok, "mml2vgm/c140sample.gwi failed: {}", msg);
     assert!(bytes > 0);
 }
@@ -147,7 +167,8 @@ fn all_mml2vgm_test_files_have_valid_vgm_header() {
             panic!("Total timeout reached after {}s", TOTAL_TIMEOUT_SECS);
         }
 
-        let source = String::from_utf8_lossy(&std::fs::read(path).expect("read failed")).into_owned();
+        let source =
+            String::from_utf8_lossy(&std::fs::read(path).expect("read failed")).into_owned();
         let start = Instant::now();
         match compiler.compile_from_source(&source) {
             Ok(result) => {
@@ -158,7 +179,11 @@ fn all_mml2vgm_test_files_have_valid_vgm_header() {
                     eprintln!("Bad VGM header: {:?}", path);
                     failures += 1;
                 } else {
-                    println!("✓ {:?} — {} bytes", path.file_name().unwrap(), result.data.len());
+                    println!(
+                        "✓ {:?} — {} bytes",
+                        path.file_name().unwrap(),
+                        result.data.len()
+                    );
                 }
             }
             Err(e) => {

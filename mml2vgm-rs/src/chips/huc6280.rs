@@ -56,6 +56,7 @@ impl Default for PsgChannel {
     }
 }
 
+/// Hu C6280.
 pub struct HuC6280 {
     clock_rate: u32,
     sample_rate: u32,
@@ -70,10 +71,12 @@ pub struct HuC6280 {
 }
 
 impl HuC6280 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -94,6 +97,7 @@ impl HuC6280 {
         self.clock_rate as f32 / (PSG_CLOCK_DIV * period)
     }
 
+    #[allow(dead_code)]
     fn noise_freq_hz(&self, ch: usize) -> f32 {
         let nf = self.channels[ch].noise_freq as u32;
         let divisor = 1u32 << (nf & 0x1F);
@@ -118,7 +122,9 @@ impl HuC6280 {
 
     fn get_channel_sample(&mut self, ch: usize, sample_rate: u32) -> (f32, f32) {
         let enabled = self.channels[ch].enabled;
-        if !enabled { return (0.0, 0.0); }
+        if !enabled {
+            return (0.0, 0.0);
+        }
 
         let vol = self.channels[ch].volume as f32 / 15.0;
         let bal_l = self.channels[ch].balance_l as f32 / 15.0;
@@ -131,7 +137,11 @@ impl HuC6280 {
             self.channels[ch].dda_sample as f32 / 15.0 * 2.0 - 1.0
         } else if ch >= 4 && self.channels[ch].noise_enable {
             // Noise output
-            if (self.noise_lfsr & 1) != 0 { 1.0 } else { -1.0 }
+            if (self.noise_lfsr & 1) != 0 {
+                1.0
+            } else {
+                -1.0
+            }
         } else {
             // Wavetable output: advance phase by frequency
             let freq = self.ch_freq_hz(ch);
@@ -148,13 +158,20 @@ impl HuC6280 {
         };
 
         let amplitude = vol * 0.15;
-        (raw * amplitude * bal_l * main_l, raw * amplitude * bal_r * main_r)
+        (
+            raw * amplitude * bal_l * main_l,
+            raw * amplitude * bal_r * main_r,
+        )
     }
 }
 
 impl SoundChipEmulator for HuC6280 {
-    fn name(&self) -> &'static str { "HuC6280" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "HuC6280"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -162,10 +179,22 @@ impl SoundChipEmulator for HuC6280 {
 
     fn write(&mut self, addr: u8, data: u8) {
         match addr {
-            0x00 => { self.selected_ch = (data & 0x07).min(5) as usize; }
-            0x01 => { self.main_vol_l = (data >> 4) & 0x0F; self.main_vol_r = data & 0x0F; }
-            0x02 => { self.channels[self.selected_ch].frequency = (self.channels[self.selected_ch].frequency & 0xF00) | data as u16; }
-            0x03 => { self.channels[self.selected_ch].frequency = (self.channels[self.selected_ch].frequency & 0x0FF) | ((data as u16 & 0x0F) << 8); }
+            0x00 => {
+                self.selected_ch = (data & 0x07).min(5) as usize;
+            }
+            0x01 => {
+                self.main_vol_l = (data >> 4) & 0x0F;
+                self.main_vol_r = data & 0x0F;
+            }
+            0x02 => {
+                self.channels[self.selected_ch].frequency =
+                    (self.channels[self.selected_ch].frequency & 0xF00) | data as u16;
+            }
+            0x03 => {
+                self.channels[self.selected_ch].frequency =
+                    (self.channels[self.selected_ch].frequency & 0x0FF)
+                        | ((data as u16 & 0x0F) << 8);
+            }
             0x04 => {
                 let ch = self.selected_ch;
                 self.channels[ch].enabled = (data & 0x80) != 0;
@@ -198,13 +227,19 @@ impl SoundChipEmulator for HuC6280 {
                 self.channels[ch].noise_enable = (data & 0x80) != 0;
                 self.channels[ch].noise_freq = data & 0x1F;
             }
-            0x08 => { self.lfo_freq = data; }
-            0x09 => { self.lfo_ctrl = data; }
+            0x08 => {
+                self.lfo_freq = data;
+            }
+            0x09 => {
+                self.lfo_ctrl = data;
+            }
             _ => {}
         }
     }
 
-    fn read(&self, _addr: u8) -> u8 { 0xFF }
+    fn read(&self, _addr: u8) -> u8 {
+        0xFF
+    }
     fn clock(&mut self) {}
 
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
@@ -225,7 +260,9 @@ impl SoundChipEmulator for HuC6280 {
 }
 
 impl Default for HuC6280 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -266,13 +303,18 @@ mod tests {
         let mut chip = HuC6280::new();
         chip.write(0x00, 0x00);
         chip.write(0x04, 0x00); // disable to reset
-        for i in 0..32u8 { chip.write(0x06, i); }
+        for i in 0..32u8 {
+            chip.write(0x06, i);
+        }
         chip.write(0x02, 0x00);
         chip.write(0x03, 0x08); // period = 0x800
         chip.write(0x04, 0x9F); // enable, volume=15
         let mut buffer = [0.0f32; 8];
         chip.generate_samples(&mut buffer, 44100);
-        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
+        assert!(
+            buffer.iter().any(|&s| s != 0.0),
+            "active channel must produce output"
+        );
     }
 
     #[test]

@@ -42,7 +42,9 @@ const XGM_PSG_TONE_LOW_BASE: u8 = 0x10;
 const XGM_PSG_TONE_HIGH_BASE: u8 = 0x20;
 const XGM_FM_BLOCK_END: [u8; 4] = [0xff, 0xff, 0xff, 0xff];
 const XGM_PSG_BLOCK_END: [u8; 4] = [0x0f, 0xff, 0xff, 0xff];
-const YM2612_FNUM_TABLE: [u16; 12] = [617, 654, 693, 734, 778, 824, 873, 925, 980, 1038, 1100, 1165];
+const YM2612_FNUM_TABLE: [u16; 12] = [
+    617, 654, 693, 734, 778, 824, 873, 925, 980, 1038, 1100, 1165,
+];
 
 impl XgmGenerator {
     /// Create a new XGM generator from an AST
@@ -113,12 +115,18 @@ impl XgmGenerator {
 
         for part in ast.parts.values() {
             let is_psg = matches!(
-                part.chip.as_deref().and_then(|chip| chip.parse::<SoundChip>().ok()),
+                part.chip
+                    .as_deref()
+                    .and_then(|chip| chip.parse::<SoundChip>().ok()),
                 Some(SoundChip::SN76489) | Some(SoundChip::SN76489X2)
             );
             let channel = Self::part_channel(&part.name, is_psg);
 
-            let target = if is_psg { &mut psg_output } else { &mut fm_output };
+            let target = if is_psg {
+                &mut psg_output
+            } else {
+                &mut fm_output
+            };
             target.push(if is_psg { XGM_PSG_PART } else { XGM_FM_PART });
             target.push(part.name.len().min(u8::MAX as usize) as u8);
             target.extend_from_slice(part.name.as_bytes());
@@ -141,7 +149,11 @@ impl XgmGenerator {
                 } else {
                     Self::push_fm_note(note, output, channel);
                 }
-                Self::push_wait(output, Self::duration_to_frames(note.duration.unwrap_or(1)), is_psg);
+                Self::push_wait(
+                    output,
+                    Self::duration_to_frames(note.duration.unwrap_or(1)),
+                    is_psg,
+                );
             }
             MmlNode::Rest(rest) => {
                 Self::push_wait(output, Self::duration_to_frames(rest.duration), is_psg);
@@ -219,7 +231,7 @@ impl XgmGenerator {
     }
 
     fn block_units(len: usize) -> u16 {
-        ((len + 0xff) / 0x100) as u16
+        len.div_ceil(0x100) as u16
     }
 
     fn duration_to_frames(duration: u32) -> u16 {

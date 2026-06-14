@@ -1,8 +1,8 @@
 //! YM2413 (OPLL) sound chip emulation
 //!
-//! The YM2413 is a simplified FM synthesis chip providing 9 channels (or 6 melodic
-//! + 5 rhythm in rhythm mode). Each channel uses 2 operators (modulator + carrier)
-//! with built-in patch ROM containing 15 melodic instruments.
+//! The YM2413 is a simplified FM synthesis chip providing 9 channels (or 6 melodic +
+//! 5 rhythm in rhythm mode). Each channel uses 2 operators (modulator + carrier) with
+//! built-in patch ROM containing 15 melodic instruments.
 //!
 //! VGM opcode 0x51: two-byte payload [addr, data].
 //!
@@ -58,7 +58,13 @@ const FREQ_MULT2: [u32; 16] = [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24
 
 /// ADSR envelope state
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum EnvState { Attack, Decay, Sustain, Release, Off }
+enum EnvState {
+    Attack,
+    Decay,
+    Sustain,
+    Release,
+    Off,
+}
 
 /// Single FM operator
 #[derive(Debug, Clone)]
@@ -71,15 +77,20 @@ struct OpllOperator {
 
 impl Default for OpllOperator {
     fn default() -> Self {
-        Self { phase_acc: 0, env_state: EnvState::Off, env_level: 511, feedback_acc: 0 }
+        Self {
+            phase_acc: 0,
+            env_state: EnvState::Off,
+            env_level: 511,
+            feedback_acc: 0,
+        }
     }
 }
 
 /// Single OPLL channel (2 operators)
 #[derive(Debug, Clone)]
 struct OpllChannel {
-    f_num: u16,   // 9-bit F-number
-    block: u8,    // 3-bit block (octave)
+    f_num: u16, // 9-bit F-number
+    block: u8,  // 3-bit block (octave)
     key_on: bool,
     sustain: bool,
     instrument: u8, // 0-15 (0 = custom)
@@ -90,8 +101,12 @@ struct OpllChannel {
 impl Default for OpllChannel {
     fn default() -> Self {
         Self {
-            f_num: 0, block: 0, key_on: false, sustain: false,
-            instrument: 0, volume: 15,
+            f_num: 0,
+            block: 0,
+            key_on: false,
+            sustain: false,
+            instrument: 0,
+            volume: 15,
             ops: [OpllOperator::default(), OpllOperator::default()],
         }
     }
@@ -106,14 +121,17 @@ pub struct YM2413 {
     channels: [OpllChannel; 9],
     rhythm_mode: bool,
     rhythm_keys: u8,
+    #[allow(dead_code)]
     accumulated_cycles: f32,
 }
 
 impl YM2413 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -158,7 +176,9 @@ impl YM2413 {
 
     /// Convert 9-bit envelope level (0=loud, 511=silent) to linear amplitude [0.0..1.0]
     fn env_to_amp(level: u32) -> f32 {
-        if level >= 511 { return 0.0; }
+        if level >= 511 {
+            return 0.0;
+        }
         // Use exponential mapping: 6dB per 64 steps (3 bits per octave)
         let db = level as f32 * (48.0 / 511.0);
         10f32.powf(-db / 20.0)
@@ -173,7 +193,9 @@ impl YM2413 {
     /// Advance envelopes and phases, return stereo sample pair
     fn channel_sample(&mut self, ch: usize) -> f32 {
         let chan = &self.channels[ch];
-        if !chan.key_on { return 0.0; }
+        if !chan.key_on {
+            return 0.0;
+        }
 
         let patch = self.get_patch(chan.instrument);
         // Modulator parameters
@@ -192,16 +214,26 @@ impl YM2413 {
         let car_inc = self.phase_inc(f_num, block, car_mult);
 
         // Advance phases
-        self.channels[ch].ops[0].phase_acc = self.channels[ch].ops[0].phase_acc.wrapping_add(mod_inc) & 0x3FFFF;
-        self.channels[ch].ops[1].phase_acc = self.channels[ch].ops[1].phase_acc.wrapping_add(car_inc) & 0x3FFFF;
+        self.channels[ch].ops[0].phase_acc =
+            self.channels[ch].ops[0].phase_acc.wrapping_add(mod_inc) & 0x3FFFF;
+        self.channels[ch].ops[1].phase_acc =
+            self.channels[ch].ops[1].phase_acc.wrapping_add(car_inc) & 0x3FFFF;
 
         let mod_phase = self.channels[ch].ops[0].phase_acc;
         let car_phase = self.channels[ch].ops[1].phase_acc;
 
         // Modulator output with feedback
-        let fb_shift = if mod_fb == 0 { return { let v = Self::sine(car_phase); v * 0.2 } } else { mod_fb };
+        let fb_shift = if mod_fb == 0 {
+            return {
+                let v = Self::sine(car_phase);
+                v * 0.2
+            };
+        } else {
+            mod_fb
+        };
         let fb_amt = self.channels[ch].ops[0].feedback_acc;
-        let mod_fb_phase = (mod_phase as i64 + (fb_amt >> (7 - fb_shift as i32)) as i64).rem_euclid(1i64 << 18) as u32;
+        let mod_fb_phase = (mod_phase as i64 + (fb_amt >> (7 - fb_shift as i32)) as i64)
+            .rem_euclid(1i64 << 18) as u32;
         let mod_out_raw = Self::sine(mod_fb_phase);
         let mod_tl_amp = 1.0 - mod_tl_raw as f32 / 63.0;
         let mod_env_amp = Self::env_to_amp(self.channels[ch].ops[0].env_level);
@@ -232,7 +264,11 @@ impl YM2413 {
             let dr = patch[4 + op] & 0x0F;
             let sl = ((patch[6 + op] >> 4) & 0x0F) as u32 * 32;
             let eg_type = (patch[op] >> 5) & 1;
-            let rr = if sustain && !key_on { 5u32 } else { (patch[6 + op] & 0x0F) as u32 };
+            let rr = if sustain && !key_on {
+                5u32
+            } else {
+                (patch[6 + op] & 0x0F) as u32
+            };
 
             let level = self.channels[ch].ops[op].env_level;
             let state = self.channels[ch].ops[op].env_state;
@@ -269,10 +305,18 @@ impl YM2413 {
                     if eg_type == 0 {
                         // Non-sustained: decay continues at RR
                         let new_lvl = if rr > 0 { (level + rr).min(511) } else { level };
-                        let new_st = if !key_on { EnvState::Release } else { EnvState::Sustain };
+                        let new_st = if !key_on {
+                            EnvState::Release
+                        } else {
+                            EnvState::Sustain
+                        };
                         (new_lvl, new_st)
                     } else {
-                        let new_st = if !key_on { EnvState::Release } else { EnvState::Sustain };
+                        let new_st = if !key_on {
+                            EnvState::Release
+                        } else {
+                            EnvState::Sustain
+                        };
                         (level, new_st)
                     }
                 }
@@ -313,8 +357,12 @@ impl YM2413 {
 }
 
 impl SoundChipEmulator for YM2413 {
-    fn name(&self) -> &'static str { "YM2413" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "YM2413"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -394,13 +442,18 @@ impl SoundChipEmulator for YM2413 {
                 mixed += self.channel_sample(ch);
             }
             let out = (mixed / 9.0).clamp(-1.0, 1.0);
-            if frame.len() >= 2 { frame[0] = out; frame[1] = out; }
+            if frame.len() >= 2 {
+                frame[0] = out;
+                frame[1] = out;
+            }
         }
     }
 }
 
 impl Default for YM2413 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -468,12 +521,15 @@ mod tests {
         let mut chip = YM2413::new();
         // Set instrument 1 (Bell)
         chip.write(0x30, 0x10); // instrument=1, volume=0 (loud)
-        // F-num for ~440 Hz at block 4: f_num ≈ 287
+                                // F-num for ~440 Hz at block 4: f_num ≈ 287
         chip.write(0x10, 0x1F); // f_num LSB
         chip.write(0x20, 0b0001_1001); // key=1, block=4, f_num_hi=1
         let mut buffer = [0.0f32; 8];
         chip.generate_samples(&mut buffer, 44100);
-        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
+        assert!(
+            buffer.iter().any(|&s| s != 0.0),
+            "active channel must produce output"
+        );
     }
 
     #[test]

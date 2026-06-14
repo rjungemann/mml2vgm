@@ -90,6 +90,7 @@ impl Default for NoiseChannel {
     }
 }
 
+/// Dmg.
 pub struct Dmg {
     clock_rate: u32,
     pulse: [PulseChannel; 2],
@@ -102,10 +103,12 @@ pub struct Dmg {
 }
 
 impl Dmg {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(4_194_304)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -138,7 +141,7 @@ impl Dmg {
 
     fn wave_sample(&self, pos: usize) -> f32 {
         let byte_idx = pos / 2;
-        let nibble = if pos % 2 == 0 {
+        let nibble = if pos.is_multiple_of(2) {
             (self.wave_ram[byte_idx] >> 4) & 0x0F
         } else {
             self.wave_ram[byte_idx] & 0x0F
@@ -149,8 +152,12 @@ impl Dmg {
 }
 
 impl SoundChipEmulator for Dmg {
-    fn name(&self) -> &'static str { "DMG (Game Boy)" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "DMG (Game Boy)"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -243,7 +250,10 @@ impl SoundChipEmulator for Dmg {
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
         for frame in buffer.chunks_mut(2) {
             if !self.master_on {
-                if frame.len() >= 2 { frame[0] = 0.0; frame[1] = 0.0; }
+                if frame.len() >= 2 {
+                    frame[0] = 0.0;
+                    frame[1] = 0.0;
+                }
                 continue;
             }
 
@@ -251,7 +261,9 @@ impl SoundChipEmulator for Dmg {
 
             // CH1 + CH2: square wave pulses
             for ch in 0..2 {
-                if !self.pulse[ch].enabled || self.pulse[ch].env_vol == 0 { continue; }
+                if !self.pulse[ch].enabled || self.pulse[ch].env_vol == 0 {
+                    continue;
+                }
                 let freq = self.pulse_freq_hz(ch);
                 let phase_inc = freq / sample_rate as f32;
                 self.pulse[ch].phase_acc += phase_inc;
@@ -277,12 +289,16 @@ impl SoundChipEmulator for Dmg {
                 }
                 let raw = self.wave_sample(self.wave.wave_pos);
                 let shift = match self.wave.output_level {
-                    1 => 0,   // full
-                    2 => 1,   // half
-                    3 => 2,   // quarter
-                    _ => 4,   // mute
+                    1 => 0, // full
+                    2 => 1, // half
+                    3 => 2, // quarter
+                    _ => 4, // mute
                 };
-                let s = if shift < 4 { raw / (1 << shift) as f32 } else { 0.0 };
+                let s = if shift < 4 {
+                    raw / (1 << shift) as f32
+                } else {
+                    0.0
+                };
                 out += s * 0.12;
             }
 
@@ -297,10 +313,14 @@ impl SoundChipEmulator for Dmg {
                     let fb = (self.noise.lfsr ^ (self.noise.lfsr >> tap)) & 1;
                     self.noise.lfsr = (self.noise.lfsr >> 1) | (fb << 14);
                     if self.noise.width_mode {
-                        self.noise.lfsr = (self.noise.lfsr & !0x40) | ((fb as u16) << 6);
+                        self.noise.lfsr = (self.noise.lfsr & !0x40) | (fb << 6);
                     }
                 }
-                let s = if (self.noise.lfsr & 1) == 0 { 1.0f32 } else { -1.0 };
+                let s = if (self.noise.lfsr & 1) == 0 {
+                    1.0f32
+                } else {
+                    -1.0
+                };
                 let vol = self.noise.env_vol as f32 / 15.0;
                 out += s * vol * 0.12;
             }
@@ -315,7 +335,9 @@ impl SoundChipEmulator for Dmg {
 }
 
 impl Default for Dmg {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -358,7 +380,10 @@ mod tests {
         chip.write(0x04, 0x87); // CH1 trigger
         let mut buf = [0.0f32; 16];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active DMG pulse must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active DMG pulse must produce output"
+        );
     }
 
     #[test]

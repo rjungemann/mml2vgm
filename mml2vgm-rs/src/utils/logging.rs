@@ -2,8 +2,6 @@
 //!
 //! Implementation will be done in Phase 1 (already set up via env_logger).
 
-use log::{debug, error, info, trace, warn};
-
 /// Initialize logging with default settings
 pub fn init_logging() {
     env_logger::Builder::new()

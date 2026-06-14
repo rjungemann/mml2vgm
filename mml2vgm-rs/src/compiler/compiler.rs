@@ -3,12 +3,10 @@
 //! Orchestrates the full compilation pipeline from MML source to VGM/XGM/ZGM output.
 //! Handles tokenization, parsing, semantic analysis, and code generation.
 
-use crate::compiler::ast::{MmlAst, PartDefinition};
+use crate::compiler::ast::MmlAst;
 use crate::compiler::codegen::CodeGenerator;
-use crate::compiler::lexer::Lexer;
 use crate::compiler::parser::Parser;
-use crate::compiler::sample_resolver::{NoopSampleResolver, SampleResolver};
-use crate::compiler::sema::Sema;
+use crate::compiler::sample_resolver::SampleResolver;
 use crate::{CompileOptions, CompileResult, MmlError, MmlResult, OutputFormat};
 use std::collections::HashMap;
 use std::fs;
@@ -130,8 +128,8 @@ impl MmlCompiler {
             let trimmed = line.trim();
 
             if !in_block {
-                let block_start = if trimmed.starts_with("'{") {
-                    Some(trimmed[2..].trim())
+                let block_start = if let Some(rest) = trimmed.strip_prefix("'{") {
+                    Some(rest.trim())
                 } else if trimmed == "{" {
                     Some("")
                 } else {
@@ -208,9 +206,10 @@ impl MmlCompiler {
 
     /// Apply chip assignments from the header's `Part*` mappings to parsed parts.
     fn apply_chip_assignments(&self, ast: &mut MmlAst, chip_map: &HashMap<char, String>) {
-        let forced_ym2612 = ast.metadata
+        let forced_ym2612 = ast
+            .metadata
             .get("ForcedMonoPartYM2612")
-            .map_or(false, |v| v == "true");
+            .is_some_and(|v| v == "true");
 
         for (name, part) in &mut ast.parts {
             if part.chip.is_none() {
@@ -226,12 +225,18 @@ impl MmlCompiler {
     }
 
     /// Tokenize source code
-    fn lex(&self, source: &str) -> MmlResult<Vec<(crate::compiler::lexer::Token, crate::Position)>> {
+    fn lex(
+        &self,
+        source: &str,
+    ) -> MmlResult<Vec<(crate::compiler::lexer::Token, crate::Position)>> {
         crate::compiler::lexer::tokenize(source)
     }
 
     /// Parse tokens into AST
-    fn parse(&self, tokens: Vec<(crate::compiler::lexer::Token, crate::Position)>) -> MmlResult<MmlAst> {
+    fn parse(
+        &self,
+        tokens: Vec<(crate::compiler::lexer::Token, crate::Position)>,
+    ) -> MmlResult<MmlAst> {
         let parser = Parser::new(tokens);
         parser.parse()
     }
@@ -255,37 +260,46 @@ impl MmlCompiler {
     }
 
     /// Generate code for the specified output format
+    #[allow(dead_code)]
     fn generate_code(&self, ast: &MmlAst) -> MmlResult<Vec<u8>> {
         let (data, _source_map) = self.generate_code_with_sourcemap(ast)?;
         Ok(data)
     }
 
     /// Generate code and extract both the binary output and source map
-    fn generate_code_with_sourcemap(&self, ast: &MmlAst) -> MmlResult<(Vec<u8>, crate::compiler::codegen::SourceMap)> {
+    fn generate_code_with_sourcemap(
+        &self,
+        ast: &MmlAst,
+    ) -> MmlResult<(Vec<u8>, crate::compiler::codegen::SourceMap)> {
         match self.options.format {
             OutputFormat::VGM => {
-                let generator = crate::compiler::codegen::vgm::VgmGenerator::from_ast(ast, &self.options)?;
+                let generator =
+                    crate::compiler::codegen::vgm::VgmGenerator::from_ast(ast, &self.options)?;
                 let data = generator.generate()?;
                 let source_map = generator.source_map().clone();
                 Ok((data, source_map))
             }
             OutputFormat::XGM => {
-                let generator = crate::compiler::codegen::xgm::XgmGenerator::from_ast(ast, &self.options)?;
+                let generator =
+                    crate::compiler::codegen::xgm::XgmGenerator::from_ast(ast, &self.options)?;
                 let data = generator.generate()?;
                 Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
             OutputFormat::XGM2 => {
-                let generator = crate::compiler::codegen::xgm::Xgm2Generator::from_ast(ast, &self.options)?;
+                let generator =
+                    crate::compiler::codegen::xgm::Xgm2Generator::from_ast(ast, &self.options)?;
                 let data = generator.generate()?;
                 Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
             OutputFormat::ZGM => {
-                let generator = crate::compiler::codegen::zgm::ZgmGenerator::from_ast(ast, &self.options)?;
+                let generator =
+                    crate::compiler::codegen::zgm::ZgmGenerator::from_ast(ast, &self.options)?;
                 let data = generator.generate()?;
                 Ok((data, crate::compiler::codegen::SourceMap::default()))
             }
             OutputFormat::MID => {
-                let generator = crate::compiler::codegen::midi::MidiGenerator::from_ast(ast, &self.options)?;
+                let generator =
+                    crate::compiler::codegen::midi::MidiGenerator::from_ast(ast, &self.options)?;
                 let data = generator.generate()?;
                 let source_map = generator.source_map().clone();
                 Ok((data, source_map))
@@ -347,7 +361,8 @@ impl MmlCompiler {
         }
         self.apply_chip_assignments(&mut ast, &pre.chip_map);
         let part_count = ast.parts.len();
-        let (output_data, source_map) = self.generate_code_with_resolver_and_sourcemap(&ast, resolver)?;
+        let (output_data, source_map) =
+            self.generate_code_with_resolver_and_sourcemap(&ast, resolver)?;
         let info = Self::info_from_vgm(&output_data, part_count);
         Ok(CompileResult {
             data: output_data,
@@ -359,6 +374,7 @@ impl MmlCompiler {
     }
 
     /// Generate code using a sample resolver (VGM only; other formats ignore samples).
+    #[allow(dead_code)]
     fn generate_code_with_resolver(
         &self,
         ast: &MmlAst,
@@ -376,11 +392,12 @@ impl MmlCompiler {
     ) -> MmlResult<(Vec<u8>, crate::compiler::codegen::SourceMap)> {
         match self.options.format {
             OutputFormat::VGM => {
-                let generator = crate::compiler::codegen::vgm::VgmGenerator::from_ast_with_resolver(
-                    ast,
-                    &self.options,
-                    resolver,
-                )?;
+                let generator =
+                    crate::compiler::codegen::vgm::VgmGenerator::from_ast_with_resolver(
+                        ast,
+                        &self.options,
+                        resolver,
+                    )?;
                 let data = generator.generate()?;
                 let source_map = generator.source_map().clone();
                 Ok((data, source_map))
@@ -392,8 +409,10 @@ impl MmlCompiler {
 
     /// Build CompileInfo from generated output data (VGM only; other formats return defaults).
     fn info_from_vgm(data: &[u8], part_count: usize) -> crate::CompileInfo {
-        let mut info = crate::CompileInfo::default();
-        info.part_count = part_count;
+        let mut info = crate::CompileInfo {
+            part_count,
+            ..Default::default()
+        };
         // Extract total_samples from VGM header at offset 0x18
         if data.len() >= 0x1C && &data[0..4] == b"Vgm " {
             let total_samples =
@@ -405,22 +424,61 @@ impl MmlCompiler {
             let mut command_count: usize = 0;
             let data_offset = if data.len() > 0x40 {
                 let raw = u32::from_le_bytes([data[0x34], data[0x35], data[0x36], data[0x37]]);
-                if raw == 0 { 0x40 } else { (raw + 0x34) as usize }
-            } else { 0x40 };
+                if raw == 0 {
+                    0x40
+                } else {
+                    (raw + 0x34) as usize
+                }
+            } else {
+                0x40
+            };
             let mut i = data_offset.min(data.len());
             while i < data.len() {
                 let op = data[i];
                 match op {
-                    0x50 => { command_count += 1; i += 2; }
-                    0x51..=0x5F => { command_count += 1; i += 3; }
-                    0x61 => { i += 3; }
-                    0x62 | 0x63 => { i += 1; }
+                    0x50 => {
+                        command_count += 1;
+                        i += 2;
+                    }
+                    0x51..=0x5F => {
+                        command_count += 1;
+                        i += 3;
+                    }
+                    0x61 => {
+                        i += 3;
+                    }
+                    0x62 | 0x63 => {
+                        i += 1;
+                    }
                     0x66 => break,
-                    0x67 => { if i + 6 < data.len() { let len = u32::from_le_bytes([data[i+2],data[i+3],data[i+4],data[i+5]]) as usize; i += 7 + len; } else { break; } }
-                    0xA0 | 0xB0..=0xBF => { command_count += 1; i += 3; }
-                    0xC0..=0xC4 | 0xD0..=0xD6 => { command_count += 1; i += 4; }
-                    0xE0..=0xE1 => { command_count += 1; i += 4; }
-                    _ => { i += 1; }
+                    0x67 => {
+                        if i + 6 < data.len() {
+                            let len = u32::from_le_bytes([
+                                data[i + 2],
+                                data[i + 3],
+                                data[i + 4],
+                                data[i + 5],
+                            ]) as usize;
+                            i += 7 + len;
+                        } else {
+                            break;
+                        }
+                    }
+                    0xA0 | 0xB0..=0xBF => {
+                        command_count += 1;
+                        i += 3;
+                    }
+                    0xC0..=0xC4 | 0xD0..=0xD6 => {
+                        command_count += 1;
+                        i += 4;
+                    }
+                    0xE0..=0xE1 => {
+                        command_count += 1;
+                        i += 4;
+                    }
+                    _ => {
+                        i += 1;
+                    }
                 }
             }
             info.command_count = command_count;
@@ -437,9 +495,13 @@ impl MmlCompiler {
     /// older VGM streams.
     fn chips_from_vgm_header(data: &[u8]) -> Vec<crate::SoundChip> {
         use crate::SoundChip;
-        if data.len() < 0x40 { return Vec::new(); }
+        if data.len() < 0x40 {
+            return Vec::new();
+        }
         let read_u32 = |off: usize| -> u32 {
-            if off + 4 > data.len() { return 0; }
+            if off + 4 > data.len() {
+                return 0;
+            }
             u32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
         };
         let version = read_u32(0x08);
@@ -475,9 +537,13 @@ impl MmlCompiler {
 
         let mut found = Vec::new();
         for &(offset, min_version, chip) in ENTRIES {
-            if version < min_version { continue; }
+            if version < min_version {
+                continue;
+            }
             let clock = read_u32(offset) & 0x7fff_ffff; // mask dual-chip flag
-            if clock != 0 { found.push(chip); }
+            if clock != 0 {
+                found.push(chip);
+            }
         }
         found
     }
@@ -574,7 +640,8 @@ mod tests {
 
     #[test]
     fn test_compiler_output_path_uses_xgm2_extension() {
-        let compiler = MmlCompiler::new(CompileOptions::new().with_output_format(OutputFormat::XGM2));
+        let compiler =
+            MmlCompiler::new(CompileOptions::new().with_output_format(OutputFormat::XGM2));
         let output_path = compiler.determine_output_path(Path::new("song.gwi"));
         assert_eq!(output_path, Path::new("song.xgm2"));
     }

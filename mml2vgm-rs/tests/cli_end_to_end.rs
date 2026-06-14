@@ -43,7 +43,8 @@ fn cli_compile_produces_vgm_file() {
 
     let (status, _stdout, stderr) = run_cli(&[
         input.to_str().unwrap(),
-        "--output", output.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
     ]);
 
     assert!(
@@ -53,7 +54,11 @@ fn cli_compile_produces_vgm_file() {
     assert!(output.exists(), "output VGM file was not created");
 
     let bytes = fs::read(&output).expect("failed to read output VGM");
-    assert!(bytes.len() >= 0x40, "output VGM is too small ({} bytes)", bytes.len());
+    assert!(
+        bytes.len() >= 0x40,
+        "output VGM is too small ({} bytes)",
+        bytes.len()
+    );
     assert_eq!(&bytes[0..4], b"Vgm ", "output VGM has wrong magic bytes");
 }
 
@@ -99,10 +104,7 @@ fn cli_check_flag_does_not_create_output_file() {
     let output = dir.path().join("check_no_output.vgm");
 
     let (status, _stdout, stderr) = run_cli(&[input.to_str().unwrap(), "--check"]);
-    assert!(
-        status.success(),
-        "CLI --check failed; stderr={stderr}"
-    );
+    assert!(status.success(), "CLI --check failed; stderr={stderr}");
     assert!(
         !output.exists(),
         "--check should not create an output file but {:?} exists",
@@ -120,8 +122,10 @@ fn cli_format_xgm_produces_correct_magic() {
 
     let (status, _stdout, stderr) = run_cli(&[
         input.to_str().unwrap(),
-        "--format", "xgm",
-        "--output", output.to_str().unwrap(),
+        "--format",
+        "xgm",
+        "--output",
+        output.to_str().unwrap(),
     ]);
     assert!(status.success(), "CLI XGM compile failed; stderr={stderr}");
     assert!(output.exists(), "XGM output file not created");
@@ -139,8 +143,10 @@ fn cli_format_zgm_produces_correct_magic() {
 
     let (status, _stdout, stderr) = run_cli(&[
         input.to_str().unwrap(),
-        "--format", "zgm",
-        "--output", output.to_str().unwrap(),
+        "--format",
+        "zgm",
+        "--output",
+        output.to_str().unwrap(),
     ]);
     assert!(status.success(), "CLI ZGM compile failed; stderr={stderr}");
     assert!(output.exists(), "ZGM output file not created");
@@ -188,12 +194,16 @@ fn cli_vgm_output_has_positive_duration() {
 
     let (status, _stdout, stderr) = run_cli(&[
         input.to_str().unwrap(),
-        "--output", output.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
     ]);
     assert!(status.success(), "compile failed; stderr={stderr}");
 
     let bytes = fs::read(&output).expect("failed to read VGM output");
-    assert!(bytes.len() >= 0x1C, "VGM too small to contain total_samples field");
+    assert!(
+        bytes.len() >= 0x1C,
+        "VGM too small to contain total_samples field"
+    );
     let total_samples = u32::from_le_bytes([bytes[0x18], bytes[0x19], bytes[0x1A], bytes[0x1B]]);
     assert!(
         total_samples > 0,
@@ -209,7 +219,8 @@ fn cli_vgm_eof_offset_matches_file_size() {
 
     let (status, _stdout, stderr) = run_cli(&[
         input.to_str().unwrap(),
-        "--output", output.to_str().unwrap(),
+        "--output",
+        output.to_str().unwrap(),
     ]);
     assert!(status.success(), "compile failed; stderr={stderr}");
 

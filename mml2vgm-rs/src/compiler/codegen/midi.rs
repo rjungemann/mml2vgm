@@ -4,12 +4,8 @@
 //! Supports both Type 0 (single track) and Type 1 (multi-track) SMF formats.
 
 use super::{CodeGenerator, NoteEvent, OutputFormat, SourceMap};
-use crate::compiler::ast::{
-    Alias, Envelope, FmInstrument, Include, InstrumentSelection, Length, Loop,
-    Metadata, MmlAst, MmlNode, Note, Octave, OctaveShift, OpxInstrument as _OpxInstrument,
-    PartDefinition, PcmInstrument, Quantize, Rest, Tempo, Volume,
-};
-use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
+use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift, PartDefinition, Rest};
+use crate::{CompileOptions, MmlResult, SoundChip};
 use std::collections::{HashMap, HashSet};
 
 /// MIDI event types for Standard MIDI File
@@ -17,50 +13,71 @@ use std::collections::{HashMap, HashSet};
 pub enum MidiEvent {
     /// Note Off event (status: 0x80-0x8F)
     NoteOff {
+        /// MIDI channel (0-15).
         channel: u8,
+        /// Note number.
         note: u8,
+        /// Release velocity.
         velocity: u8,
     },
     /// Note On event (status: 0x90-0x9F)
     NoteOn {
+        /// MIDI channel (0-15).
         channel: u8,
+        /// Note number.
         note: u8,
+        /// Attack velocity.
         velocity: u8,
     },
     /// Polyphonic Aftertouch (status: 0xA0-0xAF)
     PolyAftertouch {
+        /// MIDI channel (0-15).
         channel: u8,
+        /// Note number.
         note: u8,
+        /// Pressure value.
         value: u8,
     },
     /// Control Change (status: 0xB0-0xBF)
     ControlChange {
+        /// Channel.
         channel: u8,
+        /// Controller.
         controller: u8,
+        /// Value.
         value: u8,
     },
     /// Program Change (status: 0xC0-0xCF)
     ProgramChange {
+        /// MIDI channel (0-15).
         channel: u8,
+        /// Program (instrument) number.
         program: u8,
     },
     /// Channel Aftertouch (status: 0xD0-0xDF)
     ChannelAftertouch {
+        /// MIDI channel (0-15).
         channel: u8,
+        /// Pressure value.
         value: u8,
     },
     /// Pitch Bend (status: 0xE0-0xEF)
     PitchBend {
+        /// Channel.
         channel: u8,
+        /// Value.
         value: i16, // -8192 to 8191 (center = 0)
     },
     /// System Exclusive (status: 0xF0)
     SysEx {
+        /// Raw SysEx payload bytes.
         data: Vec<u8>,
     },
     /// Meta event (status: 0xFF)
     Meta {
+        /// Meta event type byte.
         meta_type: u8,
+        /// Meta event payload bytes.
         data: Vec<u8>,
     },
 }
@@ -77,22 +94,18 @@ pub struct MidiTrackEvent {
 /// MIDI track containing a sequence of events
 #[derive(Debug, Clone, Default)]
 pub struct MidiTrack {
+    /// Events.
     pub events: Vec<MidiTrackEvent>,
 }
 
 /// MIDI file format type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MidiFormat {
     /// Single track (Type 0)
+    #[default]
     Type0,
     /// Multi-track (Type 1)
     Type1,
-}
-
-impl Default for MidiFormat {
-    fn default() -> Self {
-        MidiFormat::Type0
-    }
 }
 
 /// Standard MIDI File generator
@@ -116,8 +129,10 @@ pub struct MidiGenerator {
     /// Part program assignments
     part_programs: HashMap<String, u8>,
     /// Part bank MSB assignments
+    #[allow(dead_code)]
     part_bank_msb: HashMap<String, u8>,
     /// Part bank LSB assignments
+    #[allow(dead_code)]
     part_bank_lsb: HashMap<String, u8>,
     /// Part transpose values
     part_transpose: HashMap<String, i8>,
@@ -128,56 +143,81 @@ pub struct MidiGenerator {
     /// Sound chips used
     chips: Vec<SoundChip>,
     /// Ticks per tick (for duration conversion)
+    #[allow(dead_code)]
     ticks_per_tick: u32,
 }
 
 /// MIDI-specific AST nodes (will be integrated into main AST later)
 #[derive(Debug, Clone, PartialEq)]
 pub struct ControlChange {
+    /// Controller.
     pub controller: u8,
+    /// Value.
     pub value: u8,
+    /// Channel.
     pub channel: Option<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Program Change.
 pub struct ProgramChange {
+    /// Program.
     pub program: u8,
+    /// Channel.
     pub channel: Option<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Pitch Bend.
 pub struct PitchBend {
+    /// Value.
     pub value: i16,
+    /// Channel.
     pub channel: Option<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Aftertouch.
 pub struct Aftertouch {
+    /// Value.
     pub value: u8,
+    /// Channel.
     pub channel: Option<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Poly Aftertouch.
 pub struct PolyAftertouch {
+    /// Note.
     pub note: u8,
+    /// Value.
     pub value: u8,
+    /// Channel.
     pub channel: Option<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Sys Ex.
 pub struct SysEx {
+    /// Data.
     pub data: Vec<u8>,
+    /// Span.
     pub span: Option<crate::Span>,
 }
 
 impl MidiGenerator {
     /// Create a new MIDI generator from an AST
-    pub fn from_ast(ast: &MmlAst, options: &CompileOptions) -> MmlResult<Self> {
+    pub fn from_ast(ast: &MmlAst, _options: &CompileOptions) -> MmlResult<Self> {
         let mut generator = Self {
             format: MidiFormat::Type0,
             ticks_per_quarter: 192, // Default: 192 ticks per quarter note (common for sequencing)
@@ -201,9 +241,10 @@ impl MidiGenerator {
         generator.extract_chips(ast);
 
         // Check if MIDI is explicitly requested or if any part uses MIDI chip
-        let has_midi_chip = ast.parts.values().any(|p| {
-            p.chip.as_ref().map_or(false, |c| c.to_uppercase() == "MIDI")
-        });
+        let _has_midi_chip = ast
+            .parts
+            .values()
+            .any(|p| p.chip.as_ref().is_some_and(|c| c.to_uppercase() == "MIDI"));
 
         // Determine format: Type 1 if multiple parts, Type 0 otherwise
         if ast.parts.len() > 1 {
@@ -237,7 +278,7 @@ impl MidiGenerator {
     /// Extract sound chips from the AST
     fn extract_chips(&mut self, ast: &MmlAst) {
         let mut chips_set = HashSet::new();
-        
+
         for part in ast.parts.values() {
             if let Some(chip_name) = &part.chip {
                 if let Ok(chip) = chip_name.parse::<SoundChip>() {
@@ -245,23 +286,23 @@ impl MidiGenerator {
                 }
             }
         }
-        
+
         // Always include MIDI if we're generating MIDI
         chips_set.insert(SoundChip::MIDI);
-        
+
         self.chips = chips_set.into_iter().collect();
     }
 
     /// Assign MIDI channels to parts
     fn assign_midi_channels(&mut self, ast: &MmlAst) {
         let mut channel = 0u8;
-        
-        for (part_name, part) in &ast.parts {
+
+        for part_name in ast.parts.keys() {
             // Check if part explicitly specifies MIDI channel
             // For now, we'll auto-assign channels 0-15
             if channel < 16 {
                 self.part_channels.insert(part_name.clone(), channel);
-                
+
                 // Default program based on channel
                 // Channel 10 (index 9) is typically drums
                 let program = if channel == 9 {
@@ -269,10 +310,10 @@ impl MidiGenerator {
                 } else {
                     0 // Acoustic Grand Piano (GM)
                 };
-                
+
                 self.part_programs.insert(part_name.clone(), program);
                 self.part_transpose.insert(part_name.clone(), 0);
-                
+
                 channel += 1;
             }
         }
@@ -297,11 +338,10 @@ impl MidiGenerator {
         // Process each part
         for (part_name, part) in &ast.parts {
             self.current_part_name = part_name.clone();
-            
+
             if self.format == MidiFormat::Type1 {
-                self.current_track_index = ast.parts.keys()
-                    .position(|k| k == part_name)
-                    .unwrap_or(0);
+                self.current_track_index =
+                    ast.parts.keys().position(|k| k == part_name).unwrap_or(0);
             }
 
             self.process_part(part)?;
@@ -334,7 +374,7 @@ impl MidiGenerator {
                         (microseconds_per_quarter >> 8) as u8,
                         microseconds_per_quarter as u8,
                     ];
-                    
+
                     for track in &mut self.tracks {
                         track.events.push(MidiTrackEvent {
                             delta: 0,
@@ -371,26 +411,49 @@ impl MidiGenerator {
 
     /// Process a single part
     fn process_part(&mut self, part: &PartDefinition) -> MmlResult<()> {
-        let channel = self.part_channels.get(&self.current_part_name).copied().unwrap_or(0);
-        let program = self.part_programs.get(&self.current_part_name).copied().unwrap_or(0);
-        let transpose = self.part_transpose.get(&self.current_part_name).copied().unwrap_or(0);
+        let channel = self
+            .part_channels
+            .get(&self.current_part_name)
+            .copied()
+            .unwrap_or(0);
+        let program = self
+            .part_programs
+            .get(&self.current_part_name)
+            .copied()
+            .unwrap_or(0);
+        let transpose = self
+            .part_transpose
+            .get(&self.current_part_name)
+            .copied()
+            .unwrap_or(0);
 
         let mut current_octave = 4u8;
         let mut current_length = 4u32;
         let mut current_volume = 100u8; // Default volume (0-127)
-        let mut current_tempo = part.tempo.unwrap_or(self.global_tempo);
         let mut time_elapsed: u32 = 0;
 
         // Add program change at start of part
         self.add_event(MidiEvent::ProgramChange { channel, program });
-        
+
         // Add bank select if needed
         // For GM, bank select MSB=0, LSB=0 is default
-        self.add_event(MidiEvent::ControlChange { channel, controller: 0, value: 0 }); // Bank Select MSB
-        self.add_event(MidiEvent::ControlChange { channel, controller: 32, value: 0 }); // Bank Select LSB
-        
+        self.add_event(MidiEvent::ControlChange {
+            channel,
+            controller: 0,
+            value: 0,
+        }); // Bank Select MSB
+        self.add_event(MidiEvent::ControlChange {
+            channel,
+            controller: 32,
+            value: 0,
+        }); // Bank Select LSB
+
         // Set volume (CC7)
-        self.add_event(MidiEvent::ControlChange { channel, controller: 7, value: current_volume });
+        self.add_event(MidiEvent::ControlChange {
+            channel,
+            controller: 7,
+            value: current_volume,
+        });
 
         // Process each command in the part
         for node in &part.commands {
@@ -401,14 +464,28 @@ impl MidiGenerator {
                     let duration_ticks = self.calc_duration_ticks(note, current_length);
 
                     // Note On
-                    self.add_event_with_delta(MidiEvent::NoteOn { channel, note: midi_note, velocity }, time_elapsed);
-                    
+                    self.add_event_with_delta(
+                        MidiEvent::NoteOn {
+                            channel,
+                            note: midi_note,
+                            velocity,
+                        },
+                        time_elapsed,
+                    );
+
                     // Note Off after duration
-                    self.add_event_with_delta(MidiEvent::NoteOff { channel, note: midi_note, velocity: 0 }, duration_ticks);
-                    
+                    self.add_event_with_delta(
+                        MidiEvent::NoteOff {
+                            channel,
+                            note: midi_note,
+                            velocity: 0,
+                        },
+                        duration_ticks,
+                    );
+
                     // Accumulate time
                     time_elapsed += duration_ticks;
-                    
+
                     // Add to source map
                     if let Some(span) = &note.span {
                         self.source_map.events.push(NoteEvent {
@@ -424,22 +501,35 @@ impl MidiGenerator {
                     }
                 }
                 MmlNode::Rest(rest) => {
-                    let duration_ticks = self.calc_duration_ticks(&Rest { duration: rest.duration, dotted: rest.dotted, span: rest.span.clone() }, current_length);
+                    let duration_ticks = self.calc_duration_ticks(
+                        &Rest {
+                            duration: rest.duration,
+                            dotted: rest.dotted,
+                            span: rest.span,
+                        },
+                        current_length,
+                    );
                     time_elapsed += duration_ticks;
                 }
                 MmlNode::Tempo(tempo) => {
-                    current_tempo = tempo.bpm;
                     let microseconds_per_quarter = self.calc_microseconds_per_quarter(tempo.bpm);
                     let tempo_data = vec![
                         (microseconds_per_quarter >> 16) as u8,
                         (microseconds_per_quarter >> 8) as u8,
                         microseconds_per_quarter as u8,
                     ];
-                    self.add_event(MidiEvent::Meta { meta_type: 0x51, data: tempo_data });
+                    self.add_event(MidiEvent::Meta {
+                        meta_type: 0x51,
+                        data: tempo_data,
+                    });
                 }
                 MmlNode::Volume(vol) => {
                     current_volume = vol.level;
-                    self.add_event(MidiEvent::ControlChange { channel, controller: 7, value: current_volume });
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: 7,
+                        value: current_volume,
+                    });
                 }
                 MmlNode::Length(len) => {
                     current_length = len.value;
@@ -455,7 +545,7 @@ impl MidiGenerator {
                         OctaveShift::Down => current_octave = current_octave.saturating_sub(1),
                     }
                 }
-                MmlNode::Quantize(q) => {
+                MmlNode::Quantize(_q) => {
                     // Quantize affects timing, handle as needed
                 }
                 MmlNode::Loop(loop_node) => {
@@ -466,14 +556,36 @@ impl MidiGenerator {
                                 MmlNode::Note(note) => {
                                     let midi_note = note.midi_note().wrapping_add(transpose as u8);
                                     let velocity = note.volume.unwrap_or(current_volume);
-                                    let duration_ticks = self.calc_duration_ticks(note, current_length);
+                                    let duration_ticks =
+                                        self.calc_duration_ticks(note, current_length);
 
-                                    self.add_event_with_delta(MidiEvent::NoteOn { channel, note: midi_note, velocity }, time_elapsed);
-                                    self.add_event_with_delta(MidiEvent::NoteOff { channel, note: midi_note, velocity: 0 }, duration_ticks);
+                                    self.add_event_with_delta(
+                                        MidiEvent::NoteOn {
+                                            channel,
+                                            note: midi_note,
+                                            velocity,
+                                        },
+                                        time_elapsed,
+                                    );
+                                    self.add_event_with_delta(
+                                        MidiEvent::NoteOff {
+                                            channel,
+                                            note: midi_note,
+                                            velocity: 0,
+                                        },
+                                        duration_ticks,
+                                    );
                                     time_elapsed += duration_ticks;
                                 }
                                 MmlNode::Rest(rest) => {
-                                    let duration_ticks = self.calc_duration_ticks(&Rest { duration: rest.duration, dotted: rest.dotted, span: rest.span.clone() }, current_length);
+                                    let duration_ticks = self.calc_duration_ticks(
+                                        &Rest {
+                                            duration: rest.duration,
+                                            dotted: rest.dotted,
+                                            span: rest.span,
+                                        },
+                                        current_length,
+                                    );
                                     time_elapsed += duration_ticks;
                                 }
                                 _ => {}
@@ -493,13 +605,17 @@ impl MidiGenerator {
                 MmlNode::PartDefinition(_) => {
                     // Nested part definition - skip
                 }
-                MmlNode::Metadata(meta) => {
+                MmlNode::Metadata(_meta) => {
                     // Handle per-part metadata
                 }
                 MmlNode::Comment(_) => {
                     // Skip comments
                 }
-                MmlNode::ChipCommand { chip: _, command, args } => {
+                MmlNode::ChipCommand {
+                    chip: _,
+                    command,
+                    args,
+                } => {
                     // Map chip commands to MIDI CC messages
                     self.handle_chip_command_to_midi(command, args, channel);
                 }
@@ -507,7 +623,10 @@ impl MidiGenerator {
                     // Map instrument to MIDI program change
                     // For now, just use instrument number as program
                     let new_program = inst.number as u8;
-                    self.add_event(MidiEvent::ProgramChange { channel, program: new_program });
+                    self.add_event(MidiEvent::ProgramChange {
+                        channel,
+                        program: new_program,
+                    });
                 }
                 MmlNode::FmInstrument(_) => {}
                 MmlNode::OpxInstrument(_) => {}
@@ -518,31 +637,50 @@ impl MidiGenerator {
                 MmlNode::Include(_) => {}
                 // MIDI-specific nodes
                 MmlNode::MidiControlChange(cc) => {
-                    self.add_event(MidiEvent::ControlChange { channel, controller: cc.controller, value: cc.value });
+                    self.add_event(MidiEvent::ControlChange {
+                        channel,
+                        controller: cc.controller,
+                        value: cc.value,
+                    });
                 }
                 MmlNode::MidiProgramChange(pc) => {
                     let target_channel = pc.channel.unwrap_or(channel);
-                    self.add_event(MidiEvent::ProgramChange { channel: target_channel, program: pc.program });
+                    self.add_event(MidiEvent::ProgramChange {
+                        channel: target_channel,
+                        program: pc.program,
+                    });
                 }
                 MmlNode::MidiPitchBend(pb) => {
                     let target_channel = pb.channel.unwrap_or(channel);
-                    self.add_event(MidiEvent::PitchBend { channel: target_channel, value: pb.value });
+                    self.add_event(MidiEvent::PitchBend {
+                        channel: target_channel,
+                        value: pb.value,
+                    });
                 }
                 MmlNode::MidiAftertouch(at) => {
                     let target_channel = at.channel.unwrap_or(channel);
-                    self.add_event(MidiEvent::ChannelAftertouch { channel: target_channel, value: at.value });
+                    self.add_event(MidiEvent::ChannelAftertouch {
+                        channel: target_channel,
+                        value: at.value,
+                    });
                 }
                 MmlNode::MidiPolyAftertouch(pa) => {
                     let target_channel = pa.channel.unwrap_or(channel);
-                    self.add_event(MidiEvent::PolyAftertouch { channel: target_channel, note: pa.note, value: pa.value });
+                    self.add_event(MidiEvent::PolyAftertouch {
+                        channel: target_channel,
+                        note: pa.note,
+                        value: pa.value,
+                    });
                 }
                 MmlNode::MidiSysEx(sysex) => {
-                    self.add_event(MidiEvent::SysEx { data: sysex.data.clone() });
+                    self.add_event(MidiEvent::SysEx {
+                        data: sysex.data.clone(),
+                    });
                 }
-                MmlNode::MidiChannel(mch) => {
+                MmlNode::MidiChannel(_mch) => {
                     // Channel assignment for part
                 }
-                MmlNode::MidiProgram(mprog) => {
+                MmlNode::MidiProgram(_mprog) => {
                     // Program assignment for part
                 }
             }
@@ -555,33 +693,37 @@ impl MidiGenerator {
     fn add_event(&mut self, event: MidiEvent) {
         let delta = 0; // Will be calculated during track building
         let track_index = self.current_track_index;
-        
+
         if track_index < self.tracks.len() {
-            self.tracks[track_index].events.push(MidiTrackEvent { delta, event });
+            self.tracks[track_index]
+                .events
+                .push(MidiTrackEvent { delta, event });
         }
     }
 
     /// Add a MIDI event with specified delta time
     fn add_event_with_delta(&mut self, event: MidiEvent, delta: u32) {
         let track_index = self.current_track_index;
-        
+
         if track_index < self.tracks.len() {
-            self.tracks[track_index].events.push(MidiTrackEvent { delta, event });
+            self.tracks[track_index]
+                .events
+                .push(MidiTrackEvent { delta, event });
         }
     }
 
     /// Handle chip-specific commands by mapping them to MIDI CC messages (Phase 10)
     fn handle_chip_command_to_midi(&mut self, command: &str, args: &[u32], channel: u8) {
         use crate::compiler::codegen::midi_controller::*;
-        
+
         let cmd_upper = command.to_uppercase();
-        
+
         // Map command to MIDI CC based on command type
         match cmd_upper.as_str() {
             // FM Operator Level/Brightness parameters → Expression CC (11)
             "TL" => {
                 if !args.is_empty() {
-                    let cc_value = ((args[0] as u8).saturating_sub(127).wrapping_neg()) as u8;
+                    let cc_value = (args[0] as u8).saturating_sub(127).wrapping_neg();
                     self.add_event(MidiEvent::ControlChange {
                         channel,
                         controller: midi_cc::EXPRESSION,
@@ -685,17 +827,19 @@ impl MidiGenerator {
     }
 
     /// Calculate duration in ticks
-    fn calc_duration_ticks(&self, note_or_rest: &impl std::fmt::Debug, current_length: u32) -> u32 {
+    fn calc_duration_ticks(
+        &self,
+        _note_or_rest: &impl std::fmt::Debug,
+        _current_length: u32,
+    ) -> u32 {
         // For now, use a simple conversion
         // A quarter note (length=4) at 120 BPM with 192 ticks/quarter = 192 ticks
         // So: duration_ticks = (ticks_per_quarter / current_length) * note_duration
         // But we need to get the actual duration from the note
-        
+
         let base_ticks = self.ticks_per_quarter as u32;
-        let length_factor = match note_or_rest {
-            _ => 4, // Default to quarter note equivalent
-        };
-        
+        let length_factor = 4;
+
         // Simple formula for now - will be refined
         base_ticks * 4 / length_factor
     }
@@ -710,7 +854,7 @@ impl MidiGenerator {
 
     /// Build tracks from events
     fn build_tracks(&mut self) {
-        for (track_idx, track) in &mut self.tracks.iter_mut().enumerate() {
+        for (_track_idx, track) in &mut self.tracks.iter_mut().enumerate() {
             // Calculate proper delta times
             let mut prev_time = 0u32;
             for event in &mut track.events {
@@ -763,7 +907,9 @@ impl MidiGenerator {
             MidiEvent::NoteOff { note, velocity, .. } => vec![*note, *velocity],
             MidiEvent::NoteOn { note, velocity, .. } => vec![*note, *velocity],
             MidiEvent::PolyAftertouch { note, value, .. } => vec![*note, *value],
-            MidiEvent::ControlChange { controller, value, .. } => vec![*controller, *value],
+            MidiEvent::ControlChange {
+                controller, value, ..
+            } => vec![*controller, *value],
             MidiEvent::ProgramChange { program, .. } => vec![*program],
             MidiEvent::ChannelAftertouch { value, .. } => vec![*value],
             MidiEvent::PitchBend { value, .. } => {
@@ -798,20 +944,21 @@ impl MidiGenerator {
     }
 
     /// Check if running status can be used
+    #[allow(dead_code)]
     fn can_use_running_status(&self, prev_status: Option<u8>, current_event: &MidiEvent) -> bool {
         if !self.running_status {
             return false;
         }
-        
+
         let current_status = self.get_status_byte(current_event);
-        
+
         match (prev_status, current_event) {
             (Some(prev), _) => {
                 // Running status can be used if same status byte
                 // Also, NoteOn with velocity=0 can be treated as NoteOff
-                prev == current_status || 
-                (prev == 0x90 && current_status == 0x80) ||
-                (prev == 0x80 && current_status == 0x90)
+                prev == current_status
+                    || (prev == 0x90 && current_status == 0x80)
+                    || (prev == 0x80 && current_status == 0x90)
             }
             _ => false,
         }
@@ -929,7 +1076,7 @@ impl MidiGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::ast::{MmlAst, PartDefinition};
+    use crate::compiler::ast::{MmlAst, Note, PartDefinition};
 
     #[test]
     fn test_midi_generator_basic() {
@@ -941,7 +1088,7 @@ mod tests {
 
         // MIDI header is 14 bytes
         assert!(result.len() >= 14);
-        
+
         // Check MThd chunk
         assert_eq!(&result[0..4], b"MThd");
         assert_eq!(&result[4..8], &6u32.to_be_bytes()); // Header length
@@ -950,7 +1097,7 @@ mod tests {
     #[test]
     fn test_midi_generator_with_note() {
         let mut ast = MmlAst::new();
-        
+
         let mut note = Note::new('C', 0, 4);
         note.duration = Some(480);
 
@@ -962,21 +1109,22 @@ mod tests {
         };
 
         ast.parts.insert("MIDI1".to_string(), part);
-        
+
         let options = CompileOptions::default();
         let generator = MidiGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
 
         // Should have header + at least one track
         assert!(result.len() > 14);
-        
+
         // Check MTrk chunk exists
         assert!(result.windows(4).any(|w| w == b"MTrk"));
     }
 
     #[test]
     fn test_var_length_encoding() {
-        let generator = MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
+        let generator =
+            MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
         let mut output = Vec::new();
 
         // Test various values
@@ -1013,31 +1161,41 @@ mod tests {
 
     #[test]
     fn test_pitch_bend_encoding() {
-        let generator = MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
-        
+        let generator =
+            MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
+
         // Center (0)
-        let data = generator.get_event_data(&MidiEvent::PitchBend { channel: 0, value: 0 });
+        let data = generator.get_event_data(&MidiEvent::PitchBend {
+            channel: 0,
+            value: 0,
+        });
         assert_eq!(data, vec![0x00, 0x40]); // 0x2000 = center (8192), LSB=0x00, MSB=0x40
 
         // +100
         // 0 + 100 + 8192 = 8292 = 0x2064
         // LSB = 0x2064 & 0x7F = 0x64 (100)
         // MSB = (0x2064 >> 7) & 0x7F = 0x40 (64)
-        let data = generator.get_event_data(&MidiEvent::PitchBend { channel: 0, value: 100 });
+        let data = generator.get_event_data(&MidiEvent::PitchBend {
+            channel: 0,
+            value: 100,
+        });
         assert_eq!(data, vec![0x64, 0x40]);
 
         // -50
         // 0 - 50 + 8192 = 8142 = 0x1FCE
         // LSB = 0x1FCE & 0x7F = 0x4E (78)
         // MSB = (0x1FCE >> 7) & 0x7F = 0x3F (63)
-        let data = generator.get_event_data(&MidiEvent::PitchBend { channel: 0, value: -50 });
+        let data = generator.get_event_data(&MidiEvent::PitchBend {
+            channel: 0,
+            value: -50,
+        });
         assert_eq!(data, vec![0x4E, 0x3F]);
     }
 
     #[test]
     fn test_midi_format_parsing() {
         use crate::OutputFormat;
-        
+
         assert_eq!("mid".parse::<OutputFormat>().unwrap(), OutputFormat::MID);
         assert_eq!("MID".parse::<OutputFormat>().unwrap(), OutputFormat::MID);
         assert_eq!("Mid".parse::<OutputFormat>().unwrap(), OutputFormat::MID);
@@ -1045,22 +1203,22 @@ mod tests {
 
     #[test]
     fn test_midi_codegenerator_format() {
-        use super::super::OutputFormat;
-        
-        let generator = MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
+        let generator =
+            MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
         assert_eq!(generator.format(), super::OutputFormat::Midi);
     }
 
     #[test]
     fn test_tempo_calculation() {
-        let generator = MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
-        
+        let generator =
+            MidiGenerator::from_ast(&MmlAst::new(), &CompileOptions::default()).unwrap();
+
         // 120 BPM = 500000 microseconds per quarter
         assert_eq!(generator.calc_microseconds_per_quarter(120), 500000);
-        
+
         // 60 BPM = 1000000 microseconds per quarter
         assert_eq!(generator.calc_microseconds_per_quarter(60), 1000000);
-        
+
         // 240 BPM = 250000 microseconds per quarter
         assert_eq!(generator.calc_microseconds_per_quarter(240), 250000);
     }

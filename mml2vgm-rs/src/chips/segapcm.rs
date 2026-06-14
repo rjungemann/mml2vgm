@@ -110,15 +110,22 @@ impl SegaPCM {
         }
 
         match addr16 % 8 {
-            0 => self.channels[ch].loop_start = (self.channels[ch].loop_start & 0xFF00) | data as u32,
-            1 => self.channels[ch].loop_start = (self.channels[ch].loop_start & 0x00FF) | ((data as u32) << 8),
+            0 => {
+                self.channels[ch].loop_start = (self.channels[ch].loop_start & 0xFF00) | data as u32
+            }
+            1 => {
+                self.channels[ch].loop_start =
+                    (self.channels[ch].loop_start & 0x00FF) | ((data as u32) << 8)
+            }
             2 => {
                 self.channels[ch].start_addr = (data as u32) << 16;
                 self.channels[ch].position = (data as u32) << 16;
             }
             3 => self.channels[ch].end_addr = (data as u32) << 16,
             4 => self.channels[ch].delta = (self.channels[ch].delta & 0xFF00) | data as u16,
-            5 => self.channels[ch].delta = (self.channels[ch].delta & 0x00FF) | ((data as u16) << 8),
+            5 => {
+                self.channels[ch].delta = (self.channels[ch].delta & 0x00FF) | ((data as u16) << 8)
+            }
             6 => self.channels[ch].vol_left = data & 0x7F,
             7 => {
                 self.channels[ch].vol_right = data & 0x7F;
@@ -160,7 +167,11 @@ impl SoundChipEmulator for SegaPCM {
 
     fn read(&self, addr: u8) -> u8 {
         let idx = addr as usize;
-        if idx < self.regs.len() { self.regs[idx] } else { 0 }
+        if idx < self.regs.len() {
+            self.regs[idx]
+        } else {
+            0
+        }
     }
 
     fn load_pcm_data(&mut self, block_type: u8, data: &[u8]) {

@@ -81,7 +81,11 @@ fn format_vgm_has_correct_magic_and_structure() {
 #[test]
 fn format_xgm_has_correct_magic() {
     let data = compile_format("@0 t120 o4 c4 d4", OutputFormat::XGM);
-    assert!(data.len() > 16, "XGM output too short: {} bytes", data.len());
+    assert!(
+        data.len() > 16,
+        "XGM output too short: {} bytes",
+        data.len()
+    );
     assert_eq!(&data[0..4], b"XGM ", "XGM magic mismatch");
 }
 
@@ -95,7 +99,11 @@ fn format_xgm2_has_correct_magic() {
 #[test]
 fn format_zgm_has_correct_magic() {
     let data = compile_format("@0 t120 o4 c4 d4", OutputFormat::ZGM);
-    assert!(data.len() > 16, "ZGM output too short: {} bytes", data.len());
+    assert!(
+        data.len() > 16,
+        "ZGM output too short: {} bytes",
+        data.len()
+    );
     assert_eq!(&data[0..4], b"ZGM ", "ZGM magic mismatch");
 }
 
@@ -196,7 +204,11 @@ fn loop_mml_compiles_to_valid_container() {
         ..Default::default()
     })
     .compile_from_source(mml);
-    assert!(result.is_ok(), "loop MML compile failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "loop MML compile failed: {:?}",
+        result.err()
+    );
     assert_vgm_structure(&result.unwrap().data);
 }
 
@@ -215,8 +227,11 @@ fn invalid_mml_returns_error_not_panic() {
         ..Default::default()
     })
     .compile_from_source(mml);
-    match result {
-        Ok(r) => assert!(r.data.len() >= 4, "non-error result should have valid header"),
-        Err(_) => {} // error is acceptable; the contract is "must not panic"
+    // error is acceptable; the contract is "must not panic"
+    if let Ok(r) = result {
+        assert!(
+            r.data.len() >= 4,
+            "non-error result should have valid header"
+        );
     }
 }

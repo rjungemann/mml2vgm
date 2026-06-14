@@ -71,7 +71,7 @@ use crate::drivers::{
     DiagnosticSeverity, DriverCompileOptions, DriverCompileResult, DriverDiagnostic,
     DriverOutputFormat, DriverToken, ExternalDriver,
 };
-use crate::{CompileOptions, OutputFormat, SoundChip, error::MmlError};
+use crate::{error::MmlError, CompileOptions, OutputFormat, SoundChip};
 
 /// MoonDriver implementation
 pub struct MoonDriver;
@@ -113,31 +113,35 @@ impl ExternalDriver for MoonDriver {
         let content_trimmed = content.trim();
 
         // High confidence: MoonDriver directive
-        if content_trimmed.starts_with("#md") || content_lower.contains("#md")
-        {
+        if content_trimmed.starts_with("#md") || content_lower.contains("#md") {
             return 95;
         }
 
         // High confidence: OPN variant directives
-        if content_lower.contains("#opn2") || content_lower.contains("#opna") || content_lower.contains("#opn3")
+        if content_lower.contains("#opn2")
+            || content_lower.contains("#opna")
+            || content_lower.contains("#opn3")
         {
             return 90;
         }
 
         // High confidence: MoonDriver mention
-        if content_lower.contains("moondriver")
-        {
+        if content_lower.contains("moondriver") {
             return 90;
         }
 
         // Medium confidence: OPN chip mentions
-        if content_lower.contains("opn2") || content_lower.contains("opna") || content_lower.contains("opn3")
+        if content_lower.contains("opn2")
+            || content_lower.contains("opna")
+            || content_lower.contains("opn3")
         {
             return 70;
         }
 
         // Medium confidence: YM chip mentions specific to MoonDriver targets
-        if content_lower.contains("ym2612") || content_lower.contains("ym2608") || content_lower.contains("ym3438")
+        if content_lower.contains("ym2612")
+            || content_lower.contains("ym2608")
+            || content_lower.contains("ym3438")
         {
             return 60;
         }
@@ -145,14 +149,16 @@ impl ExternalDriver for MoonDriver {
         // Low confidence: part commands with MDL-style usage
         if content.contains('@') {
             let at_count = content.matches('@').count();
-            let digit_count = content.chars().filter(|c| c.is_digit(10)).count();
+            let digit_count = content.chars().filter(|c| c.is_ascii_digit()).count();
             if at_count > 0 && digit_count > at_count {
                 return 40;
             }
         }
 
         // Low confidence: common MDL patterns
-        if content_lower.contains("#tempo") || content_lower.contains("#volume") || content_lower.contains("#include")
+        if content_lower.contains("#tempo")
+            || content_lower.contains("#volume")
+            || content_lower.contains("#include")
         {
             return 30;
         }
@@ -216,9 +222,11 @@ impl ExternalDriver for MoonDriver {
         let target_chips = detect_target_chips(content);
 
         // Create compile options
-        let mut compile_options = CompileOptions::default();
-        compile_options.format = output_format;
-        compile_options.target_chips = Some(target_chips);
+        let compile_options = CompileOptions {
+            format: output_format,
+            target_chips: Some(target_chips),
+            ..Default::default()
+        };
 
         let compiler = crate::compiler::compiler::MmlCompiler::new(compile_options);
 
@@ -247,22 +255,22 @@ impl ExternalDriver for MoonDriver {
 /// Detect target chips from MoonDriver content
 fn detect_target_chips(content: &str) -> Vec<SoundChip> {
     let content_lower = content.to_lowercase();
-    
+
     // Check for OPN3 (YM2609 is the closest match for OPN3 in this codebase)
     if content_lower.contains("#opn3") || content_lower.contains("ym3438") {
         return vec![SoundChip::YM2609];
     }
-    
+
     // Check for OPNA (YM2608)
     if content_lower.contains("#opna") || content_lower.contains("ym2608") {
         return vec![SoundChip::YM2608, SoundChip::SN76489];
     }
-    
+
     // Check for OPN2 (YM2612)
     if content_lower.contains("#opn2") || content_lower.contains("ym2612") {
         return vec![SoundChip::YM2612, SoundChip::SN76489];
     }
-    
+
     // Default to OPNA (YM2608) as it's the most common for MoonDriver
     vec![SoundChip::YM2608, SoundChip::SN76489]
 }
@@ -274,10 +282,15 @@ fn detect_target_chips(content: &str) -> Vec<SoundChip> {
 /// Token for MoonDriver syntax highlighting
 #[derive(Debug, Clone)]
 pub struct MoonDriverToken {
+    /// Token type.
     pub token_type: String,
+    /// Value.
     pub value: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
@@ -344,9 +357,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
             // Check for duration number
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -373,9 +386,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -427,7 +440,7 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
@@ -453,9 +466,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 if next_c == '+' || next_c == '-' {
                     value.push(chars.next().unwrap());
                     length += 1;
-                } else if next_c.is_digit(10) {
+                } else if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -482,9 +495,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -511,9 +524,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -550,9 +563,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
             if c == '(' {
                 if let Some(&next_c) = chars.peek() {
-                    if next_c.is_digit(10) {
+                    if next_c.is_ascii_digit() {
                         while let Some(&d) = chars.peek() {
-                            if d.is_digit(10) {
+                            if d.is_ascii_digit() {
                                 value.push(chars.next().unwrap());
                                 length += 1;
                             } else {
@@ -580,7 +593,7 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
@@ -612,11 +625,7 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
         // Octave up/down
         if c == '>' || c == '<' {
-            let token_type = if c == '>' {
-                "octave_up"
-            } else {
-                "octave_down"
-            };
+            let token_type = if c == '>' { "octave_up" } else { "octave_down" };
             tokens.push(create_driver_token(
                 token_type.to_string(),
                 c.to_string(),
@@ -675,10 +684,10 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         }
 
         // Numbers (standalone)
-        if c.is_digit(10) {
+        if c.is_ascii_digit() {
             let mut num_str = c.to_string();
             while let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     num_str.push(chars.next().unwrap());
                 } else {
                     break;
@@ -701,9 +710,9 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -730,13 +739,13 @@ fn moondriver_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c == '+' || next_c == '-' || next_c.is_digit(10) {
+                if next_c == '+' || next_c == '-' || next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
 
                     // Continue reading digits for multi-digit values
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -827,90 +836,153 @@ fn create_driver_token(
 /// Parse error for MoonDriver
 #[derive(Debug, Clone)]
 pub struct MoonDriverParseError {
+    /// Message.
     pub message: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
 /// AST node for MoonDriver
 #[derive(Debug, Clone)]
 pub enum MoonDriverAstNode {
+    /// Note.
     Note {
+        /// Note.
         note: char,
+        /// Sharp.
         sharp: bool,
+        /// Octave.
         octave: Option<u8>,
+        /// Duration.
         duration: Option<u8>,
+        /// Tie.
         tie: bool,
+        /// Dotted.
         dotted: bool,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Rest.
     Rest {
+        /// Duration.
         duration: Option<u8>,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Part.
     Part {
+        /// Part num.
         part_num: u8,
+        /// Commands.
         commands: Vec<MoonDriverAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Part Select.
     PartSelect {
+        /// Part num.
         part_num: u8,
+        /// Line.
         line: usize,
     },
+    /// Octave.
     Octave {
+        /// Octave.
         octave: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume.
     Volume {
+        /// Volume.
         volume: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume Change.
     VolumeChange {
+        /// Delta.
         delta: i8,
+        /// Line.
         line: usize,
     },
+    /// Length.
     Length {
+        /// Length.
         length: u8,
+        /// Line.
         line: usize,
     },
+    /// Tempo.
     Tempo {
+        /// Tempo.
         tempo: u8,
+        /// Line.
         line: usize,
     },
+    /// Instrument.
     Instrument {
+        /// Instrument.
         instrument: u8,
+        /// Line.
         line: usize,
     },
+    /// Loop.
     Loop {
+        /// Count.
         count: Option<u8>,
+        /// Body.
         body: Vec<MoonDriverAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Infinite.
     LoopInfinite {
+        /// Body.
         body: Vec<MoonDriverAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Break.
     LoopBreak {
+        /// Line.
         line: usize,
     },
+    /// Directive.
     Directive {
+        /// Name.
         name: String,
+        /// Value.
         value: Option<String>,
+        /// Line.
         line: usize,
     },
+    /// Comment.
     Comment {
+        /// Text.
         text: String,
+        /// Line.
         line: usize,
     },
+    /// Bar.
     Bar {
+        /// Line.
         line: usize,
     },
 }
 
 /// Parse MoonDriver content into AST
+// `current_part`/`current_length`/`current_volume` track parser state that is not
+// yet consumed by AST construction; retained for upcoming stateful handling.
+#[allow(unused_variables, unused_assignments)]
 fn moondriver_parse(content: &str) -> Result<Vec<MoonDriverAstNode>, Vec<MoonDriverParseError>> {
     let mut errors = Vec::new();
     let mut ast = Vec::new();
@@ -1062,7 +1134,9 @@ fn moondriver_parse(content: &str) -> Result<Vec<MoonDriverAstNode>, Vec<MoonDri
 
             "loop_start" => {
                 // Handle (n or (
-                let count = if token.value.len() > 1 && token.value.chars().nth(1).unwrap().is_digit(10) {
+                let count = if token.value.len() > 1
+                    && token.value.chars().nth(1).unwrap().is_ascii_digit()
+                {
                     let c: u8 = token.value.get(1..).unwrap().parse().unwrap_or(1);
                     Some(c)
                 } else {
@@ -1124,18 +1198,21 @@ fn moondriver_parse(content: &str) -> Result<Vec<MoonDriverAstNode>, Vec<MoonDri
             }
 
             "loop_end" | "loop_end_infinite" => {
-                ast.push(MoonDriverAstNode::LoopBreak {
-                    line: token.line,
-                });
+                ast.push(MoonDriverAstNode::LoopBreak { line: token.line });
             }
 
             "directive" => {
-                let name = token.value.split_whitespace().next().unwrap_or("").to_string();
+                let name = token
+                    .value
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 let value = token.value.get(name.len()..).map(|s| s.trim().to_string());
-                
+
                 // Clean up the name by removing #
                 let clean_name = name.trim_start_matches('#').to_string();
-                
+
                 ast.push(MoonDriverAstNode::Directive {
                     name: clean_name,
                     value,
@@ -1240,7 +1317,7 @@ mod tests {
         let result = MoonDriver.tokenize(content);
         assert!(result.is_ok());
         let tokens = result.unwrap();
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
 
         // Check for part command
         assert!(tokens.iter().any(|t| t.token_type == "part_cmd"));
@@ -1313,7 +1390,9 @@ mod tests {
         let result = moondriver_parse(content);
         assert!(result.is_ok());
         let ast = result.unwrap();
-        assert!(ast.iter().any(|n| matches!(n, MoonDriverAstNode::PartSelect { .. })));
+        assert!(ast
+            .iter()
+            .any(|n| matches!(n, MoonDriverAstNode::PartSelect { .. })));
     }
 
     #[test]

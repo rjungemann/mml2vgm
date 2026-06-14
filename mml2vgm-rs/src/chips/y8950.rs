@@ -10,18 +10,27 @@
 //! - 0xB0-0xB8: Channel Key-on/Block/F-number MSB
 //! - 0xBD: Rhythm mode
 //! - 0xC0-0xC8: Channel feedback/connection
+//!
 //! ADPCM registers: 0x07-0x12
 
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+const FREQ_MULT: [f32; 16] = [
+    0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0,
+];
 
 fn slot_to_ch_op(slot_offset: u8) -> Option<(usize, usize)> {
     let row = (slot_offset / 8) as usize;
     let col = (slot_offset % 8) as usize;
-    if row > 2 || col > 5 { return None; }
-    if col < 3 { Some((row * 3 + col, 0)) } else { Some((row * 3 + col - 3, 1)) }
+    if row > 2 || col > 5 {
+        return None;
+    }
+    if col < 3 {
+        Some((row * 3 + col, 0))
+    } else {
+        Some((row * 3 + col - 3, 1))
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,7 +42,11 @@ struct FmOperator {
 
 impl Default for FmOperator {
     fn default() -> Self {
-        Self { phase_acc: 0.0, total_level: 0, mult: 1 }
+        Self {
+            phase_acc: 0.0,
+            total_level: 0,
+            mult: 1,
+        }
     }
 }
 
@@ -52,8 +65,12 @@ impl Default for FmChannel {
     fn default() -> Self {
         Self {
             operators: [FmOperator::default(); 2],
-            f_num: 0, block: 0, key_on: false, connection: 0,
-            left_enable: true, right_enable: true,
+            f_num: 0,
+            block: 0,
+            key_on: false,
+            connection: 0,
+            left_enable: true,
+            right_enable: true,
         }
     }
 }
@@ -74,10 +91,12 @@ pub struct Y8950 {
 }
 
 impl Y8950 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -102,7 +121,9 @@ impl Y8950 {
 
     fn advance_phases(&mut self, sample_rate: u32) {
         for ch in 0..9 {
-            if !self.channels[ch].key_on { continue; }
+            if !self.channels[ch].key_on {
+                continue;
+            }
             let base_freq = self.channel_freq_hz(ch);
             for op in 0..2 {
                 let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
@@ -116,7 +137,9 @@ impl Y8950 {
     }
 
     fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {
-        if ch >= 9 || !self.channels[ch].key_on { return (0.0, 0.0); }
+        if ch >= 9 || !self.channels[ch].key_on {
+            return (0.0, 0.0);
+        }
         let op0_phase = self.channels[ch].operators[0].phase_acc;
         let op1_phase = self.channels[ch].operators[1].phase_acc;
         let tl0 = 1.0 - self.channels[ch].operators[0].total_level as f32 / 63.0;
@@ -129,8 +152,16 @@ impl Y8950 {
         };
         self.mod_feedback[ch] = mod_out;
         let sample = (output * 0.15).clamp(-1.0, 1.0);
-        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
-        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
+        let left = if self.channels[ch].left_enable {
+            sample
+        } else {
+            0.0
+        };
+        let right = if self.channels[ch].right_enable {
+            sample
+        } else {
+            0.0
+        };
         (left, right)
     }
 
@@ -162,12 +193,23 @@ impl SoundChipEmulator for Y8950 {
 
         match addr {
             // ADPCM control registers
-            0x07 => { self.adpcm_playing = (data & 0x01) != 0; }
+            0x07 => {
+                self.adpcm_playing = (data & 0x01) != 0;
+            }
             0x08 => {} // ADPCM mode
-            0x09 => { self.adpcm_start = (self.adpcm_start & 0xFF00) | data as u32; }
-            0x0A => { self.adpcm_start = (self.adpcm_start & 0x00FF) | ((data as u32) << 8); self.adpcm_address = self.adpcm_start; }
-            0x0B => { self.adpcm_stop = (self.adpcm_stop & 0xFF00) | data as u32; }
-            0x0C => { self.adpcm_stop = (self.adpcm_stop & 0x00FF) | ((data as u32) << 8); }
+            0x09 => {
+                self.adpcm_start = (self.adpcm_start & 0xFF00) | data as u32;
+            }
+            0x0A => {
+                self.adpcm_start = (self.adpcm_start & 0x00FF) | ((data as u32) << 8);
+                self.adpcm_address = self.adpcm_start;
+            }
+            0x0B => {
+                self.adpcm_stop = (self.adpcm_stop & 0xFF00) | data as u32;
+            }
+            0x0C => {
+                self.adpcm_stop = (self.adpcm_stop & 0x00FF) | ((data as u32) << 8);
+            }
 
             // Operator registers (slot-addressed)
             0x20..=0x35 => {
@@ -192,7 +234,8 @@ impl SoundChipEmulator for Y8950 {
                 let prev = self.channels[ch].key_on;
                 self.channels[ch].key_on = (data & 0x20) != 0;
                 self.channels[ch].block = (data >> 2) & 0x07;
-                self.channels[ch].f_num = (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
+                self.channels[ch].f_num =
+                    (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
                 if !prev && self.channels[ch].key_on {
                     self.channels[ch].operators[0].phase_acc = 0.0;
                     self.channels[ch].operators[1].phase_acc = 0.0;
@@ -295,7 +338,10 @@ mod tests {
         chip.write(0xB0, 0x31);
         let mut buffer = [0.0f32; 8];
         chip.generate_samples(&mut buffer, 44100);
-        assert!(buffer.iter().any(|&s| s != 0.0), "active FM channel must produce output");
+        assert!(
+            buffer.iter().any(|&s| s != 0.0),
+            "active FM channel must produce output"
+        );
     }
 
     #[test]

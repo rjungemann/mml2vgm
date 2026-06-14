@@ -18,23 +18,37 @@ pub fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> MmlResult<()
         .map_err(|e| MmlError::Compilation(format!("Cannot create WAV file: {}", e)))?;
     let mut w = BufWriter::new(file);
 
-    w.write_all(b"RIFF").map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&riff_size.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(b"WAVE").map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(b"fmt ").map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&16u32.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&1u16.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&num_channels.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&sample_rate.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&byte_rate.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&block_align.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&bits_per_sample.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(b"data").map_err(|e| MmlError::Compilation(e.to_string()))?;
-    w.write_all(&data_size.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(b"RIFF")
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&riff_size.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(b"WAVE")
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(b"fmt ")
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&16u32.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&1u16.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&num_channels.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&sample_rate.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&byte_rate.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&block_align.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&bits_per_sample.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(b"data")
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
+    w.write_all(&data_size.to_le_bytes())
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
 
     for &s in samples {
         let v = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
-        w.write_all(&v.to_le_bytes()).map_err(|e| MmlError::Compilation(e.to_string()))?;
+        w.write_all(&v.to_le_bytes())
+            .map_err(|e| MmlError::Compilation(e.to_string()))?;
     }
     Ok(())
 }
@@ -44,10 +58,13 @@ pub fn read_wav(path: &Path) -> MmlResult<Vec<f32>> {
     let mut file = File::open(path)
         .map_err(|e| MmlError::Compilation(format!("Cannot open WAV file: {}", e)))?;
     let mut data = Vec::new();
-    file.read_to_end(&mut data).map_err(|e| MmlError::Compilation(e.to_string()))?;
+    file.read_to_end(&mut data)
+        .map_err(|e| MmlError::Compilation(e.to_string()))?;
 
     if data.len() < 44 || &data[0..4] != b"RIFF" || &data[8..12] != b"WAVE" {
-        return Err(MmlError::Compilation("Not a valid RIFF/WAV file".to_string()));
+        return Err(MmlError::Compilation(
+            "Not a valid RIFF/WAV file".to_string(),
+        ));
     }
 
     let mut pos = 12usize;
@@ -55,7 +72,9 @@ pub fn read_wav(path: &Path) -> MmlResult<Vec<f32>> {
     let mut pcm_len = 0usize;
     while pos + 8 <= data.len() {
         let tag = &data[pos..pos + 4];
-        let chunk_size = u32::from_le_bytes([data[pos+4], data[pos+5], data[pos+6], data[pos+7]]) as usize;
+        let chunk_size =
+            u32::from_le_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]])
+                as usize;
         pos += 8;
         if tag == b"data" {
             pcm_start = pos;
@@ -66,7 +85,9 @@ pub fn read_wav(path: &Path) -> MmlResult<Vec<f32>> {
     }
 
     if pcm_len == 0 {
-        return Err(MmlError::Compilation("WAV file has no data chunk".to_string()));
+        return Err(MmlError::Compilation(
+            "WAV file has no data chunk".to_string(),
+        ));
     }
 
     Ok(data[pcm_start..pcm_start + pcm_len]

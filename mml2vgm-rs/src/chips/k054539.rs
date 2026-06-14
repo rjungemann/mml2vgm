@@ -38,6 +38,7 @@ struct K054539Channel {
     position: f32,
 }
 
+/// K054539.
 pub struct K054539 {
     clock_rate: u32,
     channels: [K054539Channel; NUM_CHANNELS],
@@ -46,10 +47,12 @@ pub struct K054539 {
 }
 
 impl K054539 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(18_432_000)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -61,10 +64,8 @@ impl K054539 {
 
     fn update_channel_from_regs(&mut self, ch: usize) {
         let base = ch * 0x20;
-        self.channels[ch].pitch =
-            self.regs[base] as u16 | ((self.regs[base + 1] as u16) << 8);
-        self.channels[ch].start_addr =
-            self.regs[base + 2] as u32
+        self.channels[ch].pitch = self.regs[base] as u16 | ((self.regs[base + 1] as u16) << 8);
+        self.channels[ch].start_addr = self.regs[base + 2] as u32
             | ((self.regs[base + 3] as u32) << 8)
             | ((self.regs[base + 4] as u32) << 16);
         self.channels[ch].volume = self.regs[base + 5];
@@ -72,20 +73,22 @@ impl K054539 {
         let ctrl = self.regs[base + 7];
         self.channels[ch].active = (ctrl & 0x01) != 0;
         self.channels[ch].looping = (ctrl & 0x02) != 0;
-        self.channels[ch].end_addr =
-            self.regs[base + 8] as u32
+        self.channels[ch].end_addr = self.regs[base + 8] as u32
             | ((self.regs[base + 9] as u32) << 8)
             | ((self.regs[base + 10] as u32) << 16);
-        self.channels[ch].loop_addr =
-            self.regs[base + 12] as u32
+        self.channels[ch].loop_addr = self.regs[base + 12] as u32
             | ((self.regs[base + 13] as u32) << 8)
             | ((self.regs[base + 14] as u32) << 16);
     }
 }
 
 impl SoundChipEmulator for K054539 {
-    fn name(&self) -> &'static str { "K054539" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "K054539"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         self.channels = [K054539Channel::default(); NUM_CHANNELS];
@@ -113,7 +116,11 @@ impl SoundChipEmulator for K054539 {
 
     fn read(&self, addr: u8) -> u8 {
         let idx = addr as usize;
-        if idx < 0x100 { self.regs[idx] } else { 0xFF }
+        if idx < 0x100 {
+            self.regs[idx]
+        } else {
+            0xFF
+        }
     }
 
     fn clock(&mut self) {}
@@ -131,7 +138,9 @@ impl SoundChipEmulator for K054539 {
             let mut right = 0.0f32;
 
             for ch in 0..NUM_CHANNELS {
-                if !self.channels[ch].active { continue; }
+                if !self.channels[ch].active {
+                    continue;
+                }
                 let pos = self.channels[ch].position as usize;
                 let end = self.channels[ch].end_addr as usize;
                 if pos >= end.min(self.pcm_memory.len()) {
@@ -164,7 +173,9 @@ impl SoundChipEmulator for K054539 {
 }
 
 impl Default for K054539 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -182,13 +193,13 @@ mod tests {
     fn test_k054539_channels() {
         let mut chip = K054539::new();
         let base = 0x00usize; // channel 0 base
-        // Write pitch
-        chip.write(base as u8, 0x00);       // pitch lo
-        chip.write(base as u8 + 1, 0x01);   // pitch hi → pitch = 0x0100 = 256
-        // Write volume
-        chip.write(base as u8 + 5, 0xFF);   // volume = 255
-        // Write pan
-        chip.write(base as u8 + 6, 0x7F);   // pan center
+                              // Write pitch
+        chip.write(base as u8, 0x00); // pitch lo
+        chip.write(base as u8 + 1, 0x01); // pitch hi → pitch = 0x0100 = 256
+                                          // Write volume
+        chip.write(base as u8 + 5, 0xFF); // volume = 255
+                                          // Write pan
+        chip.write(base as u8 + 6, 0x7F); // pan center
         assert_eq!(chip.channels[0].pitch, 0x0100);
         assert_eq!(chip.channels[0].volume, 0xFF);
         assert_eq!(chip.channels[0].pan, 0x7F);
@@ -209,16 +220,22 @@ mod tests {
         assert!(chip.is_initialized());
         assert_eq!(chip.read(0x05), 0x00);
         chip.clock(); // must not panic
-        // Load PCM with wrong block type — must not overwrite
+                      // Load PCM with wrong block type — must not overwrite
         let ones = vec![0xFFu8; 16];
         chip.load_pcm_data(0x00, &ones);
-        assert_eq!(chip.pcm_memory[0], 0x00, "wrong block type must not overwrite PCM memory");
+        assert_eq!(
+            chip.pcm_memory[0], 0x00,
+            "wrong block type must not overwrite PCM memory"
+        );
         // Load PCM with correct block type
         chip.load_pcm_data(0x12, &ones);
         assert_eq!(chip.pcm_memory[0], 0xFF);
         // Generate silence when no channels active
         let mut buf = [0.0f32; 8];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().all(|&s| s == 0.0), "no active channels should produce silence");
+        assert!(
+            buf.iter().all(|&s| s == 0.0),
+            "no active channels should produce silence"
+        );
     }
 }

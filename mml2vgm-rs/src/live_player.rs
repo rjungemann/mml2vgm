@@ -52,7 +52,12 @@ pub fn parse_instruments(source: &str) -> Vec<FmInstrumentDef> {
 
         // New FM instrument declaration: '@ M NNN or '@ F NNN
         if rest.starts_with('M') || rest.starts_with('F') {
-            flush_instrument(&mut instruments, &mut current_num, &mut op_params, &mut alg_fb);
+            flush_instrument(
+                &mut instruments,
+                &mut current_num,
+                &mut op_params,
+                &mut alg_fb,
+            );
             let num_str = rest.split_whitespace().nth(1).unwrap_or("0");
             let num = num_str.parse::<u8>().unwrap_or(0);
             current_num = Some(num);
@@ -63,7 +68,12 @@ pub fn parse_instruments(source: &str) -> Vec<FmInstrumentDef> {
 
         // PCM or other non-FM types — stop accumulating
         if rest.starts_with('P') || rest.starts_with('S') || rest.starts_with('D') {
-            flush_instrument(&mut instruments, &mut current_num, &mut op_params, &mut alg_fb);
+            flush_instrument(
+                &mut instruments,
+                &mut current_num,
+                &mut op_params,
+                &mut alg_fb,
+            );
             current_num = None;
             continue;
         }
@@ -85,13 +95,23 @@ pub fn parse_instruments(source: &str) -> Vec<FmInstrumentDef> {
             } else if values.len() == 2 {
                 // Alg/FB row — complete the instrument
                 alg_fb = Some((values[0], values[1]));
-                flush_instrument(&mut instruments, &mut current_num, &mut op_params, &mut alg_fb);
+                flush_instrument(
+                    &mut instruments,
+                    &mut current_num,
+                    &mut op_params,
+                    &mut alg_fb,
+                );
             }
         }
     }
 
     // Flush any trailing instrument
-    flush_instrument(&mut instruments, &mut current_num, &mut op_params, &mut alg_fb);
+    flush_instrument(
+        &mut instruments,
+        &mut current_num,
+        &mut op_params,
+        &mut alg_fb,
+    );
     instruments
 }
 
@@ -109,7 +129,10 @@ fn flush_instrument(
             }
             params.push(alg);
             params.push(fb);
-            instruments.push(FmInstrumentDef { number: num, params });
+            instruments.push(FmInstrumentDef {
+                number: num,
+                params,
+            });
         }
     }
     *current_num = None;
@@ -232,7 +255,10 @@ impl ChipKind {
     fn matches_sound_chip(self, sc: &SoundChip) -> bool {
         match self {
             ChipKind::YM2612 | ChipKind::Other => {
-                matches!(sc, SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2)
+                matches!(
+                    sc,
+                    SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2
+                )
             }
             ChipKind::SN76489 => {
                 matches!(sc, SoundChip::SN76489 | SoundChip::SN76489X2)
@@ -266,8 +292,7 @@ struct LiveChannelState {
 /// `FNUM_YM2612.txt`).
 pub fn midi_to_ym2612_freq(midi_note: u8) -> (u8, u16) {
     const FNUM_TABLE: [u16; 12] = [
-        0x283, 0x2A8, 0x2D2, 0x2FD, 0x32A, 0x35B,
-        0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4BF,
+        0x283, 0x2A8, 0x2D2, 0x2FD, 0x32A, 0x35B, 0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4BF,
     ];
     let note_index = (midi_note % 12) as usize;
     let octave = (midi_note / 12) as i32 - 1;
@@ -296,8 +321,8 @@ fn write_ym2612_op_params(chip: &mut dyn SoundChipEmulator, port: u8, ch: u8, pa
 
     // MML operator order → hardware operator offset (matches VGM generator's mml_to_hw swap)
     let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
-    for op_idx in 0..4usize {
-        let op_off = ch + mml_to_hw[op_idx] * 4;
+    for (op_idx, &hw) in mml_to_hw.iter().enumerate() {
+        let op_off = ch + hw * 4;
         let b = op_idx * op_stride;
         if params.len() > b + 8 {
             // Layout: [AR, DR, SR, RR, SL, TL, KS, ML, DT, AM?, SSG-EG?]
@@ -311,8 +336,16 @@ fn write_ym2612_op_params(chip: &mut dyn SoundChipEmulator, port: u8, ch: u8, pa
             let ks = params[b + 6] as u8;
             let ml = params[b + 7] as u8;
             let dt = params[b + 8] as u8;
-            let am = if op_stride >= 11 { params.get(b + 9).copied().unwrap_or(0) as u8 } else { 0 };
-            let ssg = if op_stride >= 11 { params.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+            let am = if op_stride >= 11 {
+                params.get(b + 9).copied().unwrap_or(0) as u8
+            } else {
+                0
+            };
+            let ssg = if op_stride >= 11 {
+                params.get(b + 10).copied().unwrap_or(0) as u8
+            } else {
+                0
+            };
 
             chip.write_port(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF));
             chip.write_port(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F));
@@ -351,7 +384,7 @@ fn write_ym2612_tl(
     for mml_op in 0..4usize {
         let hw_op = mml_to_hw[mml_op];
         let op_off = ch as usize + hw_op * 4;
-        let voice_tl = params.get(mml_op * op_stride + 5).copied().unwrap_or(0) as u32;
+        let voice_tl = params.get(mml_op * op_stride + 5).copied().unwrap_or(0);
         let tl = if carrier[mml_op] {
             (voice_tl + (127 - vol)).min(127) as u8
         } else {
@@ -371,6 +404,7 @@ fn write_ym2612_tl(
 pub struct LivePlayer {
     chips: Vec<(SoundChip, Box<dyn SoundChipEmulator>)>,
     channel_states: Vec<LiveChannelState>,
+    #[allow(dead_code)]
     sample_rate: u32,
 }
 
@@ -408,7 +442,10 @@ impl LivePlayer {
                 continue;
             }
             let letter = id.chars().next().unwrap();
-            let chip_name = chip_map.get(&letter).map(|s| s.as_str()).unwrap_or("YM2612");
+            let chip_name = chip_map
+                .get(&letter)
+                .map(|s| s.as_str())
+                .unwrap_or("YM2612");
             let chip_kind = ChipKind::from_name(chip_name);
 
             let state = match chip_kind {
@@ -479,7 +516,11 @@ impl LivePlayer {
             chips.push((SoundChip::SN76489, sn76489));
         }
 
-        Ok(Self { chips, channel_states, sample_rate })
+        Ok(Self {
+            chips,
+            channel_states,
+            sample_rate,
+        })
     }
 
     /// Trigger note-on for the named channel (e.g. `"A1"`, `"B2"`).
@@ -526,7 +567,7 @@ impl LivePlayer {
 
                 // Key-off the previous note if still sounding
                 if had_note {
-                    let key_byte = 0x00u8 | ((port & 0x1) << 2) | (hw_ch & 0x3);
+                    let key_byte = ((port & 0x1) << 2) | (hw_ch & 0x3);
                     chip.write_port(0, 0x28, key_byte);
                 }
 
@@ -585,7 +626,7 @@ impl LivePlayer {
         match chip_kind {
             ChipKind::YM2612 | ChipKind::Other => {
                 let chip = &mut *self.chips[chip_idx].1;
-                let key_byte = 0x00u8 | ((port & 0x1) << 2) | (hw_ch & 0x3);
+                let key_byte = ((port & 0x1) << 2) | (hw_ch & 0x3);
                 chip.write_port(0, 0x28, key_byte);
             }
             ChipKind::SN76489 => {

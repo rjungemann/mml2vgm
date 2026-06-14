@@ -1,25 +1,32 @@
-/// MIDI Controller Mapping for Chip-Specific Parameters
-///
-/// This module maps chip-specific MML commands to MIDI CC messages,
-/// enabling real-time control of synthesizer parameters from MIDI controllers.
-
-use crate::SoundChip;
-
 /// MIDI Controller numbers (CC)
 pub mod midi_cc {
-    pub const MOD_WHEEL: u8 = 1;           // Modulation Wheel
-    pub const BREATH: u8 = 2;               // Breath Controller
-    pub const FOOT_PEDAL: u8 = 4;           // Foot Pedal
-    pub const PORTAMENTO_TIME: u8 = 5;      // Portamento Time
-    pub const VOLUME: u8 = 7;               // Main Volume
-    pub const BALANCE: u8 = 8;              // Balance
-    pub const PAN: u8 = 10;                 // Pan
-    pub const EXPRESSION: u8 = 11;          // Expression Controller
-    pub const EFFECT_CONTROL_1: u8 = 12;    // Effect Control 1
-    pub const EFFECT_CONTROL_2: u8 = 13;    // Effect Control 2
+    /// MOD WHEEL.
+    pub const MOD_WHEEL: u8 = 1; // Modulation Wheel
+    /// BREATH.
+    pub const BREATH: u8 = 2; // Breath Controller
+    /// FOOT PEDAL.
+    pub const FOOT_PEDAL: u8 = 4; // Foot Pedal
+    /// PORTAMENTO TIME.
+    pub const PORTAMENTO_TIME: u8 = 5; // Portamento Time
+    /// VOLUME.
+    pub const VOLUME: u8 = 7; // Main Volume
+    /// BALANCE.
+    pub const BALANCE: u8 = 8; // Balance
+    /// PAN.
+    pub const PAN: u8 = 10; // Pan
+    /// EXPRESSION.
+    pub const EXPRESSION: u8 = 11; // Expression Controller
+    /// EFFECT CONTROL 1.
+    pub const EFFECT_CONTROL_1: u8 = 12; // Effect Control 1
+    /// EFFECT CONTROL 2.
+    pub const EFFECT_CONTROL_2: u8 = 13; // Effect Control 2
+    /// GENERAL PURPOSE SLIDER 1.
     pub const GENERAL_PURPOSE_SLIDER_1: u8 = 16; // General Purpose Slider 1
+    /// GENERAL PURPOSE SLIDER 2.
     pub const GENERAL_PURPOSE_SLIDER_2: u8 = 17; // General Purpose Slider 2
+    /// GENERAL PURPOSE SLIDER 3.
     pub const GENERAL_PURPOSE_SLIDER_3: u8 = 18; // General Purpose Slider 3
+    /// GENERAL PURPOSE SLIDER 4.
     pub const GENERAL_PURPOSE_SLIDER_4: u8 = 19; // General Purpose Slider 4
 }
 
@@ -40,11 +47,17 @@ pub struct ChipCCMapping {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// Mod Wheel Target.
 pub enum ModWheelTarget {
+    /// Vibrato.
     Vibrato,
+    /// Tremolo.
     Tremolo,
+    /// Brightness.
     Brightness,
+    /// Filter Cutoff.
     FilterCutoff,
+    /// None.
     None,
 }
 
@@ -240,10 +253,15 @@ impl ChipCCMapping {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// Midi Feature.
 pub enum MidiFeature {
+    /// Aftertouch.
     Aftertouch,
+    /// Poly Aftertouch.
     PolyAftertouch,
+    /// Pitch Bend.
     PitchBend,
+    /// Modulation Wheel.
     ModulationWheel,
 }
 
@@ -263,18 +281,17 @@ pub fn map_channel_aftertouch(chip: &str, aftertouch_value: u8) -> Vec<(u8, u8)>
 pub fn map_pitch_bend(chip: &str, bend_value: u16) -> Option<(u8, u8)> {
     // MIDI pitch bend is 14-bit (0x0000 = -2 semitones, 0x2000 = center, 0x3FFF = +2 semitones)
     // Calculate the amount of bend in cents (0-200 cents = 0-2 semitones by default)
-    
+
     let center = 0x2000u16;
-    let cents = if bend_value > center {
+    let _cents = if bend_value > center {
         ((bend_value - center) as u32 * 200) / (0x2000u32)
     } else {
         -((center - bend_value) as i32 * 200 / 0x2000) as u32
     };
-    
-    match chip.to_uppercase().as_str() {
-        // Return (register, value) for chip-specific pitch bend implementation
-        _ => None,
-    }
+
+    // Per-chip pitch bend register mapping is not yet implemented.
+    let _ = chip;
+    None
 }
 
 #[cfg(test)]

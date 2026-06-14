@@ -4,7 +4,7 @@
 //! Supports Windows, macOS, and Linux with various audio APIs.
 
 use super::backend::AudioBackend;
-use crate::{MmlError, MmlResult};
+use crate::MmlResult;
 
 /// CPAL audio backend for cross-platform playback
 ///

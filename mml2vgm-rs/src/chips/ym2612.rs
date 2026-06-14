@@ -93,10 +93,15 @@ impl Default for FmOperator {
 /// Envelope generator state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnvelopeState {
+    /// Off.
     Off,
+    /// Attack.
     Attack,
+    /// Decay.
     Decay,
+    /// Sustain.
     Sustain,
+    /// Release.
     Release,
 }
 
@@ -126,6 +131,7 @@ pub struct FmChannel {
     /// feedback path). Stored on the channel rather than the operator so it
     /// only exists where it's used.
     pub op0_fb_prev: f32,
+    /// Op0 fb prev2.
     pub op0_fb_prev2: f32,
 }
 
@@ -148,7 +154,7 @@ impl Default for FmChannel {
 }
 
 /// LFO (Low Frequency Oscillator) state
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Lfo {
     /// LFO enable
     pub enabled: bool,
@@ -166,22 +172,8 @@ pub struct Lfo {
     pub waveform: u8,
 }
 
-impl Default for Lfo {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            frequency: 0,
-            phase: 0,
-            phase_increment: 0,
-            am_depth: 0,
-            pm_depth: 0,
-            waveform: 0,
-        }
-    }
-}
-
 /// Timer state
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Timer {
     /// Timer enable
     pub enabled: bool,
@@ -193,46 +185,38 @@ pub struct Timer {
     pub expired: bool,
 }
 
-impl Default for Timer {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            value: 0,
-            preset: 0,
-            expired: false,
-        }
-    }
-}
-
 /// YM2612 chip emulator
 pub struct YM2612 {
     /// Master clock rate in Hz (NTSC: 7,670,453 Hz)
     clock_rate: u32,
-    
+
     /// Sample rate for output
     sample_rate: u32,
-    
+
     /// Clock divider for sample rate conversion
     clock_divider: f64,
-    
+
     /// Accumulated clock cycles
     accumulated_cycles: f64,
-    
+
     /// All 6 FM channels
     pub channels: [FmChannel; 6],
-    
+
     /// LFO
     pub lfo: Lfo,
-    
+
     /// Timers
     pub timer_a: Timer,
+    /// Timer b.
     pub timer_b: Timer,
-    
+
     /// Register cache (0x00-0xFF)
     regs: [u8; 0x100],
-    
+
     /// DAC state (not fully implemented)
+    #[allow(dead_code)]
     dac_enabled: bool,
+    #[allow(dead_code)]
     dac_sample: u8,
 }
 
@@ -379,7 +363,7 @@ impl YM2612 {
                 let op3 = Self::op_sample(&channel.operators[3], 0.0);
                 op1 + op2 + op3
             }
-            7 | _ => {
+            _ => {
                 // All four operators parallel carriers; output = sum
                 let op1 = Self::op_sample(&channel.operators[1], 0.0);
                 let op2 = Self::op_sample(&channel.operators[2], 0.0);
@@ -415,11 +399,13 @@ impl YM2612 {
     }
 
     /// Update operator phase accumulator (add phase_increment per clock cycle)
+    #[allow(dead_code)]
     fn update_operator_phase(&mut self, op: &mut FmOperator) {
         op.phase = op.phase.wrapping_add(op.phase_increment);
     }
 
     /// Update envelope generator for an operator
+    #[allow(dead_code)]
     fn update_envelope(&mut self, op: &mut FmOperator) {
         match op.envelope_state {
             EnvelopeState::Off => {
@@ -496,10 +482,10 @@ impl YM2612 {
         // Parse the address
         // The YM2612 has two address spaces (part I and part II)
         // Part I: 0x00-0x7F, Part II: 0x80-0xFF
-        let part = ((addr >> 7) & 0x01) as usize;
+        let _part = ((addr >> 7) & 0x01) as usize;
 
         // Handle register writes by full address to avoid conflicts
-        match addr & 0xFF {
+        match addr {
             // === Part I Registers (0x00-0x7F) ===
 
             // LFO control
@@ -541,19 +527,21 @@ impl YM2612 {
             0x20 | 0xA0 => {
                 self.channels[0].frequency = (self.channels[0].frequency & 0xFF00) | (data as u16);
             }
-            0x21 | 0xA1 => {
+            // Low-byte literals 0x21-0x26 are decoded as LFO/timer registers above,
+            // so only the 0xA1-0xA6 frequency addresses reach here.
+            0xA1 => {
                 self.channels[1].frequency = (self.channels[1].frequency & 0xFF00) | (data as u16);
             }
-            0x22 | 0xA2 => {
+            0xA2 => {
                 self.channels[2].frequency = (self.channels[2].frequency & 0xFF00) | (data as u16);
             }
-            0x24 | 0xA4 => {
+            0xA4 => {
                 self.channels[3].frequency = (self.channels[3].frequency & 0xFF00) | (data as u16);
             }
-            0x25 | 0xA5 => {
+            0xA5 => {
                 self.channels[4].frequency = (self.channels[4].frequency & 0xFF00) | (data as u16);
             }
-            0x26 | 0xA6 => {
+            0xA6 => {
                 self.channels[5].frequency = (self.channels[5].frequency & 0xFF00) | (data as u16);
             }
 
@@ -561,27 +549,33 @@ impl YM2612 {
             // These are the registers that conflicted with key on/off
             // Registers 0xA8-0xAA (channels 0-2) and 0xAC-0xAE (channels 3-5)
             0xA8 => {
-                self.channels[0].frequency = (self.channels[0].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[0].frequency =
+                    (self.channels[0].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[0].octave = (data >> 2) & 0x07;
             }
             0xA9 => {
-                self.channels[1].frequency = (self.channels[1].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[1].frequency =
+                    (self.channels[1].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[1].octave = (data >> 2) & 0x07;
             }
             0xAA => {
-                self.channels[2].frequency = (self.channels[2].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[2].frequency =
+                    (self.channels[2].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[2].octave = (data >> 2) & 0x07;
             }
             0xAC => {
-                self.channels[3].frequency = (self.channels[3].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[3].frequency =
+                    (self.channels[3].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[3].octave = (data >> 2) & 0x07;
             }
             0xAD => {
-                self.channels[4].frequency = (self.channels[4].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[4].frequency =
+                    (self.channels[4].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[4].octave = (data >> 2) & 0x07;
             }
             0xAE => {
-                self.channels[5].frequency = (self.channels[5].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
+                self.channels[5].frequency =
+                    (self.channels[5].frequency & 0x00FF) | ((data as u16 & 0x03) << 8);
                 self.channels[5].octave = (data >> 2) & 0x07;
             }
 
@@ -666,7 +660,8 @@ impl SoundChipEmulator for YM2612 {
             0xA0..=0xA2 => {
                 let ch = ch_base + (addr - 0xA0) as usize;
                 if ch < 6 {
-                    self.channels[ch].frequency = (self.channels[ch].frequency & 0xFF00) | (data as u16);
+                    self.channels[ch].frequency =
+                        (self.channels[ch].frequency & 0xFF00) | (data as u16);
                 }
             }
             // Block + F-Num MSB: 0xA4+n → channel n within this port
@@ -677,7 +672,8 @@ impl SoundChipEmulator for YM2612 {
                 if ch < 6 {
                     self.channels[ch].octave = (data >> 3) & 0x07;
                     let f_high = (data & 0x07) as u16;
-                    self.channels[ch].frequency = (f_high << 8) | (self.channels[ch].frequency & 0xFF);
+                    self.channels[ch].frequency =
+                        (f_high << 8) | (self.channels[ch].frequency & 0xFF);
                 }
             }
             // Algorithm/Feedback: 0xB0+n → channel n within this port
@@ -703,7 +699,7 @@ impl SoundChipEmulator for YM2612 {
         }
     }
 
-    fn read(&self, addr: u8) -> u8 {
+    fn read(&self, _addr: u8) -> u8 {
         // YM2612 status register (0x00-0x03 are status)
         // For now, return 0
         0
@@ -729,7 +725,11 @@ impl SoundChipEmulator for YM2612 {
                 0
             };
             for op in &mut channel.operators {
-                let ml: u64 = if op.multiple == 0 { 1 } else { op.multiple as u64 * 2 };
+                let ml: u64 = if op.multiple == 0 {
+                    1
+                } else {
+                    op.multiple as u64 * 2
+                };
                 op.phase_increment = ((base_inc * ml) / 2) as u32;
             }
 
@@ -747,7 +747,7 @@ impl SoundChipEmulator for YM2612 {
             for op in &mut channel.operators {
                 // Update phase accumulator
                 op.phase = op.phase.wrapping_add(op.phase_increment);
-                
+
                 // Update envelope
                 match op.envelope_state {
                     EnvelopeState::Off => {
@@ -894,11 +894,14 @@ mod tests {
         chip.write_port(0, 0xA4, 0x22); // block=4, f_high=2
         chip.write_port(0, 0xA0, 0x83); // f_low=0x83
         chip.write_port(0, 0xB4, 0xC0); // stereo enable
-        chip.write_reg(0x28, 0xF0);     // key-on ch0, all operators
-        // Generate enough samples for envelope attack to complete
+        chip.write_reg(0x28, 0xF0); // key-on ch0, all operators
+                                    // Generate enough samples for envelope attack to complete
         let mut buffer = vec![0.0f32; 44100 * 2]; // 1 second stereo
         chip.generate_samples(&mut buffer, 44100);
         let any_nonzero = buffer.iter().any(|&s| s != 0.0);
-        assert!(any_nonzero, "YM2612 should produce non-zero output after key-on");
+        assert!(
+            any_nonzero,
+            "YM2612 should produce non-zero output after key-on"
+        );
     }
 }

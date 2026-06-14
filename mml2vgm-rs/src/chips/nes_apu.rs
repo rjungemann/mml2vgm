@@ -56,6 +56,7 @@ struct NoiseChannel {
     phase_acc: f32,
 }
 
+/// Nes Apu.
 pub struct NesApu {
     clock_rate: u32,
     pulse: [PulseChannel; 2],
@@ -65,16 +66,21 @@ pub struct NesApu {
 }
 
 impl NesApu {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(1_789_772)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         let mut apu = Self {
             clock_rate,
             pulse: [PulseChannel::default(); 2],
             triangle: TriangleChannel::default(),
-            noise: NoiseChannel { lfsr: 1, ..Default::default() },
+            noise: NoiseChannel {
+                lfsr: 1,
+                ..Default::default()
+            },
             regs: [0u8; 0x18],
         };
         // Default noise LFSR seed
@@ -84,7 +90,9 @@ impl NesApu {
 
     fn apply_reg(&mut self, addr: u8, data: u8) {
         let addr = addr as usize;
-        if addr < 0x18 { self.regs[addr] = data; }
+        if addr < 0x18 {
+            self.regs[addr] = data;
+        }
         match addr {
             // Pulse 1
             0x00 => {
@@ -94,8 +102,7 @@ impl NesApu {
                 self.pulse[0].volume = data & 0x0F;
             }
             0x02 => {
-                self.pulse[0].period =
-                    (self.pulse[0].period & 0x0700) | data as u16;
+                self.pulse[0].period = (self.pulse[0].period & 0x0700) | data as u16;
             }
             0x03 => {
                 self.pulse[0].period =
@@ -110,8 +117,7 @@ impl NesApu {
                 self.pulse[1].volume = data & 0x0F;
             }
             0x06 => {
-                self.pulse[1].period =
-                    (self.pulse[1].period & 0x0700) | data as u16;
+                self.pulse[1].period = (self.pulse[1].period & 0x0700) | data as u16;
             }
             0x07 => {
                 self.pulse[1].period =
@@ -120,8 +126,7 @@ impl NesApu {
             }
             // Triangle
             0x0A => {
-                self.triangle.period =
-                    (self.triangle.period & 0x0700) | data as u16;
+                self.triangle.period = (self.triangle.period & 0x0700) | data as u16;
             }
             0x0B => {
                 self.triangle.period =
@@ -177,15 +182,17 @@ impl NesApu {
 
 // 32-step triangle sequence used by the NES APU
 const TRIANGLE_SEQ: [f32; 32] = [
-    15.0, 14.0, 13.0, 12.0, 11.0, 10.0,  9.0,  8.0,
-     7.0,  6.0,  5.0,  4.0,  3.0,  2.0,  1.0,  0.0,
-     0.0,  1.0,  2.0,  3.0,  4.0,  5.0,  6.0,  7.0,
-     8.0,  9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+    15.0, 14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0, 0.0, 1.0,
+    2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
 ];
 
 impl SoundChipEmulator for NesApu {
-    fn name(&self) -> &'static str { "NES APU" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "NES APU"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -197,7 +204,11 @@ impl SoundChipEmulator for NesApu {
 
     fn read(&self, addr: u8) -> u8 {
         let a = addr as usize;
-        if a < 0x18 { self.regs[a] } else { 0xFF }
+        if a < 0x18 {
+            self.regs[a]
+        } else {
+            0xFF
+        }
     }
 
     fn clock(&mut self) {}
@@ -208,7 +219,9 @@ impl SoundChipEmulator for NesApu {
 
             // Pulse channels
             for ch in 0..2 {
-                if !self.pulse[ch].enabled { continue; }
+                if !self.pulse[ch].enabled {
+                    continue;
+                }
                 let freq = self.pulse_freq_hz(ch);
                 let phase_inc = freq / sample_rate as f32;
                 self.pulse[ch].phase_acc += phase_inc;
@@ -246,8 +259,12 @@ impl SoundChipEmulator for NesApu {
                     let feedback = (self.noise.lfsr ^ (self.noise.lfsr >> tap)) & 1;
                     self.noise.lfsr = (self.noise.lfsr >> 1) | (feedback << 14);
                 }
-                let noise_out = if (self.noise.lfsr & 1) == 0 { 1.0f32 } else { -1.0 };
-                let vol = if self.noise.env_disable { self.noise.volume as f32 / 15.0 } else { self.noise.volume as f32 / 15.0 };
+                let noise_out = if (self.noise.lfsr & 1) == 0 {
+                    1.0f32
+                } else {
+                    -1.0
+                };
+                let vol = self.noise.volume as f32 / 15.0;
                 out += noise_out * vol * 0.12;
             }
 
@@ -261,7 +278,9 @@ impl SoundChipEmulator for NesApu {
 }
 
 impl Default for NesApu {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -299,7 +318,10 @@ mod tests {
         chip.write(0x15, 0x01); // enable pulse 1
         let mut buf = [0.0f32; 16];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active pulse channel must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active pulse channel must produce output"
+        );
     }
 
     #[test]
@@ -310,7 +332,10 @@ mod tests {
         chip.write(0x15, 0x08); // enable noise
         let mut buf = [0.0f32; 16];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active noise channel must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active noise channel must produce output"
+        );
     }
 
     #[test]

@@ -2,104 +2,137 @@
 //!
 //! This module generates VGM (Video Game Music) format files from MML AST.
 
-use super::{CodeGenerator, OutputFormat, VgmHeader, NoteEvent, SourceMap};
+use super::{CodeGenerator, NoteEvent, OutputFormat, SourceMap, VgmHeader};
 use crate::compiler::ast::{MmlAst, MmlNode, OctaveShift, OpxInstrument};
 use crate::compiler::sample_resolver::SampleResolver;
-use crate::{CompileOptions, MmlError, MmlResult, SoundChip};
+use crate::{CompileOptions, MmlResult, SoundChip};
 use std::collections::{BTreeSet, HashMap};
 
 /// VGM command types (values match the VGM specification)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum VgmCommandType {
+    /// Sn76489 Write.
     Sn76489Write = 0x50,
+    /// Ym2413 Write.
     Ym2413Write = 0x51,
+    /// Ym2612 Write Port0.
     Ym2612WritePort0 = 0x52,
+    /// Ym2612 Write Port1.
     Ym2612WritePort1 = 0x53,
+    /// Ym2151 Write.
     Ym2151Write = 0x54,
+    /// Ym2203 Write.
     Ym2203Write = 0x55,
+    /// Ym2608 Write Port0.
     Ym2608WritePort0 = 0x56,
+    /// Ym2608 Write Port1.
     Ym2608WritePort1 = 0x57,
+    /// Ym2610 Write Port0.
     Ym2610WritePort0 = 0x58,
+    /// Ym2610 Write Port1.
     Ym2610WritePort1 = 0x59,
+    /// Ym3812 Write.
     Ym3812Write = 0x5A,
+    /// Ym3526 Write.
     Ym3526Write = 0x5B,
+    /// Y8950 Write.
     Y8950Write = 0x5C,
+    /// Ymf262 Write Port0.
     Ymf262WritePort0 = 0x5E,
+    /// Ymf262 Write Port1.
     Ymf262WritePort1 = 0x5F,
     // PCM chips
+    /// Rf5c164 Reg Write.
     Rf5c164RegWrite = 0xB1,
+    /// C140 Reg Write.
     C140RegWrite = 0xD4,
+    /// C352 Reg Write.
     C352RegWrite = 0xE1,
     // PSG/Arcade chips
+    /// Ay8910 Write.
     Ay8910Write = 0xA0,
+    /// Sega Pcm Mem Write.
     SegaPcmMemWrite = 0xC0,
     // Console chips
+    /// Dmg Write.
     DmgWrite = 0xB3,
+    /// Nes Apu Write.
     NesApuWrite = 0xB4,
+    /// Vrc6 Write.
     Vrc6Write = 0xB6,
+    /// Hu C6280 Write.
     HuC6280Write = 0xB9,
+    /// K053260 Write.
     K053260Write = 0xBA,
+    /// Pokey Write.
     PokeyWrite = 0xBB,
+    /// Q Sound Write.
     QSoundWrite = 0xC4,
+    /// Ymf271 Write.
     Ymf271Write = 0xD1,
+    /// K051649 Write.
     K051649Write = 0xD2,
+    /// K054539 Write.
     K054539Write = 0xD3,
     // Timing/control
+    /// Wait.
     Wait = 0x61,
+    /// Wait1.
     Wait1 = 0x62,
+    /// Wait2.
     Wait2 = 0x63,
+    /// End.
     End = 0x66,
+    /// Data Block.
     DataBlock = 0x67,
 }
 
 /// A single VGM command
 #[derive(Debug, Clone)]
 pub struct VgmCommand {
+    /// Command type.
     pub command_type: VgmCommandType,
+    /// Data.
     pub data: Vec<u8>,
+    /// Time.
     pub time: u64,
 }
 
 /// PCM data for embedding in VGM
 #[derive(Debug, Clone)]
 pub struct PcmData {
+    /// Data.
     pub data: Vec<u8>,
+    /// Start offset.
     pub start_offset: u32,
 }
 
 /// GD3 tag for metadata
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Gd3Tag {
+    /// Track name en.
     pub track_name_en: String,
+    /// Track name jp.
     pub track_name_jp: String,
+    /// Game name en.
     pub game_name_en: String,
+    /// Game name jp.
     pub game_name_jp: String,
+    /// System name en.
     pub system_name_en: String,
+    /// System name jp.
     pub system_name_jp: String,
+    /// Author en.
     pub author_en: String,
+    /// Author jp.
     pub author_jp: String,
+    /// Release date.
     pub release_date: String,
+    /// Converter.
     pub converter: String,
+    /// Notes.
     pub notes: String,
-}
-
-impl Default for Gd3Tag {
-    fn default() -> Self {
-        Self {
-            track_name_en: String::new(),
-            track_name_jp: String::new(),
-            game_name_en: String::new(),
-            game_name_jp: String::new(),
-            system_name_en: String::new(),
-            system_name_jp: String::new(),
-            author_en: String::new(),
-            author_jp: String::new(),
-            release_date: String::new(),
-            converter: String::new(),
-            notes: String::new(),
-        }
-    }
 }
 
 /// Per-part state during VGM code generation
@@ -316,7 +349,9 @@ impl VgmGenerator {
 
         // Store FM instrument parameters from the AST
         for (num, inst) in &ast.fm_instruments {
-            generator.fm_instruments.insert(*num, inst.parameters.clone());
+            generator
+                .fm_instruments
+                .insert(*num, inst.parameters.clone());
         }
         // Store OPX instrument definitions
         for (num, inst) in &ast.opx_instruments {
@@ -418,7 +453,7 @@ impl VgmGenerator {
         }
 
         // Also check for metadata keys like PartK051649, PartNES, PartDMG, and all 21 partial chips
-        for (key, _) in &ast.metadata {
+        for key in ast.metadata.keys() {
             let chip = match key.to_uppercase().as_str() {
                 "PARTK051649" | "PARTSCC" | "PARTSCC1" => SoundChip::K051649,
                 "PARTNES" | "PARTNESAPU" | "PART2A03" => SoundChip::NES,
@@ -584,8 +619,12 @@ impl VgmGenerator {
             if let Ok(clock_val) = clock_str.parse::<u32>() {
                 if self.chips.len() == 1 {
                     match self.chips[0] {
-                        SoundChip::SN76489 | SoundChip::SN76489X2 => self.header.sn76489_clock = clock_val,
-                        SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2 => self.header.ym2612_clock = clock_val,
+                        SoundChip::SN76489 | SoundChip::SN76489X2 => {
+                            self.header.sn76489_clock = clock_val
+                        }
+                        SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2 => {
+                            self.header.ym2612_clock = clock_val
+                        }
                         SoundChip::YM2151 => self.header.ym2151_clock = clock_val,
                         SoundChip::YM2413 => self.header.ym2413_clock = clock_val,
                         SoundChip::YM2608 => self.header.ym2608_clock = clock_val,
@@ -653,7 +692,8 @@ impl VgmGenerator {
 
         // Build effective chip map from metadata + explicit part annotations.
         // Priority: explicit part.chip > PartYM2612/PartSN76489 metadata > global CHIP directive > ForcedMonoPartYM2612 > default YM2612.
-        let mut effective_chip_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut effective_chip_map: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         // Explicit part chips
         for name in &part_names {
             if let Some(chip) = ast.parts[name].chip.as_deref() {
@@ -662,31 +702,57 @@ impl VgmGenerator {
         }
         // PartYM2612 = A, PartSN76489 = B, PartYM2151 = F, etc.
         for (key, value) in &ast.metadata {
-            let chip_name = if key.starts_with("PartYM2612") { "YM2612" }
-                else if key.starts_with("PartSN76489") { "SN76489" }
-                else if key.starts_with("PartYM2151") { "YM2151" }
-                else if key.starts_with("PartYM2608") { "YM2608" }
-                else if key.starts_with("PartYM2203") { "YM2203" }
-                else if key.starts_with("PartYM2413") { "YM2413" }
-                else if key.starts_with("PartYM3812") { "YM3812" }
-                else if key.starts_with("PartYM3526") { "YM3526" }
-                else if key.starts_with("PartY8950") { "Y8950" }
-                else if key.starts_with("PartYMF262") { "YMF262" }
-                else if key.starts_with("PartK051649") | key.starts_with("PartSCC") { "K051649" }
-                else if key.starts_with("PartNES") | key.starts_with("Part2A03") { "NES" }
-                else if key.starts_with("PartDMG") | key.starts_with("PartGameBoy") { "DMG" }
-                else if key.starts_with("PartRF5C164") { "RF5C164" }
-                else if key.starts_with("PartSegaPCM") { "SegaPCM" }
-                else if key.starts_with("PartC140") { "C140" }
-                else if key.starts_with("PartC352") { "C352" }
-                else if key.starts_with("PartAY8910") { "AY8910" }
-                else if key.starts_with("PartHuC6280") { "HuC6280" }
-                else if key.starts_with("PartPOKEY") { "POKEY" }
-                else if key.starts_with("PartVRC6") { "VRC6" }
-                else if key.starts_with("PartK053260") { "K053260" }
-                else if key.starts_with("PartK054539") { "K054539" }
-                else if key.starts_with("PartQSound") { "QSound" }
-                else { continue };
+            let chip_name = if key.starts_with("PartYM2612") {
+                "YM2612"
+            } else if key.starts_with("PartSN76489") {
+                "SN76489"
+            } else if key.starts_with("PartYM2151") {
+                "YM2151"
+            } else if key.starts_with("PartYM2608") {
+                "YM2608"
+            } else if key.starts_with("PartYM2203") {
+                "YM2203"
+            } else if key.starts_with("PartYM2413") {
+                "YM2413"
+            } else if key.starts_with("PartYM3812") {
+                "YM3812"
+            } else if key.starts_with("PartYM3526") {
+                "YM3526"
+            } else if key.starts_with("PartY8950") {
+                "Y8950"
+            } else if key.starts_with("PartYMF262") {
+                "YMF262"
+            } else if key.starts_with("PartK051649") | key.starts_with("PartSCC") {
+                "K051649"
+            } else if key.starts_with("PartNES") | key.starts_with("Part2A03") {
+                "NES"
+            } else if key.starts_with("PartDMG") | key.starts_with("PartGameBoy") {
+                "DMG"
+            } else if key.starts_with("PartRF5C164") {
+                "RF5C164"
+            } else if key.starts_with("PartSegaPCM") {
+                "SegaPCM"
+            } else if key.starts_with("PartC140") {
+                "C140"
+            } else if key.starts_with("PartC352") {
+                "C352"
+            } else if key.starts_with("PartAY8910") {
+                "AY8910"
+            } else if key.starts_with("PartHuC6280") {
+                "HuC6280"
+            } else if key.starts_with("PartPOKEY") {
+                "POKEY"
+            } else if key.starts_with("PartVRC6") {
+                "VRC6"
+            } else if key.starts_with("PartK053260") {
+                "K053260"
+            } else if key.starts_with("PartK054539") {
+                "K054539"
+            } else if key.starts_with("PartQSound") {
+                "QSound"
+            } else {
+                continue;
+            };
             for name in &part_names {
                 if !effective_chip_map.contains_key(name) && name.starts_with(value.trim()) {
                     effective_chip_map.insert(name.clone(), chip_name.to_string());
@@ -704,7 +770,9 @@ impl VgmGenerator {
         // ForcedMonoPartYM2612 → assign YM2612 to all otherwise unassigned parts
         let forced_mono = ast.metadata.contains_key("ForcedMonoPartYM2612");
         for name in &part_names {
-            if !effective_chip_map.contains_key(name) && (forced_mono || ast.parts[name].chip.is_none()) {
+            if !effective_chip_map.contains_key(name)
+                && (forced_mono || ast.parts[name].chip.is_none())
+            {
                 let has_ym2612 = self.chips.contains(&SoundChip::YM2612);
                 if has_ym2612 || forced_mono {
                     effective_chip_map.insert(name.clone(), "YM2612".to_string());
@@ -714,7 +782,12 @@ impl VgmGenerator {
 
         let num_ym2612_channels: u8 = part_names
             .iter()
-            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2612").unwrap_or(false))
+            .filter(|&n| {
+                effective_chip_map
+                    .get(n)
+                    .map(|s| s == "YM2612")
+                    .unwrap_or(false)
+            })
             .count()
             .min(6) as u8;
 
@@ -726,7 +799,12 @@ impl VgmGenerator {
         // Emit YM2608 global init (same register layout as YM2612, different opcodes)
         let num_ym2608_channels: u8 = part_names
             .iter()
-            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2608").unwrap_or(false))
+            .filter(|&n| {
+                effective_chip_map
+                    .get(n)
+                    .map(|s| s == "YM2608")
+                    .unwrap_or(false)
+            })
             .count()
             .min(6) as u8;
         if num_ym2608_channels > 0 {
@@ -736,7 +814,12 @@ impl VgmGenerator {
         // Emit YM2203 global init (3-channel OPN)
         let num_ym2203_channels: u8 = part_names
             .iter()
-            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2203").unwrap_or(false))
+            .filter(|&n| {
+                effective_chip_map
+                    .get(n)
+                    .map(|s| s == "YM2203")
+                    .unwrap_or(false)
+            })
             .count()
             .min(3) as u8;
         if num_ym2203_channels > 0 {
@@ -746,7 +829,12 @@ impl VgmGenerator {
         // Emit YM2151 global init (8-channel OPM)
         let num_opm_channels: u8 = part_names
             .iter()
-            .filter(|&n| effective_chip_map.get(n).map(|s| s == "YM2151").unwrap_or(false))
+            .filter(|&n| {
+                effective_chip_map
+                    .get(n)
+                    .map(|s| s == "YM2151")
+                    .unwrap_or(false)
+            })
             .count()
             .min(8) as u8;
         if num_opm_channels > 0 {
@@ -758,7 +846,7 @@ impl VgmGenerator {
             effective_chip_map.get(n).and_then(|s| match s.as_str() {
                 "YM3812" => Some(VgmCommandType::Ym3812Write as u8),
                 "YM3526" => Some(VgmCommandType::Ym3526Write as u8),
-                "Y8950"  => Some(VgmCommandType::Y8950Write as u8),
+                "Y8950" => Some(VgmCommandType::Y8950Write as u8),
                 _ => None,
             })
         });
@@ -767,25 +855,34 @@ impl VgmGenerator {
         }
 
         // Emit YMF262 global init (18-channel OPL3)
-        let has_ymf262 = part_names
-            .iter()
-            .any(|n| effective_chip_map.get(n).map(|s| s == "YMF262").unwrap_or(false));
+        let has_ymf262 = part_names.iter().any(|n| {
+            effective_chip_map
+                .get(n)
+                .map(|s| s == "YMF262")
+                .unwrap_or(false)
+        });
         if has_ymf262 {
             self.ymf262_global_init();
         }
 
         // Emit YMF271 global init (48-slot OPX)
         let has_ymf271 = part_names.iter().any(|n| {
-            effective_chip_map.get(n).map(|s| s == "YMF271" || s == "YMF271_PCM").unwrap_or(false)
+            effective_chip_map
+                .get(n)
+                .map(|s| s == "YMF271" || s == "YMF271_PCM")
+                .unwrap_or(false)
         });
         if has_ymf271 {
             self.ymf271_global_init();
         }
 
         // Emit console chip global inits
-        let has_k051649 = part_names
-            .iter()
-            .any(|n| effective_chip_map.get(n).map(|s| s == "K051649").unwrap_or(false));
+        let has_k051649 = part_names.iter().any(|n| {
+            effective_chip_map
+                .get(n)
+                .map(|s| s == "K051649")
+                .unwrap_or(false)
+        });
         if has_k051649 {
             // K051649: silence all channels by clearing the key-on mask at
             // register 0xAF. (Earlier this was `port=3, addr=0` which is
@@ -794,30 +891,39 @@ impl VgmGenerator {
             self.k051649_write(0, 0xAF, 0, 0);
             // Initialize waveforms to default (sine-like)
             let default_wave: [i8; 32] = [
-                0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
-                72, 60, 48, 36, 24, 12, 0, -12, -24, -36, -48, -60, -72, -84, -96, -108
+                0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84, 72, 60, 48, 36,
+                24, 12, 0, -12, -24, -36, -48, -60, -72, -84, -96, -108,
             ];
             for ch in 0..5 {
                 self.k051649_set_waveform(ch, &default_wave, 0);
             }
         }
 
-        let has_nes = part_names
-            .iter()
-            .any(|n| effective_chip_map.get(n).map(|s| s == "NES").unwrap_or(false));
+        let has_nes = part_names.iter().any(|n| {
+            effective_chip_map
+                .get(n)
+                .map(|s| s == "NES")
+                .unwrap_or(false)
+        });
         if has_nes {
             self.nes_apu_global_init();
         }
 
-        let has_dmg = part_names
-            .iter()
-            .any(|n| effective_chip_map.get(n).map(|s| s == "DMG").unwrap_or(false));
+        let has_dmg = part_names.iter().any(|n| {
+            effective_chip_map
+                .get(n)
+                .map(|s| s == "DMG")
+                .unwrap_or(false)
+        });
         if has_dmg {
             self.dmg_global_init();
         }
 
         let has_ay8910 = part_names.iter().any(|n| {
-            effective_chip_map.get(n).map(|s| matches!(s.as_str(), "AY8910" | "AY-3-8910" | "YM2149" | "YM2149F")).unwrap_or(false)
+            effective_chip_map
+                .get(n)
+                .map(|s| matches!(s.as_str(), "AY8910" | "AY-3-8910" | "YM2149" | "YM2149F"))
+                .unwrap_or(false)
         });
         if has_ay8910 {
             // Enable tone channels A/B/C, disable noise (reg 0x07: bits 0-2=tone enable, 3-5=noise disable)
@@ -828,7 +934,10 @@ impl VgmGenerator {
         }
 
         let has_huc6280 = part_names.iter().any(|n| {
-            effective_chip_map.get(n).map(|s| matches!(s.as_str(), "HuC6280" | "HUC6280" | "PC_ENGINE")).unwrap_or(false)
+            effective_chip_map
+                .get(n)
+                .map(|s| matches!(s.as_str(), "HuC6280" | "HUC6280" | "PC_ENGINE"))
+                .unwrap_or(false)
         });
         if has_huc6280 {
             self.huc6280_write(0x01, 0xFF, 0); // main amplitude: max L/R
@@ -836,7 +945,7 @@ impl VgmGenerator {
                 self.huc6280_write(0x00, ch, 0); // select channel
                 self.huc6280_write(0x04, 0x00, 0); // disable (resets write pointer to 0)
                 self.huc6280_write(0x05, 0xFF, 0); // channel balance: max L/R
-                // Load sawtooth waveform: 32 samples, values 0-31
+                                                   // Load sawtooth waveform: 32 samples, values 0-31
                 for s in 0u8..32 {
                     self.huc6280_write(0x06, s, 0);
                 }
@@ -848,7 +957,12 @@ impl VgmGenerator {
         let mut global_tempo: u32 = 120;
         let mut global_length: u32 = 4;
         for node in &ast.global_settings {
-            self.process_node_global(node, &mut global_time, &mut global_tempo, &mut global_length)?;
+            self.process_node_global(
+                node,
+                &mut global_time,
+                &mut global_tempo,
+                &mut global_length,
+            )?;
         }
 
         // Process each part independently from time=0 (parallel/simultaneous playback).
@@ -936,107 +1050,191 @@ impl VgmGenerator {
             Some("YM2612") => {
                 let abs_ch = self.next_ym2612_channel;
                 self.next_ym2612_channel = self.next_ym2612_channel.saturating_add(1);
-                if abs_ch < 6 { (abs_ch / 3, abs_ch % 3, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if abs_ch < 6 {
+                    (abs_ch / 3, abs_ch % 3, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YM2608") => {
                 let abs_ch = self.next_ym2608_channel;
                 self.next_ym2608_channel = self.next_ym2608_channel.saturating_add(1);
-                if abs_ch < 6 { (abs_ch / 3, abs_ch % 3, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if abs_ch < 6 {
+                    (abs_ch / 3, abs_ch % 3, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YM2203") => {
                 let ch = self.next_ym2203_channel;
                 self.next_ym2203_channel = self.next_ym2203_channel.saturating_add(1);
-                if ch < 3 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 3 {
+                    (0, ch, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YM2151") => {
                 let ch = self.next_opm_channel;
                 self.next_opm_channel = self.next_opm_channel.saturating_add(1);
-                if ch < 8 { (0, 0, 0, ch, true) } else { (0, 0, 0, 0, false) }
+                if ch < 8 {
+                    (0, 0, 0, ch, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YM3812") | Some("YM3526") | Some("Y8950") => {
                 let ch = self.next_opl_channel;
                 self.next_opl_channel = self.next_opl_channel.saturating_add(1);
-                if ch < 9 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 9 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YMF262") => {
                 let ch = self.next_ymf262_channel;
                 self.next_ymf262_channel = self.next_ymf262_channel.saturating_add(1);
-                if ch < 18 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 18 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("K051649") | Some("SCC") | Some("SCC1") => {
                 let ch = self.next_k051649_channel;
                 self.next_k051649_channel = self.next_k051649_channel.saturating_add(1);
-                if ch < 5 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 5 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("NES") | Some("NESAPU") | Some("2A03") => {
                 let ch = self.next_nes_channel;
                 self.next_nes_channel = self.next_nes_channel.saturating_add(1);
-                if ch < 5 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 5 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
                 let ch = self.next_dmg_channel;
                 self.next_dmg_channel = self.next_dmg_channel.saturating_add(1);
-                if ch < 4 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 4 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("VRC6") => {
                 let ch = self.next_vrc6_channel;
                 self.next_vrc6_channel = self.next_vrc6_channel.saturating_add(1);
-                if ch < 3 { (0, 0, ch, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 3 {
+                    (0, 0, ch, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YM2413") | Some("OPLL") => {
                 let ch = self.next_ym2413_channel;
                 self.next_ym2413_channel = self.next_ym2413_channel.saturating_add(1);
-                if ch < 9 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 9 {
+                    (0, ch, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("AY8910") | Some("AY-3-8910") | Some("YM2149") | Some("YM2149F") => {
                 let ch = self.next_ay8910_channel;
                 self.next_ay8910_channel = self.next_ay8910_channel.saturating_add(1);
-                if ch < 3 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 3 {
+                    (0, ch, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("HuC6280") | Some("HUC6280") | Some("PC_ENGINE") => {
                 let ch = self.next_huc6280_channel;
                 self.next_huc6280_channel = self.next_huc6280_channel.saturating_add(1);
-                if ch < 6 { (0, ch, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 6 {
+                    (0, ch, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("RF5C164") => {
                 let ch = self.next_rf5c164_channel;
                 self.next_rf5c164_channel = self.next_rf5c164_channel.saturating_add(1);
-                if ch < 8 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 8 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("K053260") | Some("KONAMI_PCM") => {
                 let ch = self.next_k053260_channel;
                 self.next_k053260_channel = self.next_k053260_channel.saturating_add(1);
-                if ch < 8 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 8 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("K054539") => {
                 let ch = self.next_k054539_channel;
                 self.next_k054539_channel = self.next_k054539_channel.saturating_add(1);
-                if ch < 32 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 32 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("SegaPCM") | Some("SEGAPCM") => {
                 let ch = self.next_segapcm_channel;
                 self.next_segapcm_channel = self.next_segapcm_channel.saturating_add(1);
-                if ch < 16 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 16 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("C140") => {
                 let ch = self.next_c140_channel;
                 self.next_c140_channel = self.next_c140_channel.saturating_add(1);
-                if ch < 24 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 24 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("C352") => {
                 let ch = self.next_c352_channel;
                 self.next_c352_channel = self.next_c352_channel.saturating_add(1);
-                if ch < 32 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 32 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("QSound") | Some("QSOUND") => {
                 let ch = self.next_qsound_channel;
                 self.next_qsound_channel = self.next_qsound_channel.saturating_add(1);
-                if ch < 16 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if ch < 16 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             Some("YMF271") | Some("YMF271_PCM") => {
                 let grp = self.next_ymf271_group;
                 self.next_ymf271_group = self.next_ymf271_group.saturating_add(1);
-                if grp < 12 { (0, 0, 0, 0, true) } else { (0, 0, 0, 0, false) }
+                if grp < 12 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
             }
             _ => (0, 0, 0, 0, true),
         };
@@ -1049,33 +1247,17 @@ impl VgmGenerator {
             Some("K051649") | Some("SCC") | Some("SCC1") => {
                 self.next_k051649_channel.saturating_sub(1)
             }
-            Some("RF5C164") => {
-                self.next_rf5c164_channel.saturating_sub(1)
-            }
-            Some("K053260") | Some("KONAMI_PCM") => {
-                self.next_k053260_channel.saturating_sub(1)
-            }
-            Some("K054539") => {
-                self.next_k054539_channel.saturating_sub(1)
-            }
-            Some("SegaPCM") | Some("SEGAPCM") => {
-                self.next_segapcm_channel.saturating_sub(1)
-            }
-            Some("C140") => {
-                self.next_c140_channel.saturating_sub(1)
-            }
-            Some("C352") => {
-                self.next_c352_channel.saturating_sub(1)
-            }
-            Some("QSound") | Some("QSOUND") => {
-                self.next_qsound_channel.saturating_sub(1)
-            }
+            Some("RF5C164") => self.next_rf5c164_channel.saturating_sub(1),
+            Some("K053260") | Some("KONAMI_PCM") => self.next_k053260_channel.saturating_sub(1),
+            Some("K054539") => self.next_k054539_channel.saturating_sub(1),
+            Some("SegaPCM") | Some("SEGAPCM") => self.next_segapcm_channel.saturating_sub(1),
+            Some("C140") => self.next_c140_channel.saturating_sub(1),
+            Some("C352") => self.next_c352_channel.saturating_sub(1),
+            Some("QSound") | Some("QSOUND") => self.next_qsound_channel.saturating_sub(1),
             _ => 0,
         };
         state.nes_ch = match chip_str {
-            Some("NES") | Some("NESAPU") | Some("2A03") => {
-                self.next_nes_channel.saturating_sub(1)
-            }
+            Some("NES") | Some("NESAPU") | Some("2A03") => self.next_nes_channel.saturating_sub(1),
             _ => 0,
         };
         state.dmg_ch = match chip_str {
@@ -1101,25 +1283,47 @@ impl VgmGenerator {
         // Key off any note still ringing at end of part (suppressed in EON/envelope mode)
         if state.keyed_on && !state.eon_mode {
             match state.chip.as_deref() {
-                Some("YM2612") => { self.ym2612_key_off(&state, time); }
-                Some("YM2608") => { self.ym2608_key_off(&state, time); }
-                Some("YM2203") => { self.ym2203_key_off(&state, time); }
-                Some("YM2151") => { self.opm_key_off(&state, time); }
-                Some("YM3812") => { self.opl_key_off(VgmCommandType::Ym3812Write as u8, &state, time); }
-                Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, &state, time); }
-                Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, &state, time); }
-                Some("YMF262") => { self.ymf262_key_off(&state, time); }
-                Some("YMF271") | Some("YMF271_PCM") => { self.ymf271_key_off(&state, time); }
-                Some("K051649") | Some("SCC") | Some("SCC1") => { self.k051649_note_off(state.k051649_ch, *time); }
-                Some("NES") | Some("NESAPU") | Some("2A03") => { self.nes_apu_note_off_pulse(state.nes_ch, *time); }
-                Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => {
-                    match state.dmg_ch {
-                        2 => self.dmg_note_off_wave(*time),
-                        3 => self.dmg_note_off_noise(*time),
-                        ch => self.dmg_note_off_pulse(ch, *time),
-                    }
+                Some("YM2612") => {
+                    self.ym2612_key_off(&state, time);
                 }
-                Some("VRC6") => { self.vrc6_note_off(state.vrc6_ch, *time); }
+                Some("YM2608") => {
+                    self.ym2608_key_off(&state, time);
+                }
+                Some("YM2203") => {
+                    self.ym2203_key_off(&state, time);
+                }
+                Some("YM2151") => {
+                    self.opm_key_off(&state, time);
+                }
+                Some("YM3812") => {
+                    self.opl_key_off(VgmCommandType::Ym3812Write as u8, &state, time);
+                }
+                Some("YM3526") => {
+                    self.opl_key_off(VgmCommandType::Ym3526Write as u8, &state, time);
+                }
+                Some("Y8950") => {
+                    self.opl_key_off(VgmCommandType::Y8950Write as u8, &state, time);
+                }
+                Some("YMF262") => {
+                    self.ymf262_key_off(&state, time);
+                }
+                Some("YMF271") | Some("YMF271_PCM") => {
+                    self.ymf271_key_off(&state, time);
+                }
+                Some("K051649") | Some("SCC") | Some("SCC1") => {
+                    self.k051649_note_off(state.k051649_ch, *time);
+                }
+                Some("NES") | Some("NESAPU") | Some("2A03") => {
+                    self.nes_apu_note_off_pulse(state.nes_ch, *time);
+                }
+                Some("DMG") | Some("GAMEBOY") | Some("GAME BOY") => match state.dmg_ch {
+                    2 => self.dmg_note_off_wave(*time),
+                    3 => self.dmg_note_off_noise(*time),
+                    ch => self.dmg_note_off_pulse(ch, *time),
+                },
+                Some("VRC6") => {
+                    self.vrc6_note_off(state.vrc6_ch, *time);
+                }
                 Some("SegaPCM") | Some("SEGAPCM") => {
                     let base = (state.k051649_ch as u16) * 8;
                     self.segapcm_mem_write(base + 0x86, 0x01, *time);
@@ -1153,12 +1357,27 @@ impl VgmGenerator {
     }
 
     /// Process MML nodes that appear in global context (outside any part)
-    fn process_node_global(&mut self, node: &MmlNode, time: &mut u64, tempo: &mut u32, default_length: &mut u32) -> MmlResult<()> {
+    fn process_node_global(
+        &mut self,
+        node: &MmlNode,
+        time: &mut u64,
+        tempo: &mut u32,
+        default_length: &mut u32,
+    ) -> MmlResult<()> {
         match node {
-            MmlNode::Tempo(t) => { *tempo = t.bpm; }
-            MmlNode::Length(l) => { *default_length = l.value.max(1); }
+            MmlNode::Tempo(t) => {
+                *tempo = t.bpm;
+            }
+            MmlNode::Length(l) => {
+                *default_length = l.value.max(1);
+            }
             MmlNode::Rest(rest) => {
-                let samples = self.note_duration_to_samples(rest.duration, rest.dotted, *tempo, *default_length);
+                let samples = self.note_duration_to_samples(
+                    rest.duration,
+                    rest.dotted,
+                    *tempo,
+                    *default_length,
+                );
                 // Silence SN76489 ch0 during a rest (max attenuation = 0x9F)
                 self.commands.push(VgmCommand {
                     command_type: VgmCommandType::Sn76489Write,
@@ -1176,7 +1395,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.process_psg_note(note, &state, time);
                 let dur = note.duration.unwrap_or(*default_length);
-                let samples = self.note_duration_to_samples(dur, note.dotted, *tempo, *default_length);
+                let samples =
+                    self.note_duration_to_samples(dur, note.dotted, *tempo, *default_length);
                 if let Some(span) = &note.span {
                     self.source_map.events.push(NoteEvent {
                         sample_start: note_start_time,
@@ -1249,7 +1469,7 @@ impl VgmGenerator {
                         let ch = state.ym2612_ch;
                         self.ym2612_write_op_params(port, ch, &params, *time);
                         self.ym2612_write_tl_pass(state, &params, false, *time); // non-carriers
-                        self.ym2612_write_tl_pass(state, &params, true, *time);  // carriers
+                        self.ym2612_write_tl_pass(state, &params, true, *time); // carriers
                         state.init_done = true;
                     } else {
                         state.init_done = false;
@@ -1266,21 +1486,42 @@ impl VgmGenerator {
             MmlNode::Rest(rest) => {
                 if state.keyed_on && !state.eon_mode {
                     match state.chip.as_deref() {
-                        Some("YM2612") => { self.ym2612_key_off(state, time); }
-                        Some("YM2608") => { self.ym2608_key_off(state, time); }
-                        Some("YM2203") => { self.ym2203_key_off(state, time); }
-                        Some("YM2151") => { self.opm_key_off(state, time); }
-                        Some("YM3812") => { self.opl_key_off(VgmCommandType::Ym3812Write as u8, state, time); }
-                        Some("YM3526") => { self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time); }
-                        Some("Y8950")  => { self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time); }
-                        Some("YMF262") => { self.ymf262_key_off(state, time); }
-                        Some("YMF271") | Some("YMF271_PCM") => { self.ymf271_key_off(state, time); }
+                        Some("YM2612") => {
+                            self.ym2612_key_off(state, time);
+                        }
+                        Some("YM2608") => {
+                            self.ym2608_key_off(state, time);
+                        }
+                        Some("YM2203") => {
+                            self.ym2203_key_off(state, time);
+                        }
+                        Some("YM2151") => {
+                            self.opm_key_off(state, time);
+                        }
+                        Some("YM3812") => {
+                            self.opl_key_off(VgmCommandType::Ym3812Write as u8, state, time);
+                        }
+                        Some("YM3526") => {
+                            self.opl_key_off(VgmCommandType::Ym3526Write as u8, state, time);
+                        }
+                        Some("Y8950") => {
+                            self.opl_key_off(VgmCommandType::Y8950Write as u8, state, time);
+                        }
+                        Some("YMF262") => {
+                            self.ymf262_key_off(state, time);
+                        }
+                        Some("YMF271") | Some("YMF271_PCM") => {
+                            self.ymf271_key_off(state, time);
+                        }
                         _ => {}
                     }
                     state.keyed_on = false;
                 }
                 // Silence SN76489 ch0 during a rest (max attenuation = 0x9F)
-                if matches!(state.chip.as_deref(), Some("SN76489") | Some("SN76489X2") | None) {
+                if matches!(
+                    state.chip.as_deref(),
+                    Some("SN76489") | Some("SN76489X2") | None
+                ) {
                     self.commands.push(VgmCommand {
                         command_type: VgmCommandType::Sn76489Write,
                         data: vec![0x9F],
@@ -1292,13 +1533,18 @@ impl VgmGenerator {
                 if state.has_channel && state.chip.as_deref() == Some("YM2612") {
                     let abs_ch = state.ym2612_port * 3 + state.ym2612_ch;
                     if abs_ch < 5 {
-                        let params = state.instrument_num
+                        let params = state
+                            .instrument_num
                             .and_then(|n| self.fm_instruments.get(&n).cloned());
                         self.ym2612_write_tl_if_changed(state, params.as_deref(), *time);
                     }
                 }
-                let samples =
-                    self.note_duration_to_samples(rest.duration, rest.dotted, state.tempo, state.length);
+                let samples = self.note_duration_to_samples(
+                    rest.duration,
+                    rest.dotted,
+                    state.tempo,
+                    state.length,
+                );
                 *time += samples as u64;
                 self.add_wait(samples, *time);
             }
@@ -1322,7 +1568,11 @@ impl VgmGenerator {
                     _ => candidate,
                 });
             }
-            MmlNode::ChipCommand { chip: _, command, args } => {
+            MmlNode::ChipCommand {
+                chip: _,
+                command,
+                args,
+            } => {
                 // Route to appropriate chip command handler
                 self.handle_chip_command(command, args, state, *time)?;
             }
@@ -1347,7 +1597,8 @@ impl VgmGenerator {
                 // Write F-type operator params (DT/ML, KS/AR, etc.) on first note only.
                 // M-type returns early from OutFmSetInstrument in C# so nothing is written.
                 if !state.init_done {
-                    let params = state.instrument_num
+                    let params = state
+                        .instrument_num
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
                     if let Some(ref p) = params {
                         self.ym2612_write_op_params(state.ym2612_port, state.ym2612_ch, p, *time);
@@ -1355,7 +1606,8 @@ impl VgmGenerator {
                     state.init_done = true;
                 }
                 // Write TL (with before_tl optimization, matches C# OutFmSetVolume + beforeTL)
-                let params = state.instrument_num
+                let params = state
+                    .instrument_num
                     .and_then(|n| self.fm_instruments.get(&n).cloned());
                 self.ym2612_write_tl_if_changed(state, params.as_deref(), *time);
                 if state.keyed_on && !state.eon_mode {
@@ -1367,7 +1619,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.ym2612_key_on(state, time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1382,7 +1635,8 @@ impl VgmGenerator {
             }
             Some("YM2608") if state.has_channel => {
                 if !state.init_done {
-                    let params = state.instrument_num
+                    let params = state
+                        .instrument_num
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
                     if let Some(ref p) = params {
                         self.ym2608_write_op_params(state.ym2612_port, state.ym2612_ch, p, *time);
@@ -1397,9 +1651,11 @@ impl VgmGenerator {
                             self.ym2608_write_reg(port, 0x50 + op_off, 0x1F, *time); // KS=0, AR=31
                             self.ym2608_write_reg(port, 0x60 + op_off, 0x00, *time); // AM=0, DR=0
                             self.ym2608_write_reg(port, 0x70 + op_off, 0x00, *time); // SR=0
-                            self.ym2608_write_reg(port, 0x80 + op_off, 0x01, *time); // SL=0, RR=1
+                            self.ym2608_write_reg(port, 0x80 + op_off, 0x01, *time);
+                            // SL=0, RR=1
                         }
-                        self.ym2608_write_reg(port, 0xB0 + state.ym2612_ch, 0x07, *time); // FB=0, ALG=7
+                        self.ym2608_write_reg(port, 0xB0 + state.ym2612_ch, 0x07, *time);
+                        // FB=0, ALG=7
                     }
                     state.init_done = true;
                 }
@@ -1412,7 +1668,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.ym2608_key_on(state, time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1427,7 +1684,8 @@ impl VgmGenerator {
             }
             Some("YM2203") if state.has_channel => {
                 if !state.init_done {
-                    let params = state.instrument_num
+                    let params = state
+                        .instrument_num
                         .and_then(|n| self.fm_instruments.get(&n).cloned());
                     if let Some(ref p) = params {
                         self.ym2203_write_op_params(state.ym2612_ch, p, *time);
@@ -1443,7 +1701,8 @@ impl VgmGenerator {
                             self.ym2203_write_reg(0x70 + op_off, 0x00, *time); // SR=0
                             self.ym2203_write_reg(0x80 + op_off, 0x01, *time); // SL=0, RR=1
                         }
-                        self.ym2203_write_reg(0xB0 + state.ym2612_ch, 0x07, *time); // FB=0, ALG=7
+                        self.ym2203_write_reg(0xB0 + state.ym2612_ch, 0x07, *time);
+                        // FB=0, ALG=7
                     }
                     state.init_done = true;
                 }
@@ -1456,7 +1715,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.ym2203_key_on(state, time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1483,7 +1743,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.opm_key_on(state, time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1507,9 +1768,17 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
                 let note_start_time = *time;
-                self.opl_write_freq(VgmCommandType::Ym3812Write as u8, state.opl_ch, block, f_num, true, *time);
+                self.opl_write_freq(
+                    VgmCommandType::Ym3812Write as u8,
+                    state.opl_ch,
+                    block,
+                    f_num,
+                    true,
+                    *time,
+                );
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1533,9 +1802,17 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
                 let note_start_time = *time;
-                self.opl_write_freq(VgmCommandType::Ym3526Write as u8, state.opl_ch, block, f_num, true, *time);
+                self.opl_write_freq(
+                    VgmCommandType::Ym3526Write as u8,
+                    state.opl_ch,
+                    block,
+                    f_num,
+                    true,
+                    *time,
+                );
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1559,9 +1836,17 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
                 let note_start_time = *time;
-                self.opl_write_freq(VgmCommandType::Y8950Write as u8, state.opl_ch, block, f_num, true, *time);
+                self.opl_write_freq(
+                    VgmCommandType::Y8950Write as u8,
+                    state.opl_ch,
+                    block,
+                    f_num,
+                    true,
+                    *time,
+                );
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1576,7 +1861,7 @@ impl VgmGenerator {
             }
             Some("YMF262") if state.has_channel => {
                 let ch = state.opl_ch;
-                let port = (ch / 9) as u8;
+                let port = ch / 9;
                 let ch_in_bank = ch % 9;
                 if !state.init_done {
                     self.ymf262_init_channel(state, *time);
@@ -1588,10 +1873,15 @@ impl VgmGenerator {
                 }
                 let (block, f_num) = Self::midi_note_to_opl_freq(midi);
                 let note_start_time = *time;
-                let opcode = if port == 0 { VgmCommandType::Ymf262WritePort0 as u8 } else { VgmCommandType::Ymf262WritePort1 as u8 };
+                let opcode = if port == 0 {
+                    VgmCommandType::Ymf262WritePort0 as u8
+                } else {
+                    VgmCommandType::Ymf262WritePort1 as u8
+                };
                 self.opl_write_freq(opcode, ch_in_bank, block, f_num, true, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1618,7 +1908,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.ymf271_note_on(state, midi, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1642,8 +1933,8 @@ impl VgmGenerator {
                 if !state.init_done {
                     // Initialize with default waveform
                     let default_wave: [i8; 32] = [
-                        0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84,
-                        72, 60, 48, 36, 24, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                        0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 127, 120, 108, 96, 84, 72, 60,
+                        48, 36, 24, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     ];
                     self.k051649_set_waveform(state.k051649_ch, &default_wave, *time);
                     state.init_done = true;
@@ -1655,7 +1946,8 @@ impl VgmGenerator {
                 let note_start_time = *time;
                 self.k051649_note_on(state.k051649_ch, midi, 0, state.volume, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1681,7 +1973,8 @@ impl VgmGenerator {
                 // For simplicity, treat all NES channels as Pulse for now
                 self.nes_apu_note_on_pulse(state.nes_ch, midi, 0, state.volume, 0, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1707,7 +2000,8 @@ impl VgmGenerator {
                     self.vrc6_note_on_sawtooth(midi, state.volume, *time);
                 }
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1724,8 +2018,10 @@ impl VgmGenerator {
                 if !state.init_done {
                     if state.dmg_ch == 2 {
                         // Load a sawtooth waveform into wave RAM (registers 0x20-0x2F)
-                        let wave: [u8; 32] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
-                                              0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+                        let wave: [u8; 32] = [
+                            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5,
+                            6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                        ];
                         self.dmg_set_wave_table(&wave, *time);
                     }
                     state.init_done = true;
@@ -1745,7 +2041,8 @@ impl VgmGenerator {
                     ch => self.dmg_note_on_pulse(ch, midi, 0, state.volume, 0, *time),
                 }
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1786,7 +2083,8 @@ impl VgmGenerator {
                 // Key on: set bit 5 of MSB register
                 self.ym2413_write_reg(0x20 + state.ym2612_ch, msb | 0x20, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1800,7 +2098,9 @@ impl VgmGenerator {
                     self.add_wait(gap, *time);
                 }
             }
-            Some("AY8910") | Some("AY-3-8910") | Some("YM2149") | Some("YM2149F") if state.has_channel => {
+            Some("AY8910") | Some("AY-3-8910") | Some("YM2149") | Some("YM2149F")
+                if state.has_channel =>
+            {
                 if !state.init_done {
                     // Initialize AY8910 channel
                     // Set volume for channel (max volume, no envelope)
@@ -1816,14 +2116,15 @@ impl VgmGenerator {
                 let tone_lo = (tone & 0xFF) as u8;
                 let tone_hi = ((tone >> 8) & 0x0F) as u8;
                 // Write tone period
-                self.ay8910_write(0x00 + state.ym2612_ch * 2, tone_lo, *time);
+                self.ay8910_write(state.ym2612_ch * 2, tone_lo, *time);
                 self.ay8910_write(0x01 + state.ym2612_ch * 2, tone_hi, *time);
                 // Set volume (map 0-127 to 0-15; AY8910 reg 0x08: 15=loud, 0=silent)
                 let vol = (state.volume as u16 * 15 / 127) as u8;
                 let note_start_time = *time;
                 self.ay8910_write(0x08 + state.ym2612_ch, vol & 0x0F, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1854,7 +2155,11 @@ impl VgmGenerator {
                 // Compute playback step for the requested MIDI note.
                 // step = freq * 255 * 2048 / clock  (255 = usable samples before the 0xFF marker)
                 let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
-                let clock = if self.header.rf5c164_clock > 0 { self.header.rf5c164_clock } else { 7670453 };
+                let clock = if self.header.rf5c164_clock > 0 {
+                    self.header.rf5c164_clock
+                } else {
+                    7670453
+                };
                 let step = ((freq * 255.0 * 2048.0 / clock as f64).round() as u16).max(1);
                 let note_start_time = *time;
                 // Select channel for per-channel register writes
@@ -1875,7 +2180,8 @@ impl VgmGenerator {
                 // Key on: bit N = 0 means channel N is active
                 self.rf5c164_write(0x08, !(1u8 << ch), *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1916,25 +2222,30 @@ impl VgmGenerator {
                 }
                 // output_rate = clock/64; ROM advances at clock/(4096-pitch) bytes/sec
                 // For 256-byte loop at freq: 4096-pitch = clock/(256*freq)
-                let clock = if self.header.k053260_clock > 0 { self.header.k053260_clock } else { 8_000_000 };
+                let clock = if self.header.k053260_clock > 0 {
+                    self.header.k053260_clock
+                } else {
+                    8_000_000
+                };
                 let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let pitch_raw = 4096.0 - clock as f64 / (256.0 * freq);
                 let pitch = pitch_raw.round().clamp(0.0, 4095.0) as u16;
                 let base = 0x08u8 + ch * 8;
                 let vol = ((state.volume as u32 * 127 / 127) as u8).max(1);
                 let note_start_time = *time;
-                self.k053260_write(base + 0, (pitch & 0xFF) as u8, *time);
+                self.k053260_write(base, (pitch & 0xFF) as u8, *time);
                 self.k053260_write(base + 1, ((pitch >> 8) & 0x0F) as u8, *time);
                 self.k053260_write(base + 2, 0x00, *time); // length_lo = 256 (0x100) lo byte
                 self.k053260_write(base + 3, 0x01, *time); // length_hi = 256 (0x100) hi byte
                 self.k053260_write(base + 4, 0x00, *time); // start_lo = 0
                 self.k053260_write(base + 5, 0x00, *time); // start_mid = 0
                 self.k053260_write(base + 6, 0x00, *time); // start_hi = 0
-                self.k053260_write(base + 7, vol, *time);  // volume
+                self.k053260_write(base + 7, vol, *time); // volume
                 self.k053260_write(0x2a, 1u8 << ch, *time); // enable loop for this channel
                 self.k053260_write(0x28, 1u8 << ch, *time); // key-on (rising edge)
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -1970,7 +2281,11 @@ impl VgmGenerator {
                 }
                 // Delta (24-bit frequency): rate = freq * 65536 / output_rate
                 // output_rate = clock / 384
-                let clock = if self.header.k054539_clock > 0 { self.header.k054539_clock } else { 16_000_000 };
+                let clock = if self.header.k054539_clock > 0 {
+                    self.header.k054539_clock
+                } else {
+                    16_000_000
+                };
                 let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let output_rate = clock as f64 / 384.0;
                 let delta_f = freq * 256.0 * 65536.0 / output_rate;
@@ -1979,7 +2294,7 @@ impl VgmGenerator {
                 let vol = ((127 - state.volume as u32) * 0x3F / 127) as u8;
                 let base = ch * 0x20;
                 let note_start_time = *time;
-                self.k054539_reg_write(base + 0x00, (delta & 0xFF) as u8, *time);
+                self.k054539_reg_write(base, (delta & 0xFF) as u8, *time);
                 self.k054539_reg_write(base + 0x01, ((delta >> 8) & 0xFF) as u8, *time);
                 self.k054539_reg_write(base + 0x02, ((delta >> 16) & 0xFF) as u8, *time);
                 self.k054539_reg_write(base + 0x03, vol, *time); // volume
@@ -1989,13 +2304,14 @@ impl VgmGenerator {
                 self.k054539_reg_write(base + 0x0C, 0x00, *time); // start_lo
                 self.k054539_reg_write(base + 0x0D, 0x00, *time); // start_mid
                 self.k054539_reg_write(base + 0x0E, 0x00, *time); // start_hi
-                // Mode: 8-bit PCM, forward; enable loop-via-0x80-marker
+                                                                  // Mode: 8-bit PCM, forward; enable loop-via-0x80-marker
                 self.k054539_reg_write(0x200 + ch * 2, 0x00, *time);
                 self.k054539_reg_write(0x200 + ch * 2 + 1, 0x00, *time);
                 // Key on
                 self.k054539_reg_write(0x214, 1u8 << (ch as u8 & 7), *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2029,11 +2345,12 @@ impl VgmGenerator {
                 let vol = (state.volume as u16 * 31 / 127) as u8;
                 let note_start_time = *time;
                 self.huc6280_write(0x00, state.ym2612_ch, *time); // select channel
-                self.huc6280_write(0x02, tone_lo, *time);          // frequency low
-                self.huc6280_write(0x03, tone_hi, *time);          // frequency high
-                self.huc6280_write(0x04, 0x80 | vol, *time);       // enable + volume
+                self.huc6280_write(0x02, tone_lo, *time); // frequency low
+                self.huc6280_write(0x03, tone_hi, *time); // frequency high
+                self.huc6280_write(0x04, 0x80 | vol, *time); // enable + volume
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2052,11 +2369,13 @@ impl VgmGenerator {
                 // Emit ROM data block (type 0x80) once; 256 biased-unsigned sine samples
                 // SegaPCM: sample = rom_byte - 0x80 (signed), so 0x80=silence, 0xFF=+127, 0x01=-127
                 if !self.segapcm_data_block_written {
-                    let rom: Vec<u8> = (0..256usize).map(|i| {
-                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
-                        let s = (angle.sin() * 127.0).round() as i8 as u8;
-                        s.wrapping_add(0x80)
-                    }).collect();
+                    let rom: Vec<u8> = (0..256usize)
+                        .map(|i| {
+                            let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                            let s = (angle.sin() * 127.0).round() as i8 as u8;
+                            s.wrapping_add(0x80)
+                        })
+                        .collect();
                     self.emit_rom_data_block(0x80, &rom, *time);
                     self.segapcm_data_block_written = true;
                 }
@@ -2068,23 +2387,28 @@ impl VgmGenerator {
                 }
                 // Frequency delta (8-bit): delta = freq * 65536 / output_rate
                 // output_rate = clock / 128
-                let clock = if self.header.segapcm_clock > 0 { self.header.segapcm_clock } else { 7_670_454 };
+                let clock = if self.header.segapcm_clock > 0 {
+                    self.header.segapcm_clock
+                } else {
+                    7_670_454
+                };
                 let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let output_rate = clock as f64 / 128.0;
                 let delta = (freq * 65536.0 / output_rate).round().clamp(1.0, 255.0) as u8;
                 let vol = ((state.volume as u32 * 0x7F / 127) as u8).max(1);
                 let note_start_time = *time;
-                self.segapcm_mem_write(base + 0x02, vol, *time);   // volL
-                self.segapcm_mem_write(base + 0x03, vol, *time);   // volR
+                self.segapcm_mem_write(base + 0x02, vol, *time); // volL
+                self.segapcm_mem_write(base + 0x03, vol, *time); // volR
                 self.segapcm_mem_write(base + 0x07, delta, *time); // delta (pitch)
-                self.segapcm_mem_write(base + 0x04, 0x00, *time);  // loop_lo
-                self.segapcm_mem_write(base + 0x05, 0x00, *time);  // loop_hi
-                self.segapcm_mem_write(base + 0x06, 0x00, *time);  // end_page (loop at 0x10000)
-                self.segapcm_mem_write(base + 0x84, 0x00, *time);  // start_lo
-                self.segapcm_mem_write(base + 0x85, 0x00, *time);  // start_hi
-                self.segapcm_mem_write(base + 0x86, 0x00, *time);  // ctrl=0 (enable + loop)
+                self.segapcm_mem_write(base + 0x04, 0x00, *time); // loop_lo
+                self.segapcm_mem_write(base + 0x05, 0x00, *time); // loop_hi
+                self.segapcm_mem_write(base + 0x06, 0x00, *time); // end_page (loop at 0x10000)
+                self.segapcm_mem_write(base + 0x84, 0x00, *time); // start_lo
+                self.segapcm_mem_write(base + 0x85, 0x00, *time); // start_hi
+                self.segapcm_mem_write(base + 0x86, 0x00, *time); // ctrl=0 (enable + loop)
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2102,10 +2426,12 @@ impl VgmGenerator {
                 // Emit ROM data block (type 0x8D) once; 8 signed 8-bit sine samples.
                 // N=8 keeps freq_reg = freq*8*65536/output_rate well within 16-bit range.
                 if !self.c140_data_block_written {
-                    let rom: Vec<u8> = (0..8usize).map(|i| {
-                        let angle = std::f64::consts::TAU * i as f64 / 8.0;
-                        (angle.sin() * 127.0).round() as i8 as u8
-                    }).collect();
+                    let rom: Vec<u8> = (0..8usize)
+                        .map(|i| {
+                            let angle = std::f64::consts::TAU * i as f64 / 8.0;
+                            (angle.sin() * 127.0).round() as i8 as u8
+                        })
+                        .collect();
                     self.emit_rom_data_block(0x8D, &rom, *time);
                     self.c140_data_block_written = true;
                 }
@@ -2117,28 +2443,35 @@ impl VgmGenerator {
                 }
                 // Frequency register: delta = freq * N * 65536 / output_rate
                 // N=8 samples, output_rate = clock/288
-                let clock = if self.header.c140_clock > 0 { self.header.c140_clock } else { 6_000_000 };
+                let clock = if self.header.c140_clock > 0 {
+                    self.header.c140_clock
+                } else {
+                    6_000_000
+                };
                 let freq = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let output_rate = clock as f64 / 288.0;
-                let freq_reg = (freq * 8.0 * 65536.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let freq_reg = (freq * 8.0 * 65536.0 / output_rate)
+                    .round()
+                    .clamp(1.0, 65535.0) as u16;
                 let vol = ((state.volume as u32 * 255 / 127) as u8).max(1);
                 let note_start_time = *time;
                 // Write non-keyon registers first
-                self.c140_reg_write(base + 0x00, vol, *time);             // volume_right
-                self.c140_reg_write(base + 0x01, vol, *time);             // volume_left
+                self.c140_reg_write(base, vol, *time); // volume_right
+                self.c140_reg_write(base + 0x01, vol, *time); // volume_left
                 self.c140_reg_write(base + 0x02, (freq_reg >> 8) as u8, *time); // frequency_msb
                 self.c140_reg_write(base + 0x03, (freq_reg & 0xFF) as u8, *time); // frequency_lsb
-                self.c140_reg_write(base + 0x04, 0x00, *time);            // bank = 0
-                self.c140_reg_write(base + 0x06, 0x00, *time);            // start_msb = 0
-                self.c140_reg_write(base + 0x07, 0x00, *time);            // start_lsb = 0
-                self.c140_reg_write(base + 0x08, 0x00, *time);            // end_msb = 0
-                self.c140_reg_write(base + 0x09, 0x07, *time);            // end_lsb = 7 (8-sample loop: 0..7)
-                self.c140_reg_write(base + 0x0A, 0x00, *time);            // loop_msb = 0
-                self.c140_reg_write(base + 0x0B, 0x00, *time);            // loop_lsb = 0
-                // Key on: mode = 0x80 (keyon) | 0x10 (loop)
+                self.c140_reg_write(base + 0x04, 0x00, *time); // bank = 0
+                self.c140_reg_write(base + 0x06, 0x00, *time); // start_msb = 0
+                self.c140_reg_write(base + 0x07, 0x00, *time); // start_lsb = 0
+                self.c140_reg_write(base + 0x08, 0x00, *time); // end_msb = 0
+                self.c140_reg_write(base + 0x09, 0x07, *time); // end_lsb = 7 (8-sample loop: 0..7)
+                self.c140_reg_write(base + 0x0A, 0x00, *time); // loop_msb = 0
+                self.c140_reg_write(base + 0x0B, 0x00, *time); // loop_lsb = 0
+                                                               // Key on: mode = 0x80 (keyon) | 0x10 (loop)
                 self.c140_reg_write(base + 0x05, 0x90, *time);
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2156,10 +2489,12 @@ impl VgmGenerator {
                 let ch = state.k051649_ch as u16;
                 // Emit ROM data block (type 0x92) once; 256 signed 8-bit sine samples
                 if !self.c352_data_block_written {
-                    let rom: Vec<u8> = (0..256usize).map(|i| {
-                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
-                        (angle.sin() * 127.0).round() as i8 as u8
-                    }).collect();
+                    let rom: Vec<u8> = (0..256usize)
+                        .map(|i| {
+                            let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                            (angle.sin() * 127.0).round() as i8 as u8
+                        })
+                        .collect();
                     self.emit_rom_data_block(0x92, &rom, *time);
                     self.c352_data_block_written = true;
                 }
@@ -2174,24 +2509,31 @@ impl VgmGenerator {
                 // Fetch fires when counter >= 65536, rate = freq/65536 per sample
                 // N=64 samples at freq f: freq = f * 64 * 65536 / output_rate
                 // output_rate = clock / 288
-                let clock = if self.header.c352_clock > 0 { self.header.c352_clock } else { 16_000_000 };
+                let clock = if self.header.c352_clock > 0 {
+                    self.header.c352_clock
+                } else {
+                    16_000_000
+                };
                 let freq_hz = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let output_rate = clock as f64 / 288.0;
-                let freq_reg = (freq_hz * 64.0 * 65536.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let freq_reg = (freq_hz * 64.0 * 65536.0 / output_rate)
+                    .round()
+                    .clamp(1.0, 65535.0) as u16;
                 let vol = ((state.volume as u32 * 0xFF00 / 127) as u16).max(0x0100);
                 let note_start_time = *time;
-                self.c352_reg_write(base + 0, vol, *time);     // vol_f
-                self.c352_reg_write(base + 1, vol, *time);     // vol_r
+                self.c352_reg_write(base, vol, *time); // vol_f
+                self.c352_reg_write(base + 1, vol, *time); // vol_r
                 self.c352_reg_write(base + 2, freq_reg, *time); // freq
-                self.c352_reg_write(base + 4, 0, *time);       // wave_bank = 0
-                self.c352_reg_write(base + 5, 0, *time);       // wave_start = 0
-                self.c352_reg_write(base + 6, 63, *time);      // wave_end = 63 (for 64 samples)
-                self.c352_reg_write(base + 7, 0, *time);       // wave_loop = 0
-                // Flags: KEYON (0x8000) | LOOP (0x0002)
+                self.c352_reg_write(base + 4, 0, *time); // wave_bank = 0
+                self.c352_reg_write(base + 5, 0, *time); // wave_start = 0
+                self.c352_reg_write(base + 6, 63, *time); // wave_end = 63 (for 64 samples)
+                self.c352_reg_write(base + 7, 0, *time); // wave_loop = 0
+                                                         // Flags: KEYON (0x8000) | LOOP (0x0002)
                 self.c352_reg_write(base + 3, 0x4002u16, *time);
                 self.c352_reg_write(0x202, 0, *time); // execute keyons
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2206,13 +2548,15 @@ impl VgmGenerator {
                 }
             }
             Some("QSound") | Some("QSOUND") if state.has_channel => {
-                let ch = state.k051649_ch as u8;
+                let ch = state.k051649_ch;
                 // Emit ROM data block (type 0x8F) once; 256 signed 8-bit sine samples
                 if !self.qsound_data_block_written {
-                    let rom: Vec<u8> = (0..256usize).map(|i| {
-                        let angle = std::f64::consts::TAU * i as f64 / 256.0;
-                        (angle.sin() * 127.0).round() as i8 as u8
-                    }).collect();
+                    let rom: Vec<u8> = (0..256usize)
+                        .map(|i| {
+                            let angle = std::f64::consts::TAU * i as f64 / 256.0;
+                            (angle.sin() * 127.0).round() as i8 as u8
+                        })
+                        .collect();
                     self.emit_rom_data_block(0x8F, &rom, *time);
                     self.qsound_data_block_written = true;
                 }
@@ -2223,24 +2567,31 @@ impl VgmGenerator {
                 }
                 // Rate (4.12 fixed-point): rate = freq * 256 * 4096 / output_rate
                 // output_rate = clock / 2 / 1248
-                let clock = if self.header.qsound_clock > 0 { self.header.qsound_clock } else { 24_576_000 };
+                let clock = if self.header.qsound_clock > 0 {
+                    self.header.qsound_clock
+                } else {
+                    24_576_000
+                };
                 let freq_hz = 440.0_f64 * 2.0_f64.powf((midi as f64 - 69.0) / 12.0);
                 let output_rate = clock as f64 / 2.0 / 1248.0;
-                let rate = (freq_hz * 256.0 * 4096.0 / output_rate).round().clamp(1.0, 65535.0) as u16;
+                let rate = (freq_hz * 256.0 * 4096.0 / output_rate)
+                    .round()
+                    .clamp(1.0, 65535.0) as u16;
                 let vol = ((state.volume as u32 * 0x3FFF / 127) as u16).max(0x0100);
                 let note_start_time = *time;
                 let addr_reg = (ch as u16) * 8 + 1;
                 let rate_reg = (ch as u16) * 8 + 2;
                 let loop_reg = (ch as u16) * 8 + 4;
-                let end_reg  = (ch as u16) * 8 + 5;
-                let vol_reg  = (ch as u16) * 8 + 6;
-                self.qsound_reg_write(addr_reg as u8, 0, *time);      // start addr = 0
-                self.qsound_reg_write(rate_reg as u8, rate, *time);   // rate
-                self.qsound_reg_write(loop_reg as u8, 256, *time);    // loop_len = 256
-                self.qsound_reg_write(end_reg  as u8, 256, *time);    // end_addr = 256
-                self.qsound_reg_write(vol_reg  as u8, vol, *time);    // volume
+                let end_reg = (ch as u16) * 8 + 5;
+                let vol_reg = (ch as u16) * 8 + 6;
+                self.qsound_reg_write(addr_reg as u8, 0, *time); // start addr = 0
+                self.qsound_reg_write(rate_reg as u8, rate, *time); // rate
+                self.qsound_reg_write(loop_reg as u8, 256, *time); // loop_len = 256
+                self.qsound_reg_write(end_reg as u8, 256, *time); // end_addr = 256
+                self.qsound_reg_write(vol_reg as u8, vol, *time); // volume
                 state.keyed_on = true;
-                let (note_on_samples, gap) = Self::quantize_split(samples, state.quantize, state.quantize_proportional);
+                let (note_on_samples, gap) =
+                    Self::quantize_split(samples, state.quantize, state.quantize_proportional);
                 self.emit_note_event(note, state, note_start_time, note_on_samples);
                 *time += note_on_samples as u64;
                 self.add_wait(note_on_samples, *time);
@@ -2333,18 +2684,32 @@ impl VgmGenerator {
         let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
         let alg_idx = op_stride * 4;
         let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
-        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
+        let fb = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
 
         let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
-        for op_idx in 0..4usize {
-            let op_off = ch + mml_to_hw[op_idx] * 4;
+        for (op_idx, &hw) in mml_to_hw.iter().enumerate() {
+            let op_off = ch + hw * 4;
             let b = op_idx * op_stride;
             if params.len() > b + 8 {
-                let am    = if op_stride >= 11 { params.get(b + 9).copied().unwrap_or(0) as u8 } else { 0 };
-                let ssg   = if op_stride >= 11 { params.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+                let am = if op_stride >= 11 {
+                    params.get(b + 9).copied().unwrap_or(0) as u8
+                } else {
+                    0
+                };
+                let ssg = if op_stride >= 11 {
+                    params.get(b + 10).copied().unwrap_or(0) as u8
+                } else {
+                    0
+                };
                 let (ar, dr, sr, rr, sl, ks, ml, dt) = (
-                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
-                    params[b+4] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                    params[b] as u8,
+                    params[b + 1] as u8,
+                    params[b + 2] as u8,
+                    params[b + 3] as u8,
+                    params[b + 4] as u8,
+                    params[b + 6] as u8,
+                    params[b + 7] as u8,
+                    params[b + 8] as u8,
                 );
                 self.ym2612_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
                 self.ym2612_write_reg(port, 0x50 + op_off, ((ks & 0x3) << 6) | (ar & 0x1F), time);
@@ -2377,10 +2742,10 @@ impl VgmGenerator {
         let alg = params.get(op_stride * 4).copied().unwrap_or(7) as u8;
 
         let carrier: [bool; 4] = match alg {
-            4     => [false, true,  false, true],
-            5 | 6 => [false, true,  true,  true],
-            7     => [true,  true,  true,  true],
-            _     => [false, false, false, true],
+            4 => [false, true, false, true],
+            5 | 6 => [false, true, true, true],
+            7 => [true, true, true, true],
+            _ => [false, false, false, true],
         };
 
         let mml_to_hw: [usize; 4] = [0, 2, 1, 3];
@@ -2392,7 +2757,7 @@ impl VgmGenerator {
             }
             let hw_op = mml_to_hw[mml_op];
             let op_off = ch as usize + hw_op * 4;
-            let voice_tl = params.get(mml_op * op_stride + 5).copied().unwrap_or(0) as u32;
+            let voice_tl = params.get(mml_op * op_stride + 5).copied().unwrap_or(0);
             let tl = if is_carrier {
                 (voice_tl + (127 - vol)).min(127) as u8
             } else {
@@ -2419,8 +2784,8 @@ impl VgmGenerator {
         time: u64,
     ) {
         let port = state.ym2612_port;
-        let ch   = state.ym2612_ch;
-        let vol  = state.volume as u32;
+        let ch = state.ym2612_ch;
+        let vol = state.volume as u32;
 
         // Determine algorithm and op_stride from params (or use M-type defaults).
         let (alg, op_stride) = if let Some(p) = params {
@@ -2433,22 +2798,22 @@ impl VgmGenerator {
 
         // C# algs table: 1 = carrier (volume-adjusted), 0 = modulator (voice TL only)
         let carrier: [bool; 4] = match alg {
-            4     => [false, true,  false, true],
-            5 | 6 => [false, true,  true,  true],
-            7     => [true,  true,  true,  true],
-            _     => [false, false, false, true], // alg 0-3
+            4 => [false, true, false, true],
+            5 | 6 => [false, true, true, true],
+            7 => [true, true, true, true],
+            _ => [false, false, false, true], // alg 0-3
         };
 
         // MML op → hw_op for register offset and before_tl index (same mapping as C# OutFmSetTl swap)
         let mml_to_hw: [usize; 4] = [0, 2, 1, 3];
 
         for mml_op in 0..4usize {
-            let hw_op  = mml_to_hw[mml_op];
+            let hw_op = mml_to_hw[mml_op];
             let op_off = ch as usize + hw_op * 4;
             let voice_tl = params
                 .and_then(|p| p.get(mml_op * op_stride + 5))
                 .copied()
-                .unwrap_or(0) as u32;
+                .unwrap_or(0);
             let tl = if carrier[mml_op] {
                 (voice_tl + (127 - vol)).min(127) as u8
             } else {
@@ -2477,7 +2842,7 @@ impl VgmGenerator {
     }
 
     fn ym2612_key_off(&mut self, state: &PartCodegenState, time: &u64) {
-        let key_byte = 0x00u8 | ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
+        let key_byte = ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
         self.ym2612_write_reg(0, 0x28, key_byte, *time);
     }
 
@@ -2488,8 +2853,7 @@ impl VgmGenerator {
     fn midi_note_to_ym2612_freq(midi_note: u8) -> (u8, u16) {
         // From FNUM_YM2612.txt TYPE-C: C C# D D# E F F# G G# A A# B
         const FNUM_TABLE: [u16; 12] = [
-            0x283, 0x2A8, 0x2D2, 0x2FD, 0x32A, 0x35B,
-            0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4BF,
+            0x283, 0x2A8, 0x2D2, 0x2FD, 0x32A, 0x35B, 0x38E, 0x3C4, 0x3FE, 0x43B, 0x47B, 0x4BF,
         ];
         let note_index = (midi_note % 12) as usize;
         // MIDI C4=60: octave = 60/12 - 1 = 4; block = octave - 1 = 3
@@ -2501,7 +2865,13 @@ impl VgmGenerator {
     /// Convert a note duration to 44100 Hz sample count.
     ///
     /// `duration` is the MML length denominator (1=whole, 2=half, 4=quarter …).
-    fn note_duration_to_samples(&self, duration: u32, dotted: bool, bpm: u32, _default: u32) -> u32 {
+    fn note_duration_to_samples(
+        &self,
+        duration: u32,
+        dotted: bool,
+        bpm: u32,
+        _default: u32,
+    ) -> u32 {
         let bpm = bpm.max(1);
         let duration = duration.max(1);
         // Samples for one whole note at this BPM
@@ -2578,7 +2948,8 @@ impl VgmGenerator {
             let raw = (freq / (OPL_BASE / (1 << 20) as f64)).log2().ceil() as i32 - 9;
             raw.clamp(0, 7) as u8
         };
-        let f_num = (freq * (1u32 << (20u8.saturating_sub(block))) as f64 / OPL_BASE).round() as u16;
+        let f_num =
+            (freq * (1u32 << (20u8.saturating_sub(block))) as f64 / OPL_BASE).round() as u16;
         (block, f_num.min(1023))
     }
 
@@ -2620,30 +2991,41 @@ impl VgmGenerator {
 
     /// Convert MIDI note to RF5C164 sample address.
     /// For simplicity, map MIDI note to a sample address (basic implementation).
+    #[allow(dead_code)]
     fn midi_note_to_rf5c164_sample(&self, midi_note: u8) -> (u8, u16) {
         // Map note to sample: for now use a simple mapping
         // Note: RF5C164 uses 8-bit samples with 8 channels
-        let sample_base = ((midi_note as u16 % 12) * 0x1000) as u16;
+        let sample_base = (midi_note as u16 % 12) * 0x1000;
         (0, sample_base)
     }
 
     /// Convert MIDI note to K053260 sample address.
+    #[allow(dead_code)]
     fn midi_note_to_k053260_sample(&self, midi_note: u8) -> (u16, u8) {
-        let sample_base = ((midi_note as u16 % 16) * 0x1000) as u16;
+        let sample_base = (midi_note as u16 % 16) * 0x1000;
         (sample_base, 0)
     }
 
     /// Convert MIDI note to K054539 sample address.
+    #[allow(dead_code)]
     fn midi_note_to_k054539_sample(&self, midi_note: u8) -> (u16, u8) {
-        let sample_base = ((midi_note as u16 % 16) * 0x1000) as u16;
+        let sample_base = (midi_note as u16 % 16) * 0x1000;
         (sample_base, 0)
     }
 
     // ── YM2608 (OPNA) helpers ─────────────────────────────────────────────────
 
     fn ym2608_write_reg(&mut self, port: u8, reg: u8, val: u8, time: u64) {
-        let cmd_type = if port == 0 { VgmCommandType::Ym2608WritePort0 } else { VgmCommandType::Ym2608WritePort1 };
-        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+        let cmd_type = if port == 0 {
+            VgmCommandType::Ym2608WritePort0
+        } else {
+            VgmCommandType::Ym2608WritePort1
+        };
+        self.commands.push(VgmCommand {
+            command_type: cmd_type,
+            data: vec![reg, val],
+            time,
+        });
     }
 
     fn ym2608_global_init(&mut self, num_channels: u8) {
@@ -2670,17 +3052,32 @@ impl VgmGenerator {
         let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
         let alg_idx = op_stride * 4;
         let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
-        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
+        let fb = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
         let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
-        for op_idx in 0..4usize {
-            let op_off = ch + mml_to_hw[op_idx] * 4;
+        for (op_idx, &hw) in mml_to_hw.iter().enumerate() {
+            let op_off = ch + hw * 4;
             let b = op_idx * op_stride;
             if params.len() > b + 8 {
-                let am  = if op_stride >= 11 { params.get(b + 9).copied().unwrap_or(0) as u8 } else { 0 };
-                let ssg = if op_stride >= 11 { params.get(b + 10).copied().unwrap_or(0) as u8 } else { 0 };
+                let am = if op_stride >= 11 {
+                    params.get(b + 9).copied().unwrap_or(0) as u8
+                } else {
+                    0
+                };
+                let ssg = if op_stride >= 11 {
+                    params.get(b + 10).copied().unwrap_or(0) as u8
+                } else {
+                    0
+                };
                 let (ar, dr, sr, rr, sl, tl, ks, ml, dt) = (
-                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
-                    params[b+4] as u8, params[b+5] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                    params[b] as u8,
+                    params[b + 1] as u8,
+                    params[b + 2] as u8,
+                    params[b + 3] as u8,
+                    params[b + 4] as u8,
+                    params[b + 5] as u8,
+                    params[b + 6] as u8,
+                    params[b + 7] as u8,
+                    params[b + 8] as u8,
                 );
                 self.ym2608_write_reg(port, 0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
                 self.ym2608_write_reg(port, 0x40 + op_off, tl & 0x7F, time);
@@ -2706,7 +3103,7 @@ impl VgmGenerator {
     }
 
     fn ym2608_key_off(&mut self, state: &PartCodegenState, time: &u64) {
-        let key_byte = 0x00u8 | ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
+        let key_byte = ((state.ym2612_port & 0x1) << 2) | (state.ym2612_ch & 0x3);
         self.ym2608_write_reg(0, 0x28, key_byte, *time);
     }
 
@@ -2739,15 +3136,22 @@ impl VgmGenerator {
         let op_stride = if params.len() >= 46 { 11usize } else { 9usize };
         let alg_idx = op_stride * 4;
         let alg = params.get(alg_idx).copied().unwrap_or(7) as u8;
-        let fb  = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
+        let fb = params.get(alg_idx + 1).copied().unwrap_or(0) as u8;
         let mml_to_hw: [u8; 4] = [0, 2, 1, 3];
-        for op_idx in 0..4usize {
-            let op_off = ch + mml_to_hw[op_idx] * 4;
+        for (op_idx, &hw) in mml_to_hw.iter().enumerate() {
+            let op_off = ch + hw * 4;
             let b = op_idx * op_stride;
             if params.len() > b + 8 {
                 let (ar, dr, sr, rr, sl, tl, ks, ml, dt) = (
-                    params[b] as u8, params[b+1] as u8, params[b+2] as u8, params[b+3] as u8,
-                    params[b+4] as u8, params[b+5] as u8, params[b+6] as u8, params[b+7] as u8, params[b+8] as u8,
+                    params[b] as u8,
+                    params[b + 1] as u8,
+                    params[b + 2] as u8,
+                    params[b + 3] as u8,
+                    params[b + 4] as u8,
+                    params[b + 5] as u8,
+                    params[b + 6] as u8,
+                    params[b + 7] as u8,
+                    params[b + 8] as u8,
                 );
                 self.ym2203_write_reg(0x30 + op_off, ((dt & 0x7) << 4) | (ml & 0xF), time);
                 self.ym2203_write_reg(0x40 + op_off, tl & 0x7F, time);
@@ -2804,11 +3208,11 @@ impl VgmGenerator {
         let vol = state.volume;
         // Algorithm 7: all 4 operators are carriers → pure additive
         self.opm_write_reg(0x20 + ch, 0xC7, time); // L=1, R=1, FB=0, CON=7
-        // Each operator: DT1=0, MULT=1
+                                                   // Each operator: DT1=0, MULT=1
         for op in 0u8..4 {
             let base = op * 8 + ch;
             self.opm_write_reg(0x40 + base, 0x01, time); // DT1=0, MULT=1
-            // TL: volume maps 127→0 (full), 0→127 (mute)
+                                                         // TL: volume maps 127→0 (full), 0→127 (mute)
             let tl = (127u16.saturating_sub(vol as u16) / 4) as u8;
             self.opm_write_reg(0x60 + base, tl & 0x7F, time); // TL
             self.opm_write_reg(0x80 + base, 0x1F, time); // KS=0, AR=31
@@ -2851,7 +3255,11 @@ impl VgmGenerator {
             0x5F => VgmCommandType::Ymf262WritePort1,
             _ => VgmCommandType::Ym3812Write, // fallback
         };
-        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+        self.commands.push(VgmCommand {
+            command_type: cmd_type,
+            data: vec![reg, val],
+            time,
+        });
     }
 
     fn opl_global_init(&mut self, opcode: u8) {
@@ -2891,13 +3299,20 @@ impl VgmGenerator {
     }
 
     /// Write OPL F-num and block to channel registers; key_on controls bit 5 of B0-B8.
-    fn opl_write_freq(&mut self, opcode: u8, ch: u8, block: u8, f_num: u16, key_on: bool, time: u64) {
+    fn opl_write_freq(
+        &mut self,
+        opcode: u8,
+        ch: u8,
+        block: u8,
+        f_num: u16,
+        key_on: bool,
+        time: u64,
+    ) {
         // A0-A8: F-num low byte
         self.opl_write_raw(opcode, 0xA0 + ch, (f_num & 0xFF) as u8, time);
         // B0-B8: KON (bit5) | block (bits4:2) | F-num high (bits1:0)
-        let b_val = if key_on { 0x20u8 } else { 0u8 }
-            | ((block & 0x7) << 2)
-            | ((f_num >> 8) as u8 & 0x3);
+        let b_val =
+            if key_on { 0x20u8 } else { 0u8 } | ((block & 0x7) << 2) | ((f_num >> 8) as u8 & 0x3);
         self.opl_write_raw(opcode, 0xB0 + ch, b_val, time);
     }
 
@@ -2910,8 +3325,16 @@ impl VgmGenerator {
     // ── YMF262 (OPL3, 18-channel) helpers ────────────────────────────────────
 
     fn ymf262_write_reg(&mut self, port: u8, reg: u8, val: u8, time: u64) {
-        let cmd_type = if port == 0 { VgmCommandType::Ymf262WritePort0 } else { VgmCommandType::Ymf262WritePort1 };
-        self.commands.push(VgmCommand { command_type: cmd_type, data: vec![reg, val], time });
+        let cmd_type = if port == 0 {
+            VgmCommandType::Ymf262WritePort0
+        } else {
+            VgmCommandType::Ymf262WritePort1
+        };
+        self.commands.push(VgmCommand {
+            command_type: cmd_type,
+            data: vec![reg, val],
+            time,
+        });
     }
 
     fn ymf262_global_init(&mut self) {
@@ -2929,7 +3352,7 @@ impl VgmGenerator {
 
     fn ymf262_init_channel(&mut self, state: &PartCodegenState, time: u64) {
         let ch_abs = state.opl_ch;
-        let port = (ch_abs / 9) as u8;
+        let port = ch_abs / 9;
         let ch = ch_abs % 9;
         let vol = state.volume;
         let (mod_slot, car_slot) = Self::opl_slot(ch);
@@ -2948,8 +3371,8 @@ impl VgmGenerator {
 
     fn ymf262_key_off(&mut self, state: &PartCodegenState, time: &u64) {
         let ch_abs = state.opl_ch;
-        let port = (ch_abs / 9) as u8;
-        let ch = (ch_abs % 9) as u8;
+        let port = ch_abs / 9;
+        let ch = ch_abs % 9;
         self.ymf262_write_reg(port, 0xB0 + ch, 0x00, *time);
     }
 
@@ -2977,7 +3400,7 @@ impl VgmGenerator {
         for grp in 0u8..12 {
             let nibble = Self::GROUP_TO_NIBBLE[grp as usize];
             // KEYOFF: bank 0, reg 0x0 (synced — clears all 4 operators' key-on state)
-            self.ymf271_write_reg(0, 0x00 | nibble, 0x00, t);
+            self.ymf271_write_reg(0, nibble, 0x00, t);
         }
     }
 
@@ -3008,7 +3431,12 @@ impl VgmGenerator {
                     // TL (reg 4): total level
                     self.ymf271_write_reg(bank, 0x40 | nibble, op.tl.min(127), time);
                     // AR+KS (reg 5)
-                    self.ymf271_write_reg(bank, 0x50 | nibble, (op.ar & 0x1F) | ((op.ks & 0x07) << 5), time);
+                    self.ymf271_write_reg(
+                        bank,
+                        0x50 | nibble,
+                        (op.ar & 0x1F) | ((op.ks & 0x07) << 5),
+                        time,
+                    );
                     // D1R (reg 6)
                     self.ymf271_write_reg(bank, 0x60 | nibble, op.dr & 0x1F, time);
                     // D2R (reg 7)
@@ -3016,9 +3444,19 @@ impl VgmGenerator {
                     // RR+D1LVL (reg 8): D1LVL in high nibble, RR in low nibble
                     self.ymf271_write_reg(bank, 0x80 | nibble, (op.sl << 4) | (op.rr & 0x0F), time);
                     // MULTIPLE+DETUNE (reg 3)
-                    self.ymf271_write_reg(bank, 0x30 | nibble, (op.ml & 0x0F) | ((op.dt & 0x07) << 4), time);
+                    self.ymf271_write_reg(
+                        bank,
+                        0x30 | nibble,
+                        (op.ml & 0x0F) | ((op.dt & 0x07) << 4),
+                        time,
+                    );
                     // WAVEFORM+FEEDBACK+ACCON (reg 0xb)
-                    self.ymf271_write_reg(bank, 0xb0 | nibble, (op.wf & 0x07) | ((op.fb & 0x07) << 4) | (op.acc << 7), time);
+                    self.ymf271_write_reg(
+                        bank,
+                        0xb0 | nibble,
+                        (op.wf & 0x07) | ((op.fb & 0x07) << 4) | (op.acc << 7),
+                        time,
+                    );
                 } else {
                     self.ymf271_write_slot_defaults(nibble, car_tl, bank, time);
                 }
@@ -3058,14 +3496,14 @@ impl VgmGenerator {
         let fns_hi = (block << 4) | ((fnum >> 8) as u8 & 0x0F);
         self.ymf271_write_reg(0, 0xa0 | nibble, fns_hi, time);
         self.ymf271_write_reg(0, 0x90 | nibble, fnum_lo, time);
-        self.ymf271_write_reg(0, 0x00 | nibble, 0x01, time);
+        self.ymf271_write_reg(0, nibble, 0x01, time);
     }
 
     /// Clear key-on for a group.
     fn ymf271_key_off(&mut self, state: &PartCodegenState, time: &u64) {
         let grp = state.ymf271_group as usize;
         let nibble = Self::GROUP_TO_NIBBLE[grp];
-        self.ymf271_write_reg(0, 0x00 | nibble, 0x00, *time);
+        self.ymf271_write_reg(0, nibble, 0x00, *time);
     }
 
     /// Convert a MIDI note to YMF271 (BLOCK, FNUM).
@@ -3142,7 +3580,8 @@ impl VgmGenerator {
                 // Stored value is offset relative to the field at 0x1C.
                 let rel = byte_offset.saturating_sub(0x1C);
                 self.header.loop_offset = rel.min(u32::MAX as u64) as u32;
-                self.header.loop_samples = total_samples.saturating_sub(loop_time.min(u32::MAX as u64) as u32);
+                self.header.loop_samples =
+                    total_samples.saturating_sub(loop_time.min(u32::MAX as u64) as u32);
             }
         }
     }
@@ -3378,7 +3817,7 @@ impl VgmGenerator {
     /// selector (1=freq, 2=vol, 3=keyon) which produced VGM bytes the
     /// chip emulator and any standards-compliant external player both
     /// interpreted as more waveform RAM writes — silent playback.
-    fn k051649_note_on(&mut self, ch: u8, note: u8, octave: u8, volume: u8, time: u64) {
+    fn k051649_note_on(&mut self, ch: u8, note: u8, _octave: u8, volume: u8, time: u64) {
         let clock = self.header.k051649_clock;
         let (freq_lo, freq_hi) = self.midi_note_to_k051649_freq(note, clock);
         // Frequency: registers 0xA0+ch*2 (lo) and 0xA1+ch*2 (hi).
@@ -3419,28 +3858,40 @@ impl VgmGenerator {
         // period = (cpu_clock / (16 * (freq + 1))) / 2 - 1... let's use a simpler approach
         // From VGM spec: period = (CPU clock / (16 * note_freq)) - 1
         let period = (clock as f64 / (16.0 * freq)).round() - 1.0;
-        period.max(0.0).min(2047.0) as u16
+        period.clamp(0.0, 2047.0) as u16
     }
 
     /// Write NES Pulse channel note-on
-    fn nes_apu_note_on_pulse(&mut self, ch: u8, note: u8, octave: u8, volume: u8, duty: u8, time: u64) {
+    fn nes_apu_note_on_pulse(
+        &mut self,
+        ch: u8,
+        note: u8,
+        _octave: u8,
+        volume: u8,
+        duty: u8,
+        time: u64,
+    ) {
         let clock = self.header.nes_apu_clock;
         let period = self.midi_note_to_nes_freq(note, clock);
         let base = if ch == 0 { 0x4000 } else { 0x4004 };
-        
+
         // Write duty and volume (0x4000 or 0x4004)
         let duty_volume = ((duty & 0x3) << 6) | (volume & 0xF);
         self.nes_apu_write((base - 0x4000) as u8, duty_volume, time);
-        
+
         // Write sweep (0x4001 or 0x4005) - for now just disable sweep
         self.nes_apu_write((base - 0x4000 + 1) as u8, 0x08, time);
-        
+
         // Write timer low (0x4002 or 0x4006)
         self.nes_apu_write((base - 0x4000 + 2) as u8, (period & 0xFF) as u8, time);
-        
+
         // Write timer high + length counter (0x4003 or 0x4007)
         let length = 0; // For now, no length counter
-        self.nes_apu_write((base - 0x4000 + 3) as u8, ((period >> 8) as u8 & 0x07) | ((length & 0xF8) << 3), time);
+        self.nes_apu_write(
+            (base - 0x4000 + 3) as u8,
+            ((period >> 8) as u8 & 0x07) | ((length & 0xF8) << 3),
+            time,
+        );
     }
 
     /// Write NES Pulse channel note-off (set volume to 0)
@@ -3451,29 +3902,31 @@ impl VgmGenerator {
     }
 
     /// Write NES Triangle channel note-on
-    fn nes_apu_note_on_triangle(&mut self, note: u8, octave: u8, time: u64) {
+    #[allow(dead_code)]
+    fn nes_apu_note_on_triangle(&mut self, note: u8, _octave: u8, time: u64) {
         let clock = self.header.nes_apu_clock;
         let period = self.midi_note_to_nes_freq(note, clock);
-        
+
         // Write linear counter (0x4008)
         self.nes_apu_write(0x08, 0x80, time); // Enable linear counter, no counter value
-        
+
         // Write timer low (0x400A)
         self.nes_apu_write(0x0A, (period & 0xFF) as u8, time);
-        
+
         // Write timer high + length counter (0x400B)
         self.nes_apu_write(0x0B, ((period >> 8) as u8 & 0x07) | 0x80, time);
     }
 
     /// Write NES Noise channel note-on
+    #[allow(dead_code)]
     fn nes_apu_note_on_noise(&mut self, period: u8, mode: u8, volume: u8, time: u64) {
         // Write volume and envelope (0x400C)
         self.nes_apu_write(0x0C, (volume & 0xF) << 4, time);
-        
+
         // Write mode and period (0x400E)
         let mode_bit = if mode == 1 { 0x80 } else { 0x00 };
         self.nes_apu_write(0x0E, mode_bit | (period & 0x0F), time);
-        
+
         // Write length counter (0x400F) - for now just start the channel
         self.nes_apu_write(0x0F, 0x00, time);
     }
@@ -3482,8 +3935,10 @@ impl VgmGenerator {
     fn nes_apu_global_init(&mut self) {
         let t = 0u64;
         // Silence all channels' control / sweep / timer registers
-        for addr in [0x4000, 0x4001, 0x4002, 0x4003, 0x4004, 0x4005, 0x4006, 0x4007,
-                     0x4008, 0x4009, 0x400A, 0x400B, 0x400C, 0x400D, 0x400E, 0x400F] {
+        for addr in [
+            0x4000, 0x4001, 0x4002, 0x4003, 0x4004, 0x4005, 0x4006, 0x4007, 0x4008, 0x4009, 0x400A,
+            0x400B, 0x400C, 0x400D, 0x400E, 0x400F,
+        ] {
             self.nes_apu_write((addr - 0x4000) as u8, 0, t);
         }
         // Enable all five channels via $4015. Without this, the chip
@@ -3514,7 +3969,7 @@ impl VgmGenerator {
         let freq = 440.0_f64 * 2.0_f64.powf((midi_note as f64 - 69.0) / 12.0);
         let clock = self.header.vrc6_clock as f64;
         let period = (clock / (16.0 * freq) - 1.0).round();
-        period.max(0.0).min(4095.0) as u16
+        period.clamp(0.0, 4095.0) as u16
     }
 
     fn vrc6_note_on_pulse(&mut self, ch: u8, note: u8, volume: u8, time: u64) {
@@ -3556,30 +4011,38 @@ impl VgmGenerator {
         let clock = self.header.dmg_clock as f64;
         // period = 2048 - (clock / (32 * freq))
         let period = (2048.0 - (clock / (32.0 * freq))).round();
-        let period_int = period.max(0.0).min(2047.0) as u16;
+        let period_int = period.clamp(0.0, 2047.0) as u16;
         ((period_int & 0xFF) as u8, ((period_int >> 8) & 0x07) as u8)
     }
 
     /// Write DMG Pulse channel note-on
-    fn dmg_note_on_pulse(&mut self, ch: u8, note: u8, octave: u8, volume: u8, duty: u8, time: u64) {
+    fn dmg_note_on_pulse(
+        &mut self,
+        ch: u8,
+        note: u8,
+        _octave: u8,
+        volume: u8,
+        duty: u8,
+        time: u64,
+    ) {
         let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
-        let duty_len  = ((duty & 0x3) << 6) | 0x3F;
-        let vol_env   = ((volume & 0xF) << 4) | 0x0F;
+        let duty_len = ((duty & 0x3) << 6) | 0x3F;
+        let vol_env = ((volume & 0xF) << 4) | 0x0F;
         // NRx4: bits 2:0 = period high, bit 7 = trigger
         let freq_hi_trig = (freq_hi & 0x07) | 0x80;
         if ch == 0 {
             // CH1 register map: NR10=0x00 NR11=0x01 NR12=0x02 NR13=0x03 NR14=0x04
-            self.dmg_write(0x00, 0x00,          time); // NR10: sweep off
-            self.dmg_write(0x01, duty_len,       time); // NR11: duty + length
-            self.dmg_write(0x02, vol_env,        time); // NR12: volume + envelope
-            self.dmg_write(0x03, freq_lo,        time); // NR13: frequency lo
-            self.dmg_write(0x04, freq_hi_trig,   time); // NR14: frequency hi + trigger
+            self.dmg_write(0x00, 0x00, time); // NR10: sweep off
+            self.dmg_write(0x01, duty_len, time); // NR11: duty + length
+            self.dmg_write(0x02, vol_env, time); // NR12: volume + envelope
+            self.dmg_write(0x03, freq_lo, time); // NR13: frequency lo
+            self.dmg_write(0x04, freq_hi_trig, time); // NR14: frequency hi + trigger
         } else {
             // CH2 register map: NR21=0x06 NR22=0x07 NR23=0x08 NR24=0x09
-            self.dmg_write(0x06, duty_len,       time); // NR21: duty + length
-            self.dmg_write(0x07, vol_env,        time); // NR22: volume + envelope
-            self.dmg_write(0x08, freq_lo,        time); // NR23: frequency lo
-            self.dmg_write(0x09, freq_hi_trig,   time); // NR24: frequency hi + trigger
+            self.dmg_write(0x06, duty_len, time); // NR21: duty + length
+            self.dmg_write(0x07, vol_env, time); // NR22: volume + envelope
+            self.dmg_write(0x08, freq_lo, time); // NR23: frequency lo
+            self.dmg_write(0x09, freq_hi_trig, time); // NR24: frequency hi + trigger
         }
     }
 
@@ -3601,7 +4064,7 @@ impl VgmGenerator {
     }
 
     /// Write DMG Wave channel note-on
-    fn dmg_note_on_wave(&mut self, note: u8, octave: u8, volume: u8, time: u64) {
+    fn dmg_note_on_wave(&mut self, note: u8, _octave: u8, volume: u8, time: u64) {
         let (freq_lo, freq_hi) = self.midi_note_to_dmg_freq(note);
 
         // NR30: Wave enable (bit 7)
@@ -3625,15 +4088,15 @@ impl VgmGenerator {
     fn dmg_note_on_noise(&mut self, lfsr_width: u8, period: u8, volume: u8, time: u64) {
         // NR41: Sound length
         self.dmg_write(0x10, 0xFF, time);
-        
+
         // NR42: Initial volume + envelope
         let vol_env = ((volume & 0xF) << 4) | 0x0F;
         self.dmg_write(0x11, vol_env, time);
-        
+
         // NR43: Clock shift + width + trigger
         let width_bit = if lfsr_width == 1 { 0x40 } else { 0x00 };
         self.dmg_write(0x12, width_bit | (period & 0x0F) | 0x80, time);
-        
+
         // NR44: Trigger (bit 7)
         self.dmg_write(0x13, 0x80, time);
     }
@@ -3642,11 +4105,12 @@ impl VgmGenerator {
     fn dmg_set_wave_table(&mut self, nibbles: &[u8; 32], time: u64) {
         for i in 0..16 {
             let byte = (nibbles[i * 2] & 0x0F) | ((nibbles[i * 2 + 1] & 0x0F) << 4);
-            self.dmg_write((0x20 + i as u8), byte, time);
+            self.dmg_write(0x20 + i as u8, byte, time);
         }
     }
 
     /// Write DMG sweep register for Pulse1
+    #[allow(dead_code)]
     fn dmg_set_sweep(&mut self, period: u8, direction: u8, shift: u8, time: u64) {
         let reg = ((period & 0x7) << 4) | ((direction & 0x1) << 3) | (shift & 0x7);
         self.dmg_write(0x00, reg, time);
@@ -3679,7 +4143,15 @@ impl VgmGenerator {
     }
 
     /// Generic write helper for 3-byte VGM commands (port, addr, data)
-    fn generic_chip_write_ported(&mut self, cmd_type: VgmCommandType, port: u8, addr: u8, data: u8, time: u64) {
+    #[allow(dead_code)]
+    fn generic_chip_write_ported(
+        &mut self,
+        cmd_type: VgmCommandType,
+        port: u8,
+        addr: u8,
+        data: u8,
+        time: u64,
+    ) {
         self.commands.push(VgmCommand {
             command_type: cmd_type,
             data: vec![port, addr, data],
@@ -3781,7 +4253,12 @@ impl VgmGenerator {
     fn c352_reg_write(&mut self, addr: u16, data: u16, time: u64) {
         self.commands.push(VgmCommand {
             command_type: VgmCommandType::C352RegWrite,
-            data: vec![(addr >> 8) as u8, (addr & 0xFF) as u8, (data >> 8) as u8, (data & 0xFF) as u8],
+            data: vec![
+                (addr >> 8) as u8,
+                (addr & 0xFF) as u8,
+                (data >> 8) as u8,
+                (data & 0xFF) as u8,
+            ],
             time,
         });
     }
@@ -3833,7 +4310,7 @@ impl VgmGenerator {
         data.push(block_type);
         data.extend_from_slice(&body_len.to_le_bytes());
         data.extend_from_slice(&data_len.to_le_bytes()); // total ROM size
-        data.extend_from_slice(&0u32.to_le_bytes());     // ROM write offset = 0
+        data.extend_from_slice(&0u32.to_le_bytes()); // ROM write offset = 0
         data.extend_from_slice(rom_data);
         self.commands.push(VgmCommand {
             command_type: VgmCommandType::DataBlock,
@@ -3864,10 +4341,10 @@ impl VgmGenerator {
         time: u64,
     ) -> MmlResult<()> {
         let cmd_upper = command.to_uppercase();
-        
+
         // Determine chip type from state
         let chip = state.chip.as_deref().unwrap_or("Generic");
-        
+
         // Route to chip-specific or command-specific handlers
         match cmd_upper.as_str() {
             // FM Operator Commands (works for most FM chips)
@@ -3895,19 +4372,22 @@ impl VgmGenerator {
                 self.handle_wavetable_command(&cmd_upper, args, state, time)?;
             }
             // PCM Commands
-            "BANK" | "LOOP" | "START" | "END" |
-            "VOLUME" | "REVERSE" | "PAN" | "REVERB" => {
+            "BANK" | "LOOP" | "START" | "END" | "VOLUME" | "REVERSE" | "PAN" | "REVERB" => {
                 self.handle_pcm_command(&cmd_upper, args, state, time)?;
             }
             // Special/Meta commands
             "EON" => {
-                state.ym2612_port = if args.first().map_or(false, |&a| a != 0) { 1 } else { 0 };
+                state.ym2612_port = if args.first().is_some_and(|&a| a != 0) {
+                    1
+                } else {
+                    0
+                };
             }
             _ => {
                 // Unknown command - silently ignore (can log if needed)
             }
         }
-        
+
         Ok(())
     }
 
@@ -3916,16 +4396,16 @@ impl VgmGenerator {
         &mut self,
         command: &str,
         args: &[u32],
-        state: &PartCodegenState,
+        _state: &PartCodegenState,
         time: u64,
         chip: &str,
     ) -> MmlResult<()> {
         if args.is_empty() {
             return Ok(());
         }
-        
+
         let value = (args[0].min(255)) as u8;
-        
+
         // Map command to register offset within operator data
         // Operator register layout (per YM FM chips):
         // 0x30: AR, 0x31: DR, 0x32: SR, 0x33: RR, 0x34: SL, 0x35: TL, 0x36: KS, 0x37: ML, 0x38: DT
@@ -3941,7 +4421,7 @@ impl VgmGenerator {
             "DT" => 0x38,
             _ => return Ok(()),
         };
-        
+
         // Write to appropriate chip
         match chip {
             "YM2608" | "OPNA" => {
@@ -3962,7 +4442,7 @@ impl VgmGenerator {
             }
             _ => {}
         }
-        
+
         Ok(())
     }
 
@@ -3978,9 +4458,9 @@ impl VgmGenerator {
         if args.is_empty() {
             return Ok(());
         }
-        
+
         let value = (args[0].min(255)) as u8;
-        
+
         match command {
             "AL" => {
                 // Algorithm selection (0x04 register)
@@ -3999,14 +4479,19 @@ impl VgmGenerator {
                     "YM3526" | "OPL" | "YM3812" | "OPL2" => {
                         // OPL chips use 0xC0 + channel for feedback
                         let fb_byte = 0xC0 + (state.ym2612_ch & 0x8);
-                        self.generic_chip_write(VgmCommandType::Ym3812Write, fb_byte, feedback, time);
+                        self.generic_chip_write(
+                            VgmCommandType::Ym3812Write,
+                            fb_byte,
+                            feedback,
+                            time,
+                        );
                     }
                     _ => {}
                 }
             }
             _ => {}
         }
-        
+
         Ok(())
     }
 
@@ -4021,9 +4506,9 @@ impl VgmGenerator {
         if args.is_empty() {
             return Ok(());
         }
-        
+
         let value = (args[0].min(255)) as u8;
-        
+
         match command {
             "EN" => {
                 // Envelope enable (register 0x0D, bit 4)
@@ -4043,7 +4528,7 @@ impl VgmGenerator {
             }
             _ => {}
         }
-        
+
         Ok(())
     }
 
@@ -4058,9 +4543,9 @@ impl VgmGenerator {
         if args.is_empty() {
             return Ok(());
         }
-        
+
         let value = (args[0].min(255)) as u8;
-        
+
         match command {
             "FILTER" => {
                 // Lowpass filter mode (0x2A register, bits 0-1)
@@ -4098,13 +4583,17 @@ impl VgmGenerator {
                     return Ok(());
                 }
                 let wave_num = (args[0].min(255)) as u8;
-                
+
                 // For HuC6280: waveform select via DRR register
                 if state.chip.as_deref() == Some("HuC6280") {
                     self.huc6280_write(0x04, wave_num, time);
                 }
                 // For K051649: waveform select via register
-                else if state.chip.as_deref().map_or(false, |c| c.contains("K051649") || c.contains("SCC")) {
+                else if state
+                    .chip
+                    .as_deref()
+                    .is_some_and(|c| c.contains("K051649") || c.contains("SCC"))
+                {
                     self.k051649_write(0, 0x06, wave_num, time);
                 }
             }
@@ -4121,7 +4610,9 @@ impl VgmGenerator {
                 // HuC6280 noise mode/period for channels 4-5.
                 // Reg 0x07 (DDA / noise control on noise-capable channels):
                 //   bit 7 = noise enable, bits 0-4 = noise frequency.
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 if state.chip.as_deref() == Some("HuC6280") {
                     let val = args[0] as u8;
                     let enable = if val != 0 { 0x80 } else { 0x00 };
@@ -4136,9 +4627,9 @@ impl VgmGenerator {
                 //              bit 3 = 1 for decrease, 0 for increase,
                 //              bits 2-0 = shift.
                 if state.chip.as_deref() == Some("DMG") {
-                    let sweep_time = args.get(0).copied().unwrap_or(0) as u8 & 0x07;
-                    let direction  = args.get(1).copied().unwrap_or(0) as u8 & 0x01;
-                    let shift      = args.get(2).copied().unwrap_or(0) as u8 & 0x07;
+                    let sweep_time = args.first().copied().unwrap_or(0) as u8 & 0x07;
+                    let direction = args.get(1).copied().unwrap_or(0) as u8 & 0x01;
+                    let shift = args.get(2).copied().unwrap_or(0) as u8 & 0x07;
                     let nr10 = (sweep_time << 4) | (direction << 3) | shift;
                     self.dmg_write(0x00, nr10, time);
                 }
@@ -4147,7 +4638,9 @@ impl VgmGenerator {
                 // DMG NR43 LFSR width selector ($FF22), bit 3.
                 // 0 = 15-bit (long noise), 1 = 7-bit (short / metallic).
                 if state.chip.as_deref() == Some("DMG") {
-                    if args.is_empty() { return Ok(()); }
+                    if args.is_empty() {
+                        return Ok(());
+                    }
                     let lfsr = args[0] as u8 & 0x01;
                     self.dmg_write(0x22 - 0x10, lfsr << 3, time);
                 }
@@ -4198,7 +4691,9 @@ impl VgmGenerator {
 
         match command {
             "BANK" => {
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 match chip {
                     "SegaPCM" => {
                         // Bank select via address high byte
@@ -4211,7 +4706,9 @@ impl VgmGenerator {
                 }
             }
             "LOOP" => {
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 // Loop enable flag
                 let loop_enable = if value != 0 { 0x10 } else { 0x00 };
                 match chip {
@@ -4223,7 +4720,9 @@ impl VgmGenerator {
             }
             "START" => {
                 // Start address. Args: [low] or [low, mid, high]; missing bytes default to 0.
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 let lo = args.first().copied().unwrap_or(0) as u8;
                 let mid = args.get(1).copied().unwrap_or(0) as u8;
                 let hi = args.get(2).copied().unwrap_or(0) as u8;
@@ -4245,7 +4744,9 @@ impl VgmGenerator {
                 }
             }
             "END" => {
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 let lo = args.first().copied().unwrap_or(0) as u8;
                 let mid = args.get(1).copied().unwrap_or(0) as u8;
                 match chip {
@@ -4262,7 +4763,9 @@ impl VgmGenerator {
             }
             "VOLUME" => {
                 // Stereo volume. Args: [left, right] (0-255). Defaults: right=left.
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 let left = args.first().copied().unwrap_or(0) as u8;
                 let right = args.get(1).copied().unwrap_or(args[0]) as u8;
                 match chip {
@@ -4293,7 +4796,9 @@ impl VgmGenerator {
                 }
             }
             "PAN" => {
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 // QSound pan: 16-bit register 0x00 (channel-relative); arg is
                 // the signed pan position [-64, +64] mapped to 0x80 center.
                 let signed = args[0] as i32;
@@ -4306,15 +4811,25 @@ impl VgmGenerator {
                     }
                     "RF5C164" => {
                         // RF5C164 pan: high nibble = left, low nibble = right.
-                        let l = if signed <= 0 { 0xF } else { (0xF as i32 - signed.min(0xF)) as u8 };
-                        let r = if signed >= 0 { 0xF } else { (0xF as i32 + signed.max(-0xF)) as u8 };
+                        let l = if signed <= 0 {
+                            0xF
+                        } else {
+                            (0xF_i32 - signed.min(0xF)) as u8
+                        };
+                        let r = if signed >= 0 {
+                            0xF
+                        } else {
+                            (0xF_i32 + signed.max(-0xF)) as u8
+                        };
                         self.rf5c164_write(0x01, (l << 4) | (r & 0xF), time);
                     }
                     _ => {}
                 }
             }
             "REVERB" => {
-                if args.is_empty() { return Ok(()); }
+                if args.is_empty() {
+                    return Ok(());
+                }
                 // QSound: reverb level is set via global register 0xCD/0xCE.
                 if chip == "QSound" {
                     self.qsound_write(0x00, 0x00, time);

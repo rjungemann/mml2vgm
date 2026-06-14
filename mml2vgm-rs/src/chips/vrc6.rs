@@ -34,6 +34,7 @@ struct SawtoothChannel {
     phase_acc: f32,
 }
 
+/// VRC 6.
 pub struct VRC6 {
     clock_rate: u32,
     pulse: [PulseChannel; 2],
@@ -41,10 +42,12 @@ pub struct VRC6 {
 }
 
 impl VRC6 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(1_789_772)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -65,8 +68,12 @@ impl VRC6 {
 }
 
 impl SoundChipEmulator for VRC6 {
-    fn name(&self) -> &'static str { "VRC6" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "VRC6"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -84,7 +91,8 @@ impl SoundChipEmulator for VRC6 {
                 self.pulse[0].period = (self.pulse[0].period & 0x0F00) | data as u16;
             }
             0x02 => {
-                self.pulse[0].period = (self.pulse[0].period & 0x00FF) | (((data & 0x0F) as u16) << 8);
+                self.pulse[0].period =
+                    (self.pulse[0].period & 0x00FF) | (((data & 0x0F) as u16) << 8);
                 self.pulse[0].enabled = (data & 0x80) != 0;
             }
             // Pulse 2
@@ -97,7 +105,8 @@ impl SoundChipEmulator for VRC6 {
                 self.pulse[1].period = (self.pulse[1].period & 0x0F00) | data as u16;
             }
             0x12 => {
-                self.pulse[1].period = (self.pulse[1].period & 0x00FF) | (((data & 0x0F) as u16) << 8);
+                self.pulse[1].period =
+                    (self.pulse[1].period & 0x00FF) | (((data & 0x0F) as u16) << 8);
                 self.pulse[1].enabled = (data & 0x80) != 0;
             }
             // Sawtooth
@@ -108,14 +117,17 @@ impl SoundChipEmulator for VRC6 {
                 self.sawtooth.period = (self.sawtooth.period & 0x0F00) | data as u16;
             }
             0x22 => {
-                self.sawtooth.period = (self.sawtooth.period & 0x00FF) | (((data & 0x0F) as u16) << 8);
+                self.sawtooth.period =
+                    (self.sawtooth.period & 0x00FF) | (((data & 0x0F) as u16) << 8);
                 self.sawtooth.enabled = (data & 0x80) != 0;
             }
             _ => {}
         }
     }
 
-    fn read(&self, _addr: u8) -> u8 { 0xFF }
+    fn read(&self, _addr: u8) -> u8 {
+        0xFF
+    }
     fn clock(&mut self) {}
 
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
@@ -124,7 +136,9 @@ impl SoundChipEmulator for VRC6 {
 
             // Pulse channels
             for ch in 0..2 {
-                if !self.pulse[ch].enabled || self.pulse[ch].halt { continue; }
+                if !self.pulse[ch].enabled || self.pulse[ch].halt {
+                    continue;
+                }
                 let freq = self.pulse_freq_hz(ch);
                 let phase_inc = freq / sample_rate as f32;
                 self.pulse[ch].phase_acc += phase_inc;
@@ -138,7 +152,11 @@ impl SoundChipEmulator for VRC6 {
                 } else {
                     self.pulse[ch].duty as f32 / 8.0
                 };
-                let sample = if self.pulse[ch].phase_acc < threshold { vol } else { -vol };
+                let sample = if self.pulse[ch].phase_acc < threshold {
+                    vol
+                } else {
+                    -vol
+                };
                 out += sample * 0.25;
             }
 
@@ -165,7 +183,9 @@ impl SoundChipEmulator for VRC6 {
 }
 
 impl Default for VRC6 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -209,7 +229,10 @@ mod tests {
         chip.write(0x02, 0x80); // enable
         let mut buf = [0.0f32; 8];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active VRC6 pulse must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active VRC6 pulse must produce output"
+        );
     }
 
     #[test]
@@ -218,12 +241,15 @@ mod tests {
         assert!(chip.is_initialized());
         assert_eq!(chip.read(0x00), 0xFF);
         chip.clock(); // must not panic
-        // Sawtooth channel
+                      // Sawtooth channel
         chip.write(0x20, 0x20); // accum_rate=32
         chip.write(0x21, 0x50); // period lo
         chip.write(0x22, 0x80); // enable
         let mut buf = [0.0f32; 8];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active VRC6 sawtooth must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active VRC6 sawtooth must produce output"
+        );
     }
 }

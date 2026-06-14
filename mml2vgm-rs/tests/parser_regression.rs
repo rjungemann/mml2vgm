@@ -80,14 +80,20 @@ fn mixed_loop_types_compile() {
 fn sharp_accidental_parses() {
     // c+ = C-sharp
     let ast = parse("c+4");
-    assert!(!ast.parts.is_empty() || ast.parts.is_empty(), "parse must not panic");
+    assert!(
+        !ast.parts.is_empty() || ast.parts.is_empty(),
+        "parse must not panic"
+    );
 }
 
 #[test]
 fn flat_accidental_parses() {
     // e- = E-flat
     let ast = parse("e-4");
-    assert!(!ast.parts.is_empty() || ast.parts.is_empty(), "parse must not panic");
+    assert!(
+        !ast.parts.is_empty() || ast.parts.is_empty(),
+        "parse must not panic"
+    );
 }
 
 #[test]
@@ -282,7 +288,11 @@ fn bar_lines_are_ignored_in_compilation() {
     .expect("compile with bars failed")
     .data;
 
-    let t_without = u32::from_le_bytes([without[0x18], without[0x19], without[0x1A], without[0x1B]]);
-    let t_with    = u32::from_le_bytes([with[0x18],    with[0x19],    with[0x1A],    with[0x1B]]);
-    assert_eq!(t_without, t_with, "bar lines must not affect total duration");
+    let t_without =
+        u32::from_le_bytes([without[0x18], without[0x19], without[0x1A], without[0x1B]]);
+    let t_with = u32::from_le_bytes([with[0x18], with[0x19], with[0x1A], with[0x1B]]);
+    assert_eq!(
+        t_without, t_with,
+        "bar lines must not affect total duration"
+    );
 }

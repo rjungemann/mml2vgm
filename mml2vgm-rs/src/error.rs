@@ -12,66 +12,86 @@ use thiserror::Error;
 pub enum MmlError {
     // IO Errors
     #[error("IO error: {0}")]
+    /// Io.
     Io(#[from] io::Error),
 
     // Parse Errors
     #[error("Parse error at line {line}, column {column}: {message}")]
+    /// Parse.
     Parse {
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
+        /// Message.
         message: String,
     },
 
     // File Errors
     #[error("File not found: {0}")]
+    /// File Not Found.
     FileNotFound(PathBuf),
 
     #[error("Invalid file format: {0}")]
+    /// Invalid File Format.
     InvalidFileFormat(String),
 
     // Compilation Errors
     #[error("Compilation error: {0}")]
+    /// Compilation.
     Compilation(String),
 
     #[error("Unsupported command: {0}")]
+    /// Unsupported Command.
     UnsupportedCommand(String),
 
     #[error("Invalid instrument reference: {0}")]
+    /// Invalid Instrument.
     InvalidInstrument(usize),
 
     #[error("Invalid part name: {0}")]
+    /// Invalid Part Name.
     InvalidPartName(String),
 
     // Chip Errors
     #[error("Unsupported sound chip: {0}")]
+    /// Unsupported Chip.
     UnsupportedChip(String),
 
     #[error("Chip initialization failed: {0}")]
+    /// Chip Init Failed.
     ChipInitFailed(String),
 
     // Audio Errors
     #[error("Audio error: {0}")]
+    /// Audio Error.
     AudioError(#[from] crate::audio::AudioError),
 
     // VGM Format Errors
     #[error("Invalid VGM header: {0}")]
+    /// Invalid Vgm Header.
     InvalidVgmHeader(String),
 
     #[error("VGM version not supported: {0}")]
+    /// Unsupported Vgm Version.
     UnsupportedVgmVersion(u32),
 
     #[error("Invalid output format: {0}")]
+    /// Invalid Output Format.
     InvalidOutputFormat(String),
 
     // PCM Errors
     #[error("PCM format not supported: {0}")]
+    /// Unsupported Pcm Format.
     UnsupportedPcmFormat(String),
 
     #[error("PCM data too large: {0} bytes (max {1})")]
+    /// Pcm Too Large.
     PcmTooLarge(usize, usize),
 
     // Internal Errors
     #[error("Internal error: {0}")]
+    /// Internal.
     Internal(String),
 }
 
@@ -81,7 +101,9 @@ pub type MmlResult<T> = Result<T, MmlError>;
 /// Position information for error reporting
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
 }
 
@@ -114,7 +136,9 @@ impl Position {
                 }
                 '\r' => {
                     // Don't increment line for \r, it may be followed by \n
-                    if current_offset + 1 < source.len() && source.chars().nth(current_offset + 1) != Some('\n') {
+                    if current_offset + 1 < source.len()
+                        && source.chars().nth(current_offset + 1) != Some('\n')
+                    {
                         line += 1;
                         column = 1;
                     }
@@ -133,11 +157,14 @@ impl Position {
 /// A source span: start and end position in the source file
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
+    /// Start.
     pub start: Position,
-    pub end: Position,  // inclusive end
+    /// End.
+    pub end: Position, // inclusive end
 }
 
 impl Span {
+    /// New.
     pub fn new(start: Position, end: Position) -> Self {
         Self { start, end }
     }
@@ -146,13 +173,18 @@ impl Span {
 /// Error context for better error messages
 #[derive(Debug, Clone)]
 pub struct ErrorContext {
+    /// Position.
     pub position: Position,
+    /// Message.
     pub message: String,
+    /// Source.
     pub source: Option<String>,
+    /// Help.
     pub help: Option<String>,
 }
 
 impl ErrorContext {
+    /// New.
     pub fn new(position: Position, message: impl Into<String>) -> Self {
         Self {
             position,
@@ -162,11 +194,13 @@ impl ErrorContext {
         }
     }
 
+    /// With source.
     pub fn with_source(mut self, source: impl Into<String>) -> Self {
         self.source = Some(source.into());
         self
     }
 
+    /// With help.
     pub fn with_help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
         self
@@ -175,7 +209,9 @@ impl ErrorContext {
 
 /// Convenience trait for converting common errors to MmlError
 pub trait IntoMmlError<T> {
+    /// Into mml error.
     fn into_mml_error(self) -> MmlError;
+    /// Into mml result.
     fn into_mml_result(self) -> MmlResult<T>;
 }
 
@@ -230,7 +266,7 @@ mod tests {
     #[test]
     fn test_position_from_offset() {
         let source = "line1\nline2\nline3";
-        
+
         let pos = Position::from_offset(0, source);
         assert_eq!(pos.line, 1);
         assert_eq!(pos.column, 1);
@@ -246,11 +282,9 @@ mod tests {
 
     #[test]
     fn test_error_context() {
-        let ctx = ErrorContext::new(
-            Position::new(10, 5),
-            "Test error"
-        ).with_source("source code")
-        .with_help("Try this");
+        let ctx = ErrorContext::new(Position::new(10, 5), "Test error")
+            .with_source("source code")
+            .with_help("Try this");
 
         assert_eq!(ctx.position.line, 10);
         assert_eq!(ctx.position.column, 5);

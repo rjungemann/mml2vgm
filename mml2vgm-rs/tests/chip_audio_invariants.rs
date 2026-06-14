@@ -32,7 +32,10 @@ fn volume_scaling_louder_volume_raises_rms() {
     let loud = rms(&render_for_seconds(&sn_tone(120), 0.5));
 
     assert!(quiet > 0.0, "quiet tone unexpectedly silent");
-    assert!(loud > quiet, "louder volume must raise RMS (quiet={quiet}, loud={loud})");
+    assert!(
+        loud > quiet,
+        "louder volume must raise RMS (quiet={quiet}, loud={loud})"
+    );
     let ratio = loud / quiet;
     assert!(
         (1.6..=2.4).contains(&ratio),
@@ -67,9 +70,7 @@ fn rendered_samples_are_finite_and_bounded() {
     // ever reaches an audio device.
     for mml in [
         sn_tone(120),
-        format!(
-            "{{\n  PartYM2612 = A\n}}\n'@ M 000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 007,000\n'A1 T120 @0 v127 l1 o4 a"
-        ),
+        "{\n  PartYM2612 = A\n}\n'@ M 000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 031,000,000,000,000,000,000,001,000,000,000\n'@ 007,000\n'A1 T120 @0 v127 l1 o4 a".to_string(),
     ] {
         let pcm = render_stereo(&mml);
         assert!(!pcm.is_empty(), "render produced no samples");

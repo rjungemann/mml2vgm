@@ -31,7 +31,9 @@ fn render_mml(mml: &str, seconds: f32) -> Vec<f32> {
     player.play().expect("play failed");
     let n = (44100.0 * seconds) as usize;
     let mut buf = vec![0.0f32; n * 2];
-    player.generate_samples(&mut buf, n).expect("generate failed");
+    player
+        .generate_samples(&mut buf, n)
+        .expect("generate failed");
     buf
 }
 

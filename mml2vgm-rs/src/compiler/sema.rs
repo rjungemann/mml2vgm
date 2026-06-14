@@ -3,14 +3,21 @@
 //! Implementation will be done in Phase 2.
 
 use crate::compiler::ast::MmlAst;
-use crate::{MmlError, MmlResult};
+use crate::MmlResult;
 
 /// Semantic analysis context
 pub struct Sema {
     // Context for semantic analysis
 }
 
+impl Default for Sema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Sema {
+    /// New.
     pub fn new() -> Self {
         Self {}
     }
