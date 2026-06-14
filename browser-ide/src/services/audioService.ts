@@ -143,14 +143,48 @@ const detectChipsFromVgmHeader = (data: Uint8Array): SoundChip[] => {
   return found;
 };
 
-/** Merge two chip lists preserving order and dropping duplicates. */
+/**
+ * Canonical-cased chip names. The Rust side serialises SoundChip variants as
+ * lowercase via `#[serde(rename_all = "lowercase")]`, so `target_chips` on a
+ * compile result comes back like `['sn76489', 'ym2608']`. The VGM header
+ * detector returns canonical-cased variants (`'SN76489'`, `'SegaPCM'`, …).
+ * Without case folding, a `Set<SoundChip>` dedup misses the overlap and we
+ * end up trying to add the same emulator twice → the chip player rejects
+ * the duplicate and playback fails.
+ *
+ * Lookup table indexed by lowercase form, returning the canonical variant.
+ * Built once at module load.
+ */
+const CANONICAL_CHIP_NAMES: ReadonlyArray<SoundChip> = [
+  'YM2612', 'YM2612X', 'YM2612X2',
+  'SN76489', 'SN76489X2',
+  'YM2608', 'YM2609', 'YM2610B',
+  'YM2151', 'YM3526', 'Y8950', 'YM3812', 'YMF262', 'YMF271',
+  'YM2413', 'YM2203',
+  'RF5C164', 'SegaPCM', 'HuC6280', 'C140', 'C352',
+  'AY8910', 'K051649', 'K053260', 'K054539', 'QSound',
+  'NES', 'DMG', 'VRC6', 'POKEY', 'MIDI', 'CONDUCTOR',
+];
+const CHIP_NAME_INDEX: Map<string, SoundChip> = new Map(
+  CANONICAL_CHIP_NAMES.map(name => [name.toLowerCase(), name]),
+);
+
+const canonicalizeChip = (name: string): SoundChip | undefined =>
+  CHIP_NAME_INDEX.get(name.toLowerCase());
+
+/**
+ * Merge two chip lists preserving order, dropping duplicates, and folding
+ * lowercase / canonical-cased entries to the same chip. Unknown names are
+ * silently dropped — they wouldn't be addable to the chip player anyway.
+ */
 const mergeChips = (a: SoundChip[], b: SoundChip[]): SoundChip[] => {
   const seen = new Set<SoundChip>();
   const out: SoundChip[] = [];
   for (const chip of [...a, ...b]) {
-    if (!seen.has(chip)) {
-      seen.add(chip);
-      out.push(chip);
+    const canonical = canonicalizeChip(chip as string);
+    if (canonical && !seen.has(canonical)) {
+      seen.add(canonical);
+      out.push(canonical);
     }
   }
   return out;
