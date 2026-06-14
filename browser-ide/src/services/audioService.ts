@@ -1736,7 +1736,17 @@ export class AudioService {
    *   - Buffer: 4096 stereo frames at 44.1 kHz ≈ 92.8 ms of audio.
    *   - Steady-state sleep ≈ 92.8 - 27 ≈ 66 ms.
    *
-   *   `SLEEP_CAP_MS = 70 ms` matches `bufferMs - typical cycle`. At the
+   *   `SLEEP_CAP_MS` must be ≥ `bufferMs - cycleDur` for the buffer to
+   *   reach steady state at TARGET_FILL_MS. With the post-§W sync-write
+   *   pipeline + the OPL chip pitch fix, cycle CPU dropped to ~3-6 ms
+   *   (was 27-38 ms in the original profile). Steady-state sleep at
+   *   3 ms cycles is `92.8 - 3 = 89.8 ms`, so a cap of 70 was capping
+   *   *every* steady-state cycle and biasing the buffer upward by
+   *   ~19 ms per cycle. After ~13 cycles the ring filled, writes
+   *   started being discarded, and the chip player over-advanced —
+   *   audible as "still a bit of choppiness." Bumped to 95 ms (a touch
+   *   above bufferMs so neither cycle-time regime hits the cap in
+   *   normal operation). At the
    *   target fill the producer settles into a sleep ≈ 70 ms per cycle and
    *   the buffer stops growing. A slow cycle (38 ms) adapts itself: the
    *   pacer just computes a shorter sleep that turn, keeping fill stable.
@@ -1754,7 +1764,7 @@ export class AudioService {
    */
   private computeProducerDelayMs(): number {
     const TARGET_FILL_MS = 250;
-    const SLEEP_CAP_MS = 70;
+    const SLEEP_CAP_MS = 95;
     const sr = this.sampleRate || 44100;
 
     let bufferedMs = 0;
