@@ -5,8 +5,8 @@
 use std::time::Instant;
 
 use crate::drivers::{
-    DriverCompileOptions, DriverRegistry, ExternalDriver,
-    M98Driver, MucomDriver, MoonDriver, PMDDriver, MuapDriver,
+    DriverCompileOptions, DriverRegistry, ExternalDriver, M98Driver, MoonDriver, MuapDriver,
+    MucomDriver, PMDDriver,
 };
 use std::sync::Arc;
 
@@ -30,22 +30,52 @@ fn assert_driver_conforms(driver: &dyn ExternalDriver, own_extension: &str, mini
 
     // id / display_name / description non-empty
     assert!(!driver.id().is_empty(), "{}: id() empty", driver.id());
-    assert!(!driver.display_name().is_empty(), "{}: display_name() empty", driver.id());
-    assert!(!driver.description().is_empty(), "{}: description() empty", driver.id());
-    assert!(!driver.version().is_empty(), "{}: version() empty", driver.id());
-    assert!(!driver.target_platform().is_empty(), "{}: target_platform() empty", driver.id());
+    assert!(
+        !driver.display_name().is_empty(),
+        "{}: display_name() empty",
+        driver.id()
+    );
+    assert!(
+        !driver.description().is_empty(),
+        "{}: description() empty",
+        driver.id()
+    );
+    assert!(
+        !driver.version().is_empty(),
+        "{}: version() empty",
+        driver.id()
+    );
+    assert!(
+        !driver.target_platform().is_empty(),
+        "{}: target_platform() empty",
+        driver.id()
+    );
 
     // extensions
     let exts = driver.supported_extensions();
-    assert!(!exts.is_empty(), "{}: supported_extensions() empty", driver.id());
+    assert!(
+        !exts.is_empty(),
+        "{}: supported_extensions() empty",
+        driver.id()
+    );
 
     // detect own extension → high confidence
     let own_conf = driver.detect("", Some(own_extension));
-    assert!(own_conf >= 60, "{}: own extension confidence too low: {}", driver.id(), own_conf);
+    assert!(
+        own_conf >= 60,
+        "{}: own extension confidence too low: {}",
+        driver.id(),
+        own_conf
+    );
 
     // detect foreign extension → low confidence
     let foreign_conf = driver.detect("", Some("song.xyz_unknown_format"));
-    assert!(foreign_conf < 60, "{}: foreign extension confidence too high: {}", driver.id(), foreign_conf);
+    assert!(
+        foreign_conf < 60,
+        "{}: foreign extension confidence too high: {}",
+        driver.id(),
+        foreign_conf
+    );
 
     // compile minimal snippet – must not panic, error is acceptable
     let opts = DriverCompileOptions::default();
@@ -59,13 +89,21 @@ fn assert_driver_conforms(driver: &dyn ExternalDriver, own_extension: &str, mini
 
     // validate valid – must not panic
     let diag_result = driver.validate(minimal_snippet);
-    assert!(diag_result.is_ok(), "{}: validate(valid) returned Err", driver.id());
+    assert!(
+        diag_result.is_ok(),
+        "{}: validate(valid) returned Err",
+        driver.id()
+    );
 
     // tokenize basic – must return at least one token for non-empty input
     let tok_result = driver.tokenize(minimal_snippet);
     assert!(tok_result.is_ok(), "{}: tokenize returned Err", driver.id());
 
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "{}: test exceeded timeout", driver.id());
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "{}: test exceeded timeout",
+        driver.id()
+    );
 }
 
 fn assert_valid_vgm_output(bytes: &[u8]) {
@@ -245,7 +283,12 @@ fn registry_all_drivers_registered() {
     let start = Instant::now();
     let reg = default_registry();
     let drivers = reg.get_all_drivers();
-    assert_eq!(drivers.len(), 5, "expected 5 drivers, got {}", drivers.len());
+    assert_eq!(
+        drivers.len(),
+        5,
+        "expected 5 drivers, got {}",
+        drivers.len()
+    );
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
 }
 
@@ -254,7 +297,11 @@ fn registry_lookup_by_id() {
     let start = Instant::now();
     let reg = default_registry();
     for id in ["m98", "mucom", "moondriver", "pmd", "muap"] {
-        assert!(reg.get_driver(id).is_some(), "driver '{}' not found in registry", id);
+        assert!(
+            reg.get_driver(id).is_some(),
+            "driver '{}' not found in registry",
+            id
+        );
     }
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
 }
@@ -279,7 +326,11 @@ fn registry_no_false_positive_random_text() {
     let result = reg.detect_format("hello world this is not music", Some("readme.txt"));
     // Either no match, or a low-confidence one (registry threshold is 30)
     if let Some((_, conf)) = result {
-        assert!(conf < 80, "unexpected high confidence {} for random text", conf);
+        assert!(
+            conf < 80,
+            "unexpected high confidence {} for random text",
+            conf
+        );
     }
     assert!(start.elapsed().as_secs() < TIMEOUT_SECS);
 }

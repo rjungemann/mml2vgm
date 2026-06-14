@@ -2,7 +2,7 @@
 //!
 //! Provides a trait-based abstraction for audio output across different backends.
 
-use crate::{MmlError, MmlResult};
+use crate::MmlResult;
 use std::fmt;
 
 /// Audio backend error types

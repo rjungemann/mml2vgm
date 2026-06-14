@@ -5,12 +5,13 @@
 use std::time::Instant;
 
 use crate::compiler::ast::Note;
-use crate::{CompileOptions, OutputFormat};
 use crate::compiler::compiler::MmlCompiler;
+use crate::{CompileOptions, OutputFormat};
 
 // ── Note MIDI mapping ─────────────────────────────────────────────────────────
 
 const AST_TIMEOUT_MS: u128 = 500;
+#[allow(dead_code)]
 const CODEGEN_TIMEOUT_SECS: u64 = 5;
 const COMPILER_TIMEOUT_SECS: u64 = 10;
 
@@ -66,13 +67,27 @@ fn ast_all_chromatic_notes_octave4() {
     let start = Instant::now();
     // C4=60, C#4=61 … B4=71
     let expected: Vec<(char, i8, u8)> = vec![
-        ('C', 0, 4), ('C', 1, 4), ('D', 0, 4), ('D', 1, 4),
-        ('E', 0, 4), ('F', 0, 4), ('F', 1, 4), ('G', 0, 4),
-        ('G', 1, 4), ('A', 0, 4), ('A', 1, 4), ('B', 0, 4),
+        ('C', 0, 4),
+        ('C', 1, 4),
+        ('D', 0, 4),
+        ('D', 1, 4),
+        ('E', 0, 4),
+        ('F', 0, 4),
+        ('F', 1, 4),
+        ('G', 0, 4),
+        ('G', 1, 4),
+        ('A', 0, 4),
+        ('A', 1, 4),
+        ('B', 0, 4),
     ];
     for (i, (letter, acc, oct)) in expected.iter().enumerate() {
         let note = Note::new(*letter, *acc, *oct);
-        assert_eq!(note.midi_note() as usize, 60 + i, "chromatic note {} wrong", i);
+        assert_eq!(
+            note.midi_note() as usize,
+            60 + i,
+            "chromatic note {} wrong",
+            i
+        );
     }
     assert!(start.elapsed().as_millis() < AST_TIMEOUT_MS);
 }
@@ -103,7 +118,9 @@ fn compiler_compile_from_source_ok() {
 fn compiler_output_contains_data() {
     let start = Instant::now();
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
     assert!(!result.data.is_empty(), "expected non-empty output");
     assert!(start.elapsed().as_secs() < COMPILER_TIMEOUT_SECS);
 }
@@ -120,7 +137,9 @@ fn compiler_validate_ok() {
 fn compiler_warnings_empty_by_default() {
     let start = Instant::now();
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
     assert!(result.warnings.is_empty());
     assert!(start.elapsed().as_secs() < COMPILER_TIMEOUT_SECS);
 }
@@ -141,16 +160,14 @@ fn compiler_compile_empty_source() {
 fn codegen_vgm_header_magic() {
     let start = Instant::now();
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
     assert!(
         result.data.len() >= 4,
         "VGM output too short to have magic bytes"
     );
-    assert_eq!(
-        &result.data[0..4],
-        b"Vgm ",
-        "VGM magic bytes mismatch"
-    );
+    assert_eq!(&result.data[0..4], b"Vgm ", "VGM magic bytes mismatch");
     assert!(start.elapsed().as_secs() < COMPILER_TIMEOUT_SECS);
 }
 
@@ -158,7 +175,9 @@ fn codegen_vgm_header_magic() {
 fn codegen_vgm_nonzero_output() {
     let start = Instant::now();
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
     assert!(!result.data.is_empty());
     assert!(start.elapsed().as_secs() < COMPILER_TIMEOUT_SECS);
 }
@@ -168,10 +187,20 @@ fn codegen_vgm_nonzero_output() {
 #[test]
 fn codegen_all_formats_same_source() {
     let start = Instant::now();
-    for format in [OutputFormat::VGM, OutputFormat::XGM, OutputFormat::XGM2, OutputFormat::ZGM] {
+    for format in [
+        OutputFormat::VGM,
+        OutputFormat::XGM,
+        OutputFormat::XGM2,
+        OutputFormat::ZGM,
+    ] {
         let compiler = make_compiler(format);
         let result = compiler.compile_from_source(MINIMAL_MML);
-        assert!(result.is_ok(), "format {:?} failed: {:?}", format, result.err());
+        assert!(
+            result.is_ok(),
+            "format {:?} failed: {:?}",
+            format,
+            result.err()
+        );
     }
     assert!(start.elapsed().as_secs() < COMPILER_TIMEOUT_SECS);
 }
@@ -179,18 +208,25 @@ fn codegen_all_formats_same_source() {
 #[test]
 fn compiler_compile_from_source_xgm_has_fm_psg_blocks() {
     let compiler = make_compiler(OutputFormat::XGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
 
     assert!(result.data.len() >= 0x20);
     assert_eq!(&result.data[0..4], b"XGM ");
     assert_eq!(result.data[4], 0x10);
-    assert_eq!(&result.data[result.data.len() - 4..], &[0x0f, 0xff, 0xff, 0xff]);
+    assert_eq!(
+        &result.data[result.data.len() - 4..],
+        &[0x0f, 0xff, 0xff, 0xff]
+    );
 }
 
 #[test]
 fn compiler_compile_from_source_xgm2_has_block_sizes() {
     let compiler = make_compiler(OutputFormat::XGM2);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
 
     assert!(result.data.len() >= 0x20);
     assert_eq!(&result.data[0..4], b"XGM2");
@@ -202,7 +238,9 @@ fn compiler_compile_from_source_xgm2_has_block_sizes() {
 #[test]
 fn compiler_compile_from_source_zgm_has_offsets() {
     let compiler = make_compiler(OutputFormat::ZGM);
-    let result = compiler.compile_from_source(MINIMAL_MML).expect("compile failed");
+    let result = compiler
+        .compile_from_source(MINIMAL_MML)
+        .expect("compile failed");
 
     assert!(result.data.len() >= 0x40);
     assert_eq!(&result.data[0..4], b"ZGM ");
@@ -261,7 +299,9 @@ fn csharp_format_song_info_preprocessed() {
 'A1 o4 l4 c d e f
 ";
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(src).expect("csharp_format_song_info_preprocessed compile failed");
+    let result = compiler
+        .compile_from_source(src)
+        .expect("csharp_format_song_info_preprocessed compile failed");
     assert!(!result.data.is_empty());
     assert_eq!(&result.data[0..4], b"Vgm ", "VGM magic missing");
 }
@@ -290,7 +330,9 @@ fn csharp_format_note_letter_part_names() {
     // F is a note letter (CDEFGAB), but 'F1 means part F channel 1 in C# format.
     let src = "'F1 t120\n'F1 o4 l4 c r d r\n'F2 o4 l4 e r f r\n";
     let compiler = make_compiler(OutputFormat::VGM);
-    let result = compiler.compile_from_source(src).expect("note-letter part name compile failed");
+    let result = compiler
+        .compile_from_source(src)
+        .expect("note-letter part name compile failed");
     assert!(!result.data.is_empty());
 }
 
@@ -329,10 +371,18 @@ fn csharp_format_fm_instrument_accumulated() {
 ";
     let tokens = tokenize(src_no_header).expect("tokenize failed");
     let ast = Parser::new(tokens).parse().expect("parse failed");
-    assert!(ast.fm_instruments.contains_key(&0), "FM instrument 0 not stored");
+    assert!(
+        ast.fm_instruments.contains_key(&0),
+        "FM instrument 0 not stored"
+    );
     let inst = &ast.fm_instruments[&0];
     // 4 operators × 11 params + 2 ALG/FB params = 46
-    assert_eq!(inst.parameters.len(), 46, "expected 46 parameters, got {}", inst.parameters.len());
+    assert_eq!(
+        inst.parameters.len(),
+        46,
+        "expected 46 parameters, got {}",
+        inst.parameters.len()
+    );
     // First operator's first param (AR) = 31
     assert_eq!(inst.parameters[0], 31, "expected AR=31 for op1");
     // ALG/FB row: param index 44 = ALG = 7, param index 45 = FB = 0
@@ -340,7 +390,9 @@ fn csharp_format_fm_instrument_accumulated() {
     assert_eq!(inst.parameters[45], 0, "expected FB=0");
 
     // Full compile should also succeed
-    let result = compiler.compile_from_source(src).expect("compile_from_source failed");
+    let result = compiler
+        .compile_from_source(src)
+        .expect("compile_from_source failed");
     assert!(!result.data.is_empty());
     assert_eq!(&result.data[0..4], b"Vgm ");
 }
@@ -385,8 +437,15 @@ fn csharp_format_t0100_full_no_hang() {
     let compiler = make_compiler(OutputFormat::VGM);
     let start = Instant::now();
     let result = compiler.compile_from_source(src);
-    assert!(start.elapsed().as_secs() < 5, "T0100 full content compile took too long (hang?)");
-    assert!(result.is_ok(), "T0100 full content compile failed: {:?}", result.err());
+    assert!(
+        start.elapsed().as_secs() < 5,
+        "T0100 full content compile took too long (hang?)"
+    );
+    assert!(
+        result.is_ok(),
+        "T0100 full content compile failed: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -415,8 +474,13 @@ fn csharp_format_song_info_no_hang() {
 ";
     let compiler = make_compiler(OutputFormat::VGM);
     let start = Instant::now();
-    let result = compiler.compile_from_source(src).expect("T0100-style compile failed");
-    assert!(start.elapsed().as_secs() < 2, "compile took too long (hang?)");
+    let result = compiler
+        .compile_from_source(src)
+        .expect("T0100-style compile failed");
+    assert!(
+        start.elapsed().as_secs() < 2,
+        "compile took too long (hang?)"
+    );
     assert!(!result.data.is_empty());
 }
 
@@ -425,14 +489,35 @@ fn test_instrument_110_stored() {
     // Test that F-type instrument 110 from T0000 is stored correctly
     let src = "'@ F 110\n   AR  DR  SR  RR  SL  TL  KS  ML  DT\n'@ 031,000,000,000,000,033,000,004,007\n'@ 018,015,009,007,003,009,000,004,007\n'@ 031,000,000,000,000,024,000,002,003\n'@ 031,015,009,007,003,000,000,002,003\n'@ 004,007\n";
     let ast = crate::compiler::parser::parse(src).expect("parse failed");
-    assert!(ast.fm_instruments.contains_key(&110), "instrument 110 not stored; keys: {:?}", ast.fm_instruments.keys().collect::<Vec<_>>());
+    assert!(
+        ast.fm_instruments.contains_key(&110),
+        "instrument 110 not stored; keys: {:?}",
+        ast.fm_instruments.keys().collect::<Vec<_>>()
+    );
     let inst = &ast.fm_instruments[&110];
-    assert_eq!(inst.parameters.len(), 38, "expected 38 params, got {}", inst.parameters.len());
+    assert_eq!(
+        inst.parameters.len(),
+        38,
+        "expected 38 params, got {}",
+        inst.parameters.len()
+    );
     // ALG should be at [36], FB at [37]
-    assert_eq!(inst.parameters[36], 4, "ALG expected 4 got {}", inst.parameters[36]);
-    assert_eq!(inst.parameters[37], 7, "FB expected 7 got {}", inst.parameters[37]);
+    assert_eq!(
+        inst.parameters[36], 4,
+        "ALG expected 4 got {}",
+        inst.parameters[36]
+    );
+    assert_eq!(
+        inst.parameters[37], 7,
+        "FB expected 7 got {}",
+        inst.parameters[37]
+    );
     // TL of op0 should be at [5]
-    assert_eq!(inst.parameters[5], 33, "TL op0 expected 33 got {}", inst.parameters[5]);
+    assert_eq!(
+        inst.parameters[5], 33,
+        "TL op0 expected 33 got {}",
+        inst.parameters[5]
+    );
 }
 
 #[test]
@@ -450,10 +535,14 @@ fn test_instrument_110_params_in_vgm() {
     let mut found = false;
     let mut i = 0x100; // start after VGM header
     while i + 2 < data.len() {
-        if data[i] == 0x52 && data[i+1] == 0xB0 {
-            let val = data[i+2];
+        if data[i] == 0x52 && data[i + 1] == 0xB0 {
+            let val = data[i + 2];
             eprintln!("Found B0+ch0 write at offset {}: val=0x{:02X}", i, val);
-            assert_eq!(val, 0x3C, "Expected B0 = 0x3C (ALG=4,FB=7 from inst 110), got 0x{:02X}", val);
+            assert_eq!(
+                val, 0x3C,
+                "Expected B0 = 0x3C (ALG=4,FB=7 from inst 110), got 0x{:02X}",
+                val
+            );
             found = true;
             break;
         }
@@ -468,10 +557,19 @@ fn test_instrument_110_debug() {
     // First, check what AST is parsed
     let ast = crate::compiler::parser::parse(src).expect("parse failed");
     eprintln!("Parts: {:?}", ast.parts.keys().collect::<Vec<_>>());
-    eprintln!("FM instruments: {:?}", ast.fm_instruments.keys().collect::<Vec<_>>());
+    eprintln!(
+        "FM instruments: {:?}",
+        ast.fm_instruments.keys().collect::<Vec<_>>()
+    );
     if let Some(part) = ast.parts.get("A1") {
         eprintln!("Part A1 chip: {:?}", part.chip);
-        eprintln!("Part A1 commands: {:?}", part.commands.iter().map(|c| format!("{:?}", c)).collect::<Vec<_>>());
+        eprintln!(
+            "Part A1 commands: {:?}",
+            part.commands
+                .iter()
+                .map(|c| format!("{:?}", c))
+                .collect::<Vec<_>>()
+        );
     }
 }
 
@@ -488,16 +586,28 @@ fn test_t0000_codegen_debug() {
     while i < data.len() && count < 30 {
         match data[i] {
             0x52 | 0x53 if i + 2 < data.len() => {
-                eprintln!("write @{}: port={} reg=0x{:02X} val=0x{:02X}", count, data[i]-0x52, data[i+1], data[i+2]);
-                i += 3; count += 1;
+                eprintln!(
+                    "write @{}: port={} reg=0x{:02X} val=0x{:02X}",
+                    count,
+                    data[i] - 0x52,
+                    data[i + 1],
+                    data[i + 2]
+                );
+                i += 3;
+                count += 1;
             }
             0x61 if i + 2 < data.len() => {
-                let s = u16::from_le_bytes([data[i+1], data[i+2]]);
+                let s = u16::from_le_bytes([data[i + 1], data[i + 2]]);
                 eprintln!("wait: {} samples", s);
                 i += 3;
             }
-            0x66 => { eprintln!("EOF"); break; }
-            _ => { i += 1; }
+            0x66 => {
+                eprintln!("EOF");
+                break;
+            }
+            _ => {
+                i += 1;
+            }
         }
     }
 }
@@ -505,59 +615,98 @@ fn test_t0000_codegen_debug() {
 #[test]
 fn test_t0000_actual_file() {
     // Test directly against the actual T0000 file
-    let path = std::path::Path::new("/tmp/mml2vgm-csharp/mml2vgm/samples/test/T0000_SongInfoDef.gwi");
-    if !path.exists() { eprintln!("Skipping: file not found"); return; }
+    let path =
+        std::path::Path::new("/tmp/mml2vgm-csharp/mml2vgm/samples/test/T0000_SongInfoDef.gwi");
+    if !path.exists() {
+        eprintln!("Skipping: file not found");
+        return;
+    }
     // Parse the T0000 source directly (without preprocess) and check fm_instruments
     {
         let raw = std::fs::read_to_string(path).expect("read");
-        let source = raw.strip_prefix('\u{FEFF}').unwrap_or(&raw)
+        let source = raw
+            .strip_prefix('\u{FEFF}')
+            .unwrap_or(&raw)
             .replace("\r\n", "\n")
             .split('\n')
-            .map(|l| if l.trim_start().starts_with(';') { "" } else { l })
-            .collect::<Vec<_>>().join("\n");
+            .map(|l| {
+                if l.trim_start().starts_with(';') {
+                    ""
+                } else {
+                    l
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         let tokens = crate::compiler::lexer::tokenize(&source).expect("lex");
-        let ast = crate::compiler::parser::Parser::new(tokens).parse().expect("parse");
+        let ast = crate::compiler::parser::Parser::new(tokens)
+            .parse()
+            .expect("parse");
         eprintln!("=== WITHOUT preprocess ===");
-        eprintln!("fm_instruments keys: {:?}", ast.fm_instruments.keys().collect::<Vec<_>>());
+        eprintln!(
+            "fm_instruments keys: {:?}",
+            ast.fm_instruments.keys().collect::<Vec<_>>()
+        );
     }
     // Parse WITH preprocess (same as compiler.compile path)
     {
-        use crate::compiler::compiler::MmlCompiler;
         let raw = std::fs::read_to_string(path).expect("read");
-        let source = raw.strip_prefix('\u{FEFF}').unwrap_or(&raw)
+        let source = raw
+            .strip_prefix('\u{FEFF}')
+            .unwrap_or(&raw)
             .replace("\r\n", "\n")
             .split('\n')
-            .map(|l| if l.trim_start().starts_with(';') { "" } else { l })
-            .collect::<Vec<_>>().join("\n");
+            .map(|l| {
+                if l.trim_start().starts_with(';') {
+                    ""
+                } else {
+                    l
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         // Simulate preprocess: strip '{...}' block manually
         let mut out_lines: Vec<&str> = Vec::new();
         let mut in_block = false;
         for line in source.lines() {
             let trimmed = line.trim();
-            if !in_block {
-                if trimmed.starts_with("'{") || trimmed == "{" {
-                    in_block = true;
-                    continue;
-                }
+            if !in_block && (trimmed.starts_with("'{") || trimmed == "{") {
+                in_block = true;
+                continue;
             }
             if in_block {
-                if trimmed == "}" { in_block = false; }
+                if trimmed == "}" {
+                    in_block = false;
+                }
                 continue;
             }
             out_lines.push(line);
         }
         let preprocessed = out_lines.join("\n");
         let tokens = crate::compiler::lexer::tokenize(&preprocessed).expect("lex2");
-        let ast = crate::compiler::parser::Parser::new(tokens).parse().expect("parse2");
+        let ast = crate::compiler::parser::Parser::new(tokens)
+            .parse()
+            .expect("parse2");
         eprintln!("=== WITH preprocess ===");
-        eprintln!("fm_instruments keys: {:?}", ast.fm_instruments.keys().collect::<Vec<_>>());
+        eprintln!(
+            "fm_instruments keys: {:?}",
+            ast.fm_instruments.keys().collect::<Vec<_>>()
+        );
         for (num, inst) in &ast.fm_instruments {
-            let stride = if inst.parameters.len() >= 46 { 11usize } else { 9usize };
-            eprintln!("  @{}: {} params (stride {}), alg={:?}, fb={:?}, tl[0]={:?}",
-                num, inst.parameters.len(), stride,
+            let stride = if inst.parameters.len() >= 46 {
+                11usize
+            } else {
+                9usize
+            };
+            eprintln!(
+                "  @{}: {} params (stride {}), alg={:?}, fb={:?}, tl[0]={:?}",
+                num,
+                inst.parameters.len(),
+                stride,
                 inst.parameters.get(stride * 4),
                 inst.parameters.get(stride * 4 + 1),
-                inst.parameters.get(5));
+                inst.parameters.get(5)
+            );
         }
         eprintln!("=== PART COMMANDS ===");
         for (part_name, part) in &ast.parts {
@@ -580,19 +729,36 @@ fn test_t0000_actual_file() {
     let mut total_wait = 0u64;
     while i < data.len() && count < 60 {
         match data[i] {
-            0x66 => { eprintln!("EOF"); break; }
-            0x52 | 0x53 if i+2 < data.len() => {
-                let port = data[i] - 0x52;
-                eprintln!("write[{}]: port={} reg=0x{:02X} val=0x{:02X}", count, port, data[i+1], data[i+2]);
-                i += 3; count += 1;
+            0x66 => {
+                eprintln!("EOF");
+                break;
             }
-            0x61 if i+2 < data.len() => {
-                let s = (data[i+1] as u64) | ((data[i+2] as u64) << 8);
+            0x52 | 0x53 if i + 2 < data.len() => {
+                let port = data[i] - 0x52;
+                eprintln!(
+                    "write[{}]: port={} reg=0x{:02X} val=0x{:02X}",
+                    count,
+                    port,
+                    data[i + 1],
+                    data[i + 2]
+                );
+                i += 3;
+                count += 1;
+            }
+            0x61 if i + 2 < data.len() => {
+                let s = (data[i + 1] as u64) | ((data[i + 2] as u64) << 8);
                 total_wait += s;
-                eprintln!("wait: {} samples (total={} ≈ {} notes @29400)", s, total_wait, total_wait as f64/29400.0);
+                eprintln!(
+                    "wait: {} samples (total={} ≈ {} notes @29400)",
+                    s,
+                    total_wait,
+                    total_wait as f64 / 29400.0
+                );
                 i += 3;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
 }

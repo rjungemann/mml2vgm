@@ -90,7 +90,10 @@ fn parse_tempo_in_part() {
 #[test]
 fn parse_tempo_node_in_global() {
     let ast = timed_parse("t120");
-    let has_tempo = ast.global_settings.iter().any(|n| matches!(n, MmlNode::Tempo(_)));
+    let has_tempo = ast
+        .global_settings
+        .iter()
+        .any(|n| matches!(n, MmlNode::Tempo(_)));
     assert!(has_tempo, "expected Tempo node in global settings");
 }
 
@@ -112,7 +115,10 @@ fn parse_single_note_global() {
 #[test]
 fn parse_note_with_duration() {
     let ast = timed_parse("c4");
-    let has_note = ast.global_settings.iter().any(|n| matches!(n, MmlNode::Note(_)));
+    let has_note = ast
+        .global_settings
+        .iter()
+        .any(|n| matches!(n, MmlNode::Note(_)));
     assert!(has_note);
 }
 
@@ -120,7 +126,11 @@ fn parse_note_with_duration() {
 fn parse_dotted_rest() {
     let ast = timed_parse("r4.");
     let has_rest = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Rest(r) = n { r.dotted } else { false }
+        if let MmlNode::Rest(r) = n {
+            r.dotted
+        } else {
+            false
+        }
     });
     assert!(has_rest, "expected dotted rest");
 }
@@ -129,7 +139,11 @@ fn parse_dotted_rest() {
 fn parse_tied_note() {
     let ast = timed_parse("c4_");
     let has_tied = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Note(note) = n { note.tied } else { false }
+        if let MmlNode::Note(note) = n {
+            note.tied
+        } else {
+            false
+        }
     });
     assert!(has_tied, "expected tied note");
 }
@@ -140,7 +154,11 @@ fn parse_tied_note() {
 fn parse_octave_absolute() {
     let ast = timed_parse("o4");
     let has_octave = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Octave(o) = n { o.number == 4 } else { false }
+        if let MmlNode::Octave(o) = n {
+            o.number == 4
+        } else {
+            false
+        }
     });
     assert!(has_octave, "expected Octave(4)");
 }
@@ -148,18 +166,20 @@ fn parse_octave_absolute() {
 #[test]
 fn parse_octave_relative_up() {
     let ast = timed_parse(">");
-    let has_shift = ast.global_settings.iter().any(|n| {
-        matches!(n, MmlNode::OctaveShift(OctaveShift::Up))
-    });
+    let has_shift = ast
+        .global_settings
+        .iter()
+        .any(|n| matches!(n, MmlNode::OctaveShift(OctaveShift::Up)));
     assert!(has_shift, "expected OctaveShift::Up");
 }
 
 #[test]
 fn parse_octave_relative_down() {
     let ast = timed_parse("<");
-    let has_shift = ast.global_settings.iter().any(|n| {
-        matches!(n, MmlNode::OctaveShift(OctaveShift::Down))
-    });
+    let has_shift = ast
+        .global_settings
+        .iter()
+        .any(|n| matches!(n, MmlNode::OctaveShift(OctaveShift::Down)));
     assert!(has_shift, "expected OctaveShift::Down");
 }
 
@@ -169,7 +189,11 @@ fn parse_octave_relative_down() {
 fn parse_volume() {
     let ast = timed_parse("v13");
     let has_vol = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Volume(v) = n { v.level == 13 } else { false }
+        if let MmlNode::Volume(v) = n {
+            v.level == 13
+        } else {
+            false
+        }
     });
     assert!(has_vol, "expected Volume(13)");
 }
@@ -178,7 +202,11 @@ fn parse_volume() {
 fn parse_length_command() {
     let ast = timed_parse("l8");
     let has_len = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Length(l) = n { l.value == 8 } else { false }
+        if let MmlNode::Length(l) = n {
+            l.value == 8
+        } else {
+            false
+        }
     });
     assert!(has_len, "expected Length(8)");
 }
@@ -188,7 +216,10 @@ fn parse_length_command() {
 #[test]
 fn parse_loop_infinite() {
     let ast = timed_parse("[c d e]");
-    let has_loop = ast.global_settings.iter().any(|n| matches!(n, MmlNode::Loop(_)));
+    let has_loop = ast
+        .global_settings
+        .iter()
+        .any(|n| matches!(n, MmlNode::Loop(_)));
     assert!(has_loop, "expected a Loop node");
 }
 
@@ -196,7 +227,11 @@ fn parse_loop_infinite() {
 fn parse_loop_finite() {
     let ast = timed_parse("(c d e)3");
     let has_loop = ast.global_settings.iter().any(|n| {
-        if let MmlNode::Loop(l) = n { l.count == 3 } else { false }
+        if let MmlNode::Loop(l) = n {
+            l.count == 3
+        } else {
+            false
+        }
     });
     assert!(has_loop, "expected Loop with count=3");
 }
@@ -212,7 +247,10 @@ fn parse_envelope_definition() {
 #[test]
 fn parse_pcm_instrument_definition() {
     let ast = timed_parse("'@ P 0, \"b.wav\", 8000, 100, C140");
-    assert!(ast.pcm_instruments.contains_key(&0), "expected PCM instrument 0");
+    assert!(
+        ast.pcm_instruments.contains_key(&0),
+        "expected PCM instrument 0"
+    );
     let pcm = &ast.pcm_instruments[&0];
     assert_eq!(pcm.frequency, 8000);
     assert_eq!(pcm.volume, 100);
@@ -222,7 +260,10 @@ fn parse_pcm_instrument_definition() {
 #[test]
 fn parse_fm_instrument_definition() {
     let ast = timed_parse("'@ F 0 \"Bass\" 31 0 8 0 0 5 3 1 24");
-    assert!(ast.fm_instruments.contains_key(&0), "expected FM instrument 0");
+    assert!(
+        ast.fm_instruments.contains_key(&0),
+        "expected FM instrument 0"
+    );
 }
 
 // ── Note MIDI mapping ─────────────────────────────────────────────────────────
@@ -255,7 +296,7 @@ fn parse_note_midi_dflat4() {
 #[test]
 fn parse_note_midi_boundary_low() {
     let note = crate::compiler::ast::Note::new('C', -1, 0); // B-1 would be below 0
-    // clamped to 0
+                                                            // clamped to 0
     assert!(note.midi_note() <= 127);
 }
 
@@ -298,7 +339,10 @@ fn parse_stress_many_parts() {
     let start = Instant::now();
     let tokens = tokenize(&source).expect("tokenize failed");
     let ast = Parser::new(tokens).parse().expect("parse failed");
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "parse_stress_many_parts exceeded timeout");
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "parse_stress_many_parts exceeded timeout"
+    );
     assert_eq!(ast.parts.len(), 64);
 }
 
@@ -309,7 +353,10 @@ fn parse_stress_long_loop_body() {
     let start = Instant::now();
     let tokens = tokenize(&source).expect("tokenize failed");
     let _ast = Parser::new(tokens).parse().expect("parse failed");
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "parse_stress_long_loop_body exceeded timeout");
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "parse_stress_long_loop_body exceeded timeout"
+    );
 }
 
 #[test]
@@ -324,7 +371,10 @@ fn parse_stress_all_note_variants() {
     let start = Instant::now();
     let tokens = tokenize(&source).expect("tokenize failed");
     let _ast = Parser::new(tokens).parse().expect("parse failed");
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "parse_stress_all_note_variants exceeded timeout");
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "parse_stress_all_note_variants exceeded timeout"
+    );
 }
 
 // ── MIDI note number command ─────────────────────────────────────────────────
@@ -334,9 +384,17 @@ fn parse_note_number_middle_c() {
     // n60 = MIDI 60 = C4 (middle C)
     let ast = timed_parse("'A1 n60");
     let part = ast.parts.get("A1").unwrap();
-    let note = part.commands.iter().find_map(|n| {
-        if let MmlNode::Note(note) = n { Some(note) } else { None }
-    }).expect("expected a Note node");
+    let note = part
+        .commands
+        .iter()
+        .find_map(|n| {
+            if let MmlNode::Note(note) = n {
+                Some(note)
+            } else {
+                None
+            }
+        })
+        .expect("expected a Note node");
     assert_eq!(note.letter, 'C');
     assert_eq!(note.accidental, 0);
     assert_eq!(note.octave, 4);
@@ -347,11 +405,19 @@ fn parse_note_number_csharp2() {
     // n37 = MIDI 37 = C#2 (as used in Sitaraba/3MLE files)
     let ast = timed_parse("'A1 n37");
     let part = ast.parts.get("A1").unwrap();
-    let note = part.commands.iter().find_map(|n| {
-        if let MmlNode::Note(note) = n { Some(note) } else { None }
-    }).expect("expected a Note node");
+    let note = part
+        .commands
+        .iter()
+        .find_map(|n| {
+            if let MmlNode::Note(note) = n {
+                Some(note)
+            } else {
+                None
+            }
+        })
+        .expect("expected a Note node");
     assert_eq!(note.letter, 'C');
-    assert_eq!(note.accidental, 1);  // sharp
+    assert_eq!(note.accidental, 1); // sharp
     assert_eq!(note.octave, 2);
 }
 
@@ -360,9 +426,17 @@ fn parse_note_number_b_natural() {
     // n47 = MIDI 47 = B2
     let ast = timed_parse("'A1 n47");
     let part = ast.parts.get("A1").unwrap();
-    let note = part.commands.iter().find_map(|n| {
-        if let MmlNode::Note(note) = n { Some(note) } else { None }
-    }).expect("expected a Note node");
+    let note = part
+        .commands
+        .iter()
+        .find_map(|n| {
+            if let MmlNode::Note(note) = n {
+                Some(note)
+            } else {
+                None
+            }
+        })
+        .expect("expected a Note node");
     assert_eq!(note.letter, 'B');
     assert_eq!(note.accidental, 0);
     assert_eq!(note.octave, 2);
@@ -373,23 +447,39 @@ fn parse_note_number_does_not_change_octave() {
     // n37 is C#2; the A that follows should still be at octave 3 (set by o3)
     let ast = timed_parse("'A1 o3 n37 a");
     let part = ast.parts.get("A1").unwrap();
-    let notes: Vec<_> = part.commands.iter().filter_map(|n| {
-        if let MmlNode::Note(note) = n { Some(note) } else { None }
-    }).collect();
+    let notes: Vec<_> = part
+        .commands
+        .iter()
+        .filter_map(|n| {
+            if let MmlNode::Note(note) = n {
+                Some(note)
+            } else {
+                None
+            }
+        })
+        .collect();
     // First note is from n37 (octave 2), second note 'a' should be at octave 3
     assert_eq!(notes.len(), 2);
-    assert_eq!(notes[0].octave, 2);  // from n37
+    assert_eq!(notes[0].octave, 2); // from n37
     assert_eq!(notes[1].letter, 'A');
-    assert_eq!(notes[1].octave, 3);  // current_octave still 3
+    assert_eq!(notes[1].octave, 3); // current_octave still 3
 }
 
 #[test]
 fn parse_note_number_dotted() {
     let ast = timed_parse("'A1 l8 n60.");
     let part = ast.parts.get("A1").unwrap();
-    let note = part.commands.iter().find_map(|n| {
-        if let MmlNode::Note(note) = n { Some(note) } else { None }
-    }).expect("expected a Note node");
+    let note = part
+        .commands
+        .iter()
+        .find_map(|n| {
+            if let MmlNode::Note(note) = n {
+                Some(note)
+            } else {
+                None
+            }
+        })
+        .expect("expected a Note node");
     assert!(note.dotted, "expected dotted note");
     assert_eq!(note.letter, 'C');
 }
@@ -398,14 +488,24 @@ fn parse_note_number_dotted() {
 fn parse_note_number_roundtrip() {
     // Verify n<N> midi_note() equals the original N for all naturals
     let naturals = [
-        (0u32, 'C', 0i8), (2, 'D', 0), (4, 'E', 0), (5, 'F', 0),
-        (7, 'G', 0), (9, 'A', 0), (11, 'B', 0),
+        (0u32, 'C', 0i8),
+        (2, 'D', 0),
+        (4, 'E', 0),
+        (5, 'F', 0),
+        (7, 'G', 0),
+        (9, 'A', 0),
+        (11, 'B', 0),
     ];
     for (offset, letter, acc) in &naturals {
         let midi = 48 + offset; // octave 3
         let octave = (midi / 12).saturating_sub(1) as u8;
         let note = crate::compiler::ast::Note::new(*letter, *acc, octave);
-        assert_eq!(note.midi_note(), midi as u8, "roundtrip failed for {}", letter);
+        assert_eq!(
+            note.midi_note(),
+            midi as u8,
+            "roundtrip failed for {}",
+            letter
+        );
     }
 }
 
@@ -423,7 +523,7 @@ fn collect_chip_commands(ast: &crate::compiler::ast::MmlAst) -> Vec<(String, Vec
         }
     };
     visit(&ast.global_settings);
-    for (_name, part) in &ast.parts {
+    for part in ast.parts.values() {
         visit(&part.commands);
     }
     out
@@ -459,9 +559,13 @@ fn parse_phase9_wavetable_extras() {
 fn parse_phase9_pcm_address_and_volume() {
     let ast = timed_parse("A @START 16,32,0 @END 64,128 @VOLUME 200,150");
     let cmds = collect_chip_commands(&ast);
-    assert!(cmds.iter().any(|(c, a)| c == "START" && a == &vec![16, 32, 0]));
+    assert!(cmds
+        .iter()
+        .any(|(c, a)| c == "START" && a == &vec![16, 32, 0]));
     assert!(cmds.iter().any(|(c, a)| c == "END" && a == &vec![64, 128]));
-    assert!(cmds.iter().any(|(c, a)| c == "VOLUME" && a == &vec![200, 150]));
+    assert!(cmds
+        .iter()
+        .any(|(c, a)| c == "VOLUME" && a == &vec![200, 150]));
 }
 
 #[test]

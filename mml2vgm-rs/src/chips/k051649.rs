@@ -38,10 +38,16 @@ struct SccChannel {
 
 impl Default for SccChannel {
     fn default() -> Self {
-        Self { frequency: 0, volume: 0, enabled: false, phase_acc: 0.0 }
+        Self {
+            frequency: 0,
+            volume: 0,
+            enabled: false,
+            phase_acc: 0.0,
+        }
     }
 }
 
+/// K051649.
 pub struct K051649 {
     clock_rate: u32,
     channels: [SccChannel; NUM_CHANNELS],
@@ -50,10 +56,12 @@ pub struct K051649 {
 }
 
 impl K051649 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(1_789_772)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -80,7 +88,7 @@ impl K051649 {
                 let idx = (addr - 0xA0) as usize;
                 let ch = idx / 2;
                 if ch < NUM_CHANNELS {
-                    if idx % 2 == 0 {
+                    if idx.is_multiple_of(2) {
                         self.channels[ch].frequency =
                             (self.channels[ch].frequency & 0xFF00) | data as u16;
                     } else {
@@ -104,8 +112,12 @@ impl K051649 {
 }
 
 impl SoundChipEmulator for K051649 {
-    fn name(&self) -> &'static str { "K051649 (SCC)" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "K051649 (SCC)"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -122,14 +134,18 @@ impl SoundChipEmulator for K051649 {
         self.apply_write(addr, data);
     }
 
-    fn read(&self, _addr: u8) -> u8 { 0xFF }
+    fn read(&self, _addr: u8) -> u8 {
+        0xFF
+    }
     fn clock(&mut self) {}
 
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32) {
         for frame in buffer.chunks_mut(2) {
             let mut out = 0.0f32;
             for ch in 0..NUM_CHANNELS {
-                if !self.channels[ch].enabled || self.channels[ch].volume == 0 { continue; }
+                if !self.channels[ch].enabled || self.channels[ch].volume == 0 {
+                    continue;
+                }
                 let period = self.channels[ch].frequency.max(1) as f32;
                 let freq_hz = self.clock_rate as f32 / (WAVE_LEN as f32 * period);
                 let phase_inc = freq_hz / sample_rate as f32;
@@ -152,7 +168,9 @@ impl SoundChipEmulator for K051649 {
 }
 
 impl Default for K051649 {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -196,7 +214,10 @@ mod tests {
         chip.write(0xAF, 0x01); // ch0 on
         let mut buf = [0.0f32; 8];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active SCC channel must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active SCC channel must produce output"
+        );
     }
 
     #[test]
@@ -205,7 +226,10 @@ mod tests {
         // Write to ch3 waveform region — in SCC mode ch4 should see same data
         chip.write(0x60, 0x55); // ch3 waveform byte 0
         assert_eq!(chip.waveforms[3][0], 0x55_u8 as i8);
-        assert_eq!(chip.waveforms[4][0], 0x55_u8 as i8, "ch4 should mirror ch3 in SCC mode");
+        assert_eq!(
+            chip.waveforms[4][0], 0x55_u8 as i8,
+            "ch4 should mirror ch3 in SCC mode"
+        );
     }
 
     #[test]

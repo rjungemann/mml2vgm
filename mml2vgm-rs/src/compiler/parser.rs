@@ -4,13 +4,12 @@
 //! It takes tokens from the lexer and builds an Abstract Syntax Tree (AST).
 
 use crate::compiler::ast::{
-    Alias, Arpeggio, Aftertouch, ControlChange, Envelope, FmInstrument, Include, Length,
-    Loop, Metadata, MidiChannel, MidiProgram, MmlAst, MmlNode, Note, Octave, OctaveShift,
-    OpxInstrument, OpxMode, OpxOperator,
-    PartDefinition, PcmInstrument, PitchBend, PolyAftertouch, ProgramChange, Rest,
-    SysEx, Tempo, Volume,
+    Aftertouch, Arpeggio, ControlChange, Envelope, FmInstrument, Length, Loop, MidiChannel,
+    MidiProgram, MmlAst, MmlNode, Note, Octave, OctaveShift, OpxInstrument, OpxMode, OpxOperator,
+    PartDefinition, PcmInstrument, PitchBend, PolyAftertouch, ProgramChange, Rest, SysEx, Tempo,
+    Volume,
 };
-use crate::compiler::lexer::{Token, tokenize};
+use crate::compiler::lexer::{tokenize, Token};
 use crate::{MmlError, MmlResult, Position, Span};
 use std::path::PathBuf;
 
@@ -45,6 +44,7 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// New.
     pub fn new(tokens: Vec<(Token, Position)>) -> Self {
         Self {
             tokens,
@@ -74,7 +74,10 @@ impl Parser {
 
     /// Get current position
     fn current_position(&self) -> Position {
-        self.tokens.get(self.current).map(|(_, p)| *p).unwrap_or_else(|| Position::new(0, 0))
+        self.tokens
+            .get(self.current)
+            .map(|(_, p)| *p)
+            .unwrap_or_else(|| Position::new(0, 0))
     }
 
     /// Advance to next token
@@ -98,6 +101,7 @@ impl Parser {
     }
 
     /// Consume current token and return it
+    #[allow(dead_code)]
     fn consume_token(&mut self) -> Option<Token> {
         let token = self.current_token();
         self.advance();
@@ -119,12 +123,15 @@ impl Parser {
         if let Some(ref part_name) = self.current_part {
             // Create part if it doesn't exist
             if !ast.parts.contains_key(part_name) {
-                ast.parts.insert(part_name.clone(), PartDefinition {
-                    name: part_name.clone(),
-                    chip: None,
-                    tempo: None,
-                    commands: Vec::new(),
-                });
+                ast.parts.insert(
+                    part_name.clone(),
+                    PartDefinition {
+                        name: part_name.clone(),
+                        chip: None,
+                        tempo: None,
+                        commands: Vec::new(),
+                    },
+                );
             }
             if let Some(part) = ast.parts.get_mut(part_name) {
                 part.commands.push(node);
@@ -162,15 +169,23 @@ impl Parser {
                             let directive_upper = directive.to_uppercase();
                             if directive_upper == "CHIP" {
                                 self.advance(); // Consume CHIP
-                                // Skip whitespace
+                                                // Skip whitespace
                                 while let Some(Token::Whitespace(_)) = self.current_token() {
                                     self.advance();
                                 }
                                 // Get the chip name. Note: 'C', 'A', 'B' etc. are tokenized as
                                 // Token::Note by the lexer, so C140/C352 arrive as Note('C')+Number(140).
                                 let chip_prefix: Option<String> = match self.current_token() {
-                                    Some(Token::Identifier(id)) => { let v = id.clone(); self.advance(); Some(v) }
-                                    Some(Token::Note(letter)) => { let v = letter.to_string(); self.advance(); Some(v) }
+                                    Some(Token::Identifier(id)) => {
+                                        let v = id.clone();
+                                        self.advance();
+                                        Some(v)
+                                    }
+                                    Some(Token::Note(letter)) => {
+                                        let v = letter.to_string();
+                                        self.advance();
+                                        Some(v)
+                                    }
                                     _ => None,
                                 };
                                 if let Some(prefix) = chip_prefix {
@@ -187,17 +202,18 @@ impl Parser {
                                 }
                             } else if directive_upper == "CLOCK" {
                                 self.advance(); // Consume CLOCK
-                                // Skip whitespace
+                                                // Skip whitespace
                                 while let Some(Token::Whitespace(_)) = self.current_token() {
                                     self.advance();
                                 }
                                 if let Some(Token::Number(clock_val)) = self.current_token() {
-                                    ast.metadata.insert("CLOCK".to_string(), clock_val.to_string());
+                                    ast.metadata
+                                        .insert("CLOCK".to_string(), clock_val.to_string());
                                     self.advance();
                                 }
                             } else if directive_upper.starts_with("TRACK") {
                                 self.advance(); // Consume TRACK
-                                // Skip whitespace
+                                                // Skip whitespace
                                 while let Some(Token::Whitespace(_)) = self.current_token() {
                                     self.advance();
                                 }
@@ -248,13 +264,13 @@ impl Parser {
     /// Parse song info block: { ... }
     fn parse_song_info(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
         self.advance(); // Consume {
-        
+
         while !self.is_at_end() && !matches!(self.current_token(), Some(Token::RightBrace)) {
             // Skip whitespace
             while let Some(Token::Whitespace(_)) = self.current_token() {
                 self.advance();
             }
-            
+
             if let Some(token) = self.current_token() {
                 match token {
                     Token::Identifier(key) => {
@@ -289,7 +305,7 @@ impl Parser {
                 }
             }
         }
-        
+
         if self.consume(Token::RightBrace) {
             Ok(())
         } else {
@@ -320,7 +336,6 @@ impl Parser {
                     let letter = letter.to_ascii_uppercase();
                     self.advance(); // consume the note letter
                     let part_name = if let Some(Token::Number(n)) = self.current_token() {
-                        let n = n;
                         self.advance(); // consume the channel number
                         format!("{}{}", letter, n)
                     } else {
@@ -346,12 +361,11 @@ impl Parser {
                         self.current_part = Some(part_name);
                     // Single alphabetic letter followed by a channel number → C# part name (H1, I1 …)
                     } else if name.len() == 1
-                        && name.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+                        && name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
                     {
                         let letter = name.chars().next().unwrap().to_ascii_uppercase();
                         self.advance(); // consume the letter
                         let part_name = if let Some(Token::Number(n)) = self.current_token() {
-                            let n = n;
                             self.advance();
                             format!("{}{}", letter, n)
                         } else {
@@ -389,28 +403,29 @@ impl Parser {
             return Some("Vp".to_string());
         }
         // V01-V48
-        if name_upper.starts_with('V') && !name_upper.starts_with("VF") && !name_upper.starts_with("VS") {
+        if name_upper.starts_with('V')
+            && !name_upper.starts_with("VF")
+            && !name_upper.starts_with("VS")
+        {
             let rest = &name_upper[1..];
             if let Ok(n) = rest.parse::<u32>() {
-                if n >= 1 && n <= 48 {
+                if (1..=48).contains(&n) {
                     return Some(format!("V{:02}", n));
                 }
             }
         }
         // Vf01-Vf48
-        if name_upper.starts_with("VF") {
-            let rest = &name_upper[2..];
+        if let Some(rest) = name_upper.strip_prefix("VF") {
             if let Ok(n) = rest.parse::<u32>() {
-                if n >= 1 && n <= 48 {
+                if (1..=48).contains(&n) {
                     return Some(format!("Vf{:02}", n));
                 }
             }
         }
         // Vs01-Vs48
-        if name_upper.starts_with("VS") {
-            let rest = &name_upper[2..];
+        if let Some(rest) = name_upper.strip_prefix("VS") {
             if let Ok(n) = rest.parse::<u32>() {
-                if n >= 1 && n <= 48 {
+                if (1..=48).contains(&n) {
                     return Some(format!("Vs{:02}", n));
                 }
             }
@@ -451,10 +466,10 @@ impl Parser {
     /// Parse part definition
     fn parse_part_definition(&mut self, ast: &mut MmlAst, name: &str) -> MmlResult<()> {
         self.advance(); // Consume identifier
-        
+
         let mut chip = None;
         let mut tempo = None;
-        
+
         while !self.is_at_end() {
             if let Some(token) = self.current_token() {
                 match token {
@@ -467,8 +482,11 @@ impl Parser {
                     }
                     Token::Identifier(ref chip_name) => {
                         let cu = chip_name.to_uppercase();
-                        if cu.starts_with("YM") || cu.starts_with("SN") 
-                            || cu.starts_with("AY") || cu.starts_with("RF") {
+                        if cu.starts_with("YM")
+                            || cu.starts_with("SN")
+                            || cu.starts_with("AY")
+                            || cu.starts_with("RF")
+                        {
                             chip = Some(chip_name.clone());
                             self.advance();
                         } else {
@@ -486,17 +504,17 @@ impl Parser {
                 }
             }
         }
-        
+
         let part = PartDefinition {
             name: name.to_string(),
             chip: chip.clone(),
             tempo,
             commands: Vec::new(),
         };
-        
+
         ast.parts.insert(name.to_string(), part);
         self.current_part = Some(name.to_string());
-        
+
         Ok(())
     }
 
@@ -516,7 +534,6 @@ impl Parser {
         match self.current_token() {
             // Continuation row: '@ 031,012,...  — operator row or ALG/FB row
             Some(Token::Number(first)) => {
-                let first = first;
                 if self.pending_opx_instrument.is_some() {
                     self.parse_opx_instrument_row(ast, first)?;
                 } else if self.pending_fm_instrument.is_some() {
@@ -542,7 +559,7 @@ impl Parser {
                         "X4" => OpxMode::X4,
                         "X3" => OpxMode::X3,
                         "X2" => OpxMode::X2,
-                        _    => OpxMode::X1,
+                        _ => OpxMode::X1,
                     };
                     self.advance(); // consume X4/X3/X2/X1
                     self.start_opx_instrument(ast, mode)?;
@@ -602,7 +619,6 @@ impl Parser {
 
         let number = match self.current_token() {
             Some(Token::Number(n)) => {
-                let n = n;
                 self.advance();
                 n
             }
@@ -655,9 +671,10 @@ impl Parser {
         }
 
         // Finalise after 5 rows: 4 operator rows + 1 ALG/FB row
-        let ready = self.pending_fm_instrument
+        let ready = self
+            .pending_fm_instrument
             .as_ref()
-            .map_or(false, |(_, rows, _)| rows.len() >= 5);
+            .is_some_and(|(_, rows, _)| rows.len() >= 5);
         if ready {
             self.finalize_pending_fm_instrument(ast);
         }
@@ -673,7 +690,11 @@ impl Parser {
             for row in rows {
                 parameters.extend(row);
             }
-            let inst = FmInstrument { number, name: String::new(), parameters };
+            let inst = FmInstrument {
+                number,
+                name: String::new(),
+                parameters,
+            };
             ast.fm_instruments.insert(number, inst);
         }
     }
@@ -687,7 +708,10 @@ impl Parser {
         self.finalize_pending_opx_instrument(ast);
 
         let number = match self.current_token() {
-            Some(Token::Number(n)) => { self.advance(); n }
+            Some(Token::Number(n)) => {
+                self.advance();
+                n
+            }
             Some(Token::Identifier(ref s)) if s.parse::<u32>().is_ok() => {
                 let n = s.parse::<u32>().unwrap();
                 self.advance();
@@ -717,7 +741,10 @@ impl Parser {
         self.advance();
         while let Some(token) = self.current_token() {
             match token {
-                Token::Number(n) => { row.push(n); self.advance(); }
+                Token::Number(n) => {
+                    row.push(n);
+                    self.advance();
+                }
                 Token::Comma => self.advance(),
                 Token::Apostrophe | Token::Eof => break,
                 _ => break,
@@ -726,10 +753,13 @@ impl Parser {
         if let Some((_, _, rows)) = &mut self.pending_opx_instrument {
             rows.push(row);
         }
-        let ready = self.pending_opx_instrument.as_ref().map_or(false, |(_, mode, rows)| {
-            rows.len() >= mode.operator_count() + 1   // operator rows + AL row
-                || (matches!(mode, OpxMode::X1) && rows.len() >= 1)
-        });
+        let ready = self
+            .pending_opx_instrument
+            .as_ref()
+            .is_some_and(|(_, mode, rows)| {
+                rows.len() > mode.operator_count()   // operator rows + AL row
+                || (matches!(mode, OpxMode::X1) && !rows.is_empty())
+            });
         if ready {
             self.finalize_pending_opx_instrument(ast);
         }
@@ -740,7 +770,8 @@ impl Parser {
     fn finalize_pending_opx_instrument(&mut self, ast: &mut MmlAst) {
         if let Some((number, mode, rows)) = self.pending_opx_instrument.take() {
             let op_count = mode.operator_count();
-            let mut operators: Vec<OpxOperator> = rows.iter()
+            let mut operators: Vec<OpxOperator> = rows
+                .iter()
                 .take(op_count)
                 .map(|r| OpxOperator::from_params(r))
                 .collect();
@@ -750,11 +781,20 @@ impl Parser {
             }
             // Last row (if present) is AL — algorithm
             let algorithm = if !matches!(mode, OpxMode::X1) {
-                rows.get(op_count).and_then(|r| r.first()).copied().unwrap_or(0) as u8
+                rows.get(op_count)
+                    .and_then(|r| r.first())
+                    .copied()
+                    .unwrap_or(0) as u8
             } else {
                 0
             };
-            let inst = OpxInstrument { number, name: None, mode, operators, algorithm };
+            let inst = OpxInstrument {
+                number,
+                name: None,
+                mode,
+                operators,
+                algorithm,
+            };
             ast.opx_instruments.insert(number, inst);
         }
     }
@@ -774,7 +814,7 @@ impl Parser {
         } else {
             return Ok(());
         };
-        
+
         // Skip comma and whitespace
         while let Some(token) = self.current_token() {
             match token {
@@ -782,7 +822,7 @@ impl Parser {
                 _ => break,
             }
         }
-        
+
         let filename = if let Some(Token::StringLiteral(s)) = self.current_token() {
             self.advance();
             PathBuf::from(s)
@@ -792,7 +832,7 @@ impl Parser {
         } else {
             PathBuf::new()
         };
-        
+
         // Skip comma and whitespace
         while let Some(token) = self.current_token() {
             match token {
@@ -800,14 +840,14 @@ impl Parser {
                 _ => break,
             }
         }
-        
+
         let frequency = if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             n
         } else {
             0
         };
-        
+
         // Skip comma and whitespace
         while let Some(token) = self.current_token() {
             match token {
@@ -815,17 +855,17 @@ impl Parser {
                 _ => break,
             }
         }
-        
+
         let volume = if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             n.clamp(0, 127) as u8
         } else {
             100
         };
-        
+
         let mut chip = String::new();
         let mut option = None;
-        
+
         if self.current_token() == Some(Token::Comma) {
             self.advance();
             while let Some(token) = self.current_token() {
@@ -875,7 +915,7 @@ impl Parser {
                 }
             }
         }
-        
+
         let inst = PcmInstrument {
             number,
             name: filename.to_string_lossy().into_owned(),
@@ -886,7 +926,7 @@ impl Parser {
             option,
         };
         ast.pcm_instruments.insert(number, inst);
-        
+
         Ok(())
     }
 
@@ -901,7 +941,7 @@ impl Parser {
                 self.advance();
             }
         }
-        
+
         let number = if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             n
@@ -915,7 +955,7 @@ impl Parser {
         } else {
             return Ok(());
         };
-        
+
         // Skip comma and whitespace
         while let Some(token) = self.current_token() {
             match token {
@@ -923,7 +963,7 @@ impl Parser {
                 _ => break,
             }
         }
-        
+
         let mut parameters = Vec::new();
         while let Some(token) = self.current_token() {
             match token {
@@ -936,10 +976,10 @@ impl Parser {
                 _ => self.advance(),
             }
         }
-        
+
         let env = Envelope { number, parameters };
         ast.envelopes.insert(number, env);
-        
+
         Ok(())
     }
 
@@ -954,7 +994,7 @@ impl Parser {
                 self.advance();
             }
         }
-        
+
         let number = if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             n
@@ -968,7 +1008,7 @@ impl Parser {
         } else {
             return Ok(());
         };
-        
+
         // Skip comma and whitespace
         while let Some(token) = self.current_token() {
             match token {
@@ -976,7 +1016,7 @@ impl Parser {
                 _ => break,
             }
         }
-        
+
         let mut notes = Vec::new();
         while let Some(token) = self.current_token() {
             match token {
@@ -991,14 +1031,14 @@ impl Parser {
                     } else {
                         0
                     };
-                    
+
                     let octave = if let Some(Token::Number(n)) = self.current_token() {
                         self.advance();
                         n as u8
                     } else {
                         self.current_octave
                     };
-                    
+
                     notes.push(Note::new(letter, accidental, octave));
                 }
                 Token::Comma | Token::Whitespace(_) => self.advance(),
@@ -1006,10 +1046,10 @@ impl Parser {
                 _ => self.advance(),
             }
         }
-        
+
         let arp = Arpeggio { number, notes };
         ast.arpeggios.insert(number, arp);
-        
+
         Ok(())
     }
 
@@ -1017,7 +1057,7 @@ impl Parser {
     fn parse_alias_definition(&mut self, ast: &mut MmlAst) -> MmlResult<()> {
         // Skip alias keyword
         self.advance();
-        
+
         // Read name
         let name = if let Some(Token::Identifier(s)) = self.current_token() {
             self.advance();
@@ -1025,18 +1065,18 @@ impl Parser {
         } else {
             return Ok(());
         };
-        
+
         // Skip whitespace
         while let Some(Token::Whitespace(_)) = self.current_token() {
             self.advance();
         }
-        
+
         if self.consume(Token::Equals) {
             // Skip whitespace
             while let Some(Token::Whitespace(_)) = self.current_token() {
                 self.advance();
             }
-            
+
             let expansion = if let Some(Token::Identifier(s)) = self.current_token() {
                 self.advance();
                 s
@@ -1049,10 +1089,10 @@ impl Parser {
             } else {
                 String::new()
             };
-            
+
             ast.aliases.insert(name, expansion);
         }
-        
+
         Ok(())
     }
 
@@ -1062,12 +1102,12 @@ impl Parser {
         if let Some(Token::Identifier(_)) = self.current_token() {
             self.advance();
         }
-        
+
         // Skip whitespace
         while let Some(Token::Whitespace(_)) = self.current_token() {
             self.advance();
         }
-        
+
         let path = if let Some(Token::StringLiteral(s)) = self.current_token() {
             self.advance();
             PathBuf::from(s)
@@ -1077,9 +1117,9 @@ impl Parser {
         } else {
             PathBuf::new()
         };
-        
+
         ast.includes.push(path);
-        
+
         Ok(())
     }
 
@@ -1088,7 +1128,7 @@ impl Parser {
         if matches!(self.current_token(), Some(Token::AtSign)) {
             self.advance();
         }
-        
+
         // Check for MIDI-specific commands first
         if let Some(token) = self.current_token() {
             match token {
@@ -1244,27 +1284,27 @@ impl Parser {
                 _ => {}
             }
         }
-        
+
         // Parse regular instrument selection or chip-specific command
         if let Some(Token::Identifier(s)) = self.current_token() {
             let s_upper = s.to_uppercase();
-            
+
             // Check if this is a known chip-specific command
             if self.is_chip_command(&s_upper) {
                 self.advance();
                 return self.parse_chip_command(&s_upper);
             }
-            
+
             // Otherwise try to parse as instrument number
             if s.parse::<usize>().is_ok() {
                 self.advance();
                 let number = s.parse::<usize>().unwrap();
                 return Ok(Some(MmlNode::InstrumentSelection(
-                    crate::compiler::ast::InstrumentSelection { number, span: None }
+                    crate::compiler::ast::InstrumentSelection { number, span: None },
                 )));
             }
         }
-        
+
         if let Some(Token::Number(n)) = self.current_token() {
             // Special case: digit-prefixed chip commands like `@4OP` tokenize as
             // Number(4) + Identifier("OP"). Stitch them and look up the combined name.
@@ -1278,7 +1318,10 @@ impl Parser {
             }
             self.advance();
             return Ok(Some(MmlNode::InstrumentSelection(
-                crate::compiler::ast::InstrumentSelection { number: n as usize, span: None }
+                crate::compiler::ast::InstrumentSelection {
+                    number: n as usize,
+                    span: None,
+                },
             )));
         }
 
@@ -1303,25 +1346,18 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
-        let value = if self.consume(Token::Equals) {
+
+        let value = if self.consume(Token::Equals) || self.consume(Token::Comma) {
             if let Some(Token::Number(n)) = self.current_token() {
                 self.advance();
                 n as u8
             } else {
                 127 // Default to max if no value specified
             }
-        } else if self.consume(Token::Comma) {
-            if let Some(Token::Number(n)) = self.current_token() {
-                self.advance();
-                n as u8
-            } else {
-                127
-            }
         } else {
             127 // Default value
         };
-        
+
         Ok(Some(MmlNode::MidiControlChange(ControlChange {
             controller,
             value,
@@ -1338,7 +1374,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         Ok(Some(MmlNode::MidiProgramChange(ProgramChange {
             program,
             channel: None,
@@ -1355,7 +1391,11 @@ impl Parser {
             (n as i16 - 8192).clamp(-8192, 8191)
         } else if self.consume(Token::Sharp) || self.consume(Token::Flat) {
             // Handle + and - prefixes
-            let sign = if self.current_token() == Some(Token::Sharp) { 1 } else { -1 };
+            let sign = if self.current_token() == Some(Token::Sharp) {
+                1
+            } else {
+                -1
+            };
             if let Some(Token::Number(n)) = self.current_token() {
                 self.advance();
                 let base: i16 = n as i16;
@@ -1366,7 +1406,7 @@ impl Parser {
         } else {
             0 // Center
         };
-        
+
         Ok(Some(MmlNode::MidiPitchBend(PitchBend {
             value,
             channel: None,
@@ -1382,7 +1422,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         Ok(Some(MmlNode::MidiAftertouch(Aftertouch {
             value,
             channel: None,
@@ -1398,7 +1438,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         let value = if self.consume(Token::Comma) {
             if let Some(Token::Number(n)) = self.current_token() {
                 self.advance();
@@ -1409,7 +1449,7 @@ impl Parser {
         } else {
             127
         };
-        
+
         Ok(Some(MmlNode::MidiPolyAftertouch(PolyAftertouch {
             note,
             value,
@@ -1421,7 +1461,7 @@ impl Parser {
     /// Parse @x or @sysex system exclusive command
     fn parse_midi_sysex(&mut self) -> MmlResult<Option<MmlNode>> {
         let mut data = Vec::new();
-        
+
         // Parse hex bytes separated by commas
         while let Some(Token::Number(n)) = self.current_token() {
             data.push(n as u8);
@@ -1430,11 +1470,8 @@ impl Parser {
                 break;
             }
         }
-        
-        Ok(Some(MmlNode::MidiSysEx(SysEx {
-            data,
-            span: None,
-        })))
+
+        Ok(Some(MmlNode::MidiSysEx(SysEx { data, span: None })))
     }
 
     /// Parse @ch MIDI channel command
@@ -1445,7 +1482,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         Ok(Some(MmlNode::MidiChannel(MidiChannel {
             channel,
             span: None,
@@ -1460,10 +1497,10 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         let mut bank_msb = None;
         let mut bank_lsb = None;
-        
+
         if self.consume(Token::Comma) {
             if let Some(Token::Number(n)) = self.current_token() {
                 self.advance();
@@ -1476,7 +1513,7 @@ impl Parser {
                 }
             }
         }
-        
+
         Ok(Some(MmlNode::MidiProgram(MidiProgram {
             program,
             bank_msb,
@@ -1493,7 +1530,9 @@ impl Parser {
                     self.advance();
                     0 // Pan left
                 }
-                Token::Identifier(ref s) if s.to_lowercase() == "center" || s.to_lowercase() == "centre" => {
+                Token::Identifier(ref s)
+                    if s.to_lowercase() == "center" || s.to_lowercase() == "centre" =>
+                {
                     self.advance();
                     64 // Pan center
                 }
@@ -1512,7 +1551,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         Ok(Some(self.create_control_change(10, value)))
     }
 
@@ -1524,7 +1563,7 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         Ok(Some(self.create_control_change(11, value)))
     }
 
@@ -1540,7 +1579,7 @@ impl Parser {
         } else {
             127 // Default to on
         };
-        
+
         Ok(Some(self.create_control_change(64, value)))
     }
 
@@ -1554,22 +1593,22 @@ impl Parser {
         } else {
             return Ok(None);
         };
-        
+
         // Map drum names to MIDI note numbers
-        let note_number = match identifier.to_lowercase().as_str() {
-            "kick" | "bd" | "bassdrum" => 36,      // Bass Drum
-            "snare" | "sd" => 38,                 // Acoustic Snare
-            "hh" | "hihat" | "closedhh" => 42,     // Closed Hi-Hat
-            "oh" | "openhh" => 46,                 // Open Hi-Hat
-            "crash" => 49,                         // Crash Cymbal
-            "ride" => 51,                          // Ride Cymbal
-            "tom1" | "hightom" => 50,              // High Tom
-            "tom2" | "midtom" => 48,                // Mid Tom
-            "tom3" | "lowtom" => 41,                // Low Tom
-            "clap" => 39,                          // Hand Clap
-            "cowbell" => 56,                       // Cowbell
-            "tambourine" => 54,                    // Tambourine
-            "shaker" => 70,                        // Shaker
+        let _note_number = match identifier.to_lowercase().as_str() {
+            "kick" | "bd" | "bassdrum" => 36,  // Bass Drum
+            "snare" | "sd" => 38,              // Acoustic Snare
+            "hh" | "hihat" | "closedhh" => 42, // Closed Hi-Hat
+            "oh" | "openhh" => 46,             // Open Hi-Hat
+            "crash" => 49,                     // Crash Cymbal
+            "ride" => 51,                      // Ride Cymbal
+            "tom1" | "hightom" => 50,          // High Tom
+            "tom2" | "midtom" => 48,           // Mid Tom
+            "tom3" | "lowtom" => 41,           // Low Tom
+            "clap" => 39,                      // Hand Clap
+            "cowbell" => 56,                   // Cowbell
+            "tambourine" => 54,                // Tambourine
+            "shaker" => 70,                    // Shaker
             _ => {
                 // Try to parse as a number
                 if let Ok(n) = identifier.parse::<u8>() {
@@ -1579,12 +1618,12 @@ impl Parser {
                 }
             }
         };
-        
+
         // Create a note on channel 10 (drum channel in GM)
-        let mut note = Note::new('C', 0, 4);
+        let note = Note::new('C', 0, 4);
         // Override the MIDI note calculation to use the drum number
         // We'll need to handle this specially in the code generator
-        
+
         Ok(Some(MmlNode::Note(note)))
     }
 
@@ -1628,7 +1667,7 @@ impl Parser {
 
                     Ok(Some(MmlNode::Note(note)))
                 }
-                
+
                 // MIDI note number: n<0-127>
                 // Converts a MIDI note number directly to a note, bypassing current octave.
                 // The octave is derived from the MIDI number: octave = (midi / 12) - 1.
@@ -1643,18 +1682,18 @@ impl Parser {
                         let octave = (midi / 12).saturating_sub(1) as u8;
                         let pos = midi % 12;
                         let (letter, accidental): (char, i8) = match pos {
-                            0  => ('C', 0),
-                            1  => ('C', 1),
-                            2  => ('D', 0),
-                            3  => ('D', 1),
-                            4  => ('E', 0),
-                            5  => ('F', 0),
-                            6  => ('F', 1),
-                            7  => ('G', 0),
-                            8  => ('G', 1),
-                            9  => ('A', 0),
+                            0 => ('C', 0),
+                            1 => ('C', 1),
+                            2 => ('D', 0),
+                            3 => ('D', 1),
+                            4 => ('E', 0),
+                            5 => ('F', 0),
+                            6 => ('F', 1),
+                            7 => ('G', 0),
+                            8 => ('G', 1),
+                            9 => ('A', 0),
                             10 => ('A', 1),
-                            _  => ('B', 0),  // 11 = B
+                            _ => ('B', 0), // 11 = B
                         };
                         let mut note = Note::new(letter, accidental, octave);
                         note.duration = Some(self.current_length);
@@ -1695,7 +1734,7 @@ impl Parser {
 
                     Ok(Some(MmlNode::Rest(rest)))
                 }
-                
+
                 Token::OctaveCommand => {
                     self.advance();
                     let octave = if let Some(Token::Number(n)) = self.current_token() {
@@ -1707,15 +1746,19 @@ impl Parser {
                     self.current_octave = octave;
                     Ok(Some(MmlNode::Octave(Octave { number: octave })))
                 }
-                
+
                 Token::GreaterThan => {
                     self.advance();
                     let shift_up = !self.octave_reversed;
                     if shift_up {
-                        if self.current_octave < 8 { self.current_octave += 1; }
+                        if self.current_octave < 8 {
+                            self.current_octave += 1;
+                        }
                         Ok(Some(MmlNode::OctaveShift(OctaveShift::Up)))
                     } else {
-                        if self.current_octave > 0 { self.current_octave -= 1; }
+                        if self.current_octave > 0 {
+                            self.current_octave -= 1;
+                        }
                         Ok(Some(MmlNode::OctaveShift(OctaveShift::Down)))
                     }
                 }
@@ -1724,14 +1767,18 @@ impl Parser {
                     self.advance();
                     let shift_up = self.octave_reversed;
                     if shift_up {
-                        if self.current_octave < 8 { self.current_octave += 1; }
+                        if self.current_octave < 8 {
+                            self.current_octave += 1;
+                        }
                         Ok(Some(MmlNode::OctaveShift(OctaveShift::Up)))
                     } else {
-                        if self.current_octave > 0 { self.current_octave -= 1; }
+                        if self.current_octave > 0 {
+                            self.current_octave -= 1;
+                        }
                         Ok(Some(MmlNode::OctaveShift(OctaveShift::Down)))
                     }
                 }
-                
+
                 Token::TempoCommand => {
                     self.advance();
                     let bpm = if let Some(Token::Number(n)) = self.current_token() {
@@ -1743,7 +1790,7 @@ impl Parser {
                     self.current_tempo = bpm;
                     Ok(Some(MmlNode::Tempo(Tempo { bpm })))
                 }
-                
+
                 Token::VolumeCommand => {
                     self.advance();
                     let level = if let Some(Token::Number(n)) = self.current_token() {
@@ -1755,7 +1802,7 @@ impl Parser {
                     self.current_volume = level;
                     Ok(Some(MmlNode::Volume(Volume { level })))
                 }
-                
+
                 Token::LengthCommand => {
                     self.advance();
                     let value = if let Some(Token::Number(n)) = self.current_token() {
@@ -1767,7 +1814,7 @@ impl Parser {
                     self.current_length = value;
                     Ok(Some(MmlNode::Length(Length { value })))
                 }
-                
+
                 Token::Bar => {
                     self.advance();
                     Ok(Some(MmlNode::Bar))
@@ -1780,7 +1827,7 @@ impl Parser {
                     self.advance();
                     Ok(Some(MmlNode::LoopMarker))
                 }
-                
+
                 Token::AtSign => {
                     let span_start = self.current_position();
                     self.advance();
@@ -1788,12 +1835,17 @@ impl Parser {
                         let number = n as usize;
                         self.advance();
                         let span_end = self.current_position();
-                        Ok(Some(MmlNode::InstrumentSelection(crate::compiler::ast::InstrumentSelection { number, span: Some(Span::new(span_start, span_end)) })))
+                        Ok(Some(MmlNode::InstrumentSelection(
+                            crate::compiler::ast::InstrumentSelection {
+                                number,
+                                span: Some(Span::new(span_start, span_end)),
+                            },
+                        )))
                     } else {
                         Ok(None)
                     }
                 }
-                
+
                 Token::Identifier(cmd) if cmd.to_uppercase().starts_with("EON") => {
                     self.advance();
                     Ok(Some(MmlNode::ChipCommand {
@@ -1807,8 +1859,7 @@ impl Parser {
                 // The lexer may produce "q1" as a single Identifier, or "q" + Number separately.
                 Token::Identifier(cmd)
                     if (cmd.starts_with('q') || cmd.starts_with('Q'))
-                        && (cmd.len() == 1
-                            || cmd[1..].chars().all(|c| c.is_ascii_digit())) =>
+                        && (cmd.len() == 1 || cmd[1..].chars().all(|c| c.is_ascii_digit())) =>
                 {
                     let proportional = cmd.starts_with('Q');
                     let embedded_value = if cmd.len() > 1 {
@@ -1831,7 +1882,7 @@ impl Parser {
                         proportional,
                     })))
                 }
-                
+
                 // Infinite loop: [body]
                 Token::LeftBracket => {
                     self.advance();
@@ -1878,9 +1929,7 @@ impl Parser {
                     Ok(Some(MmlNode::Comment(text)))
                 }
 
-                _ => {
-                    Ok(None)
-                }
+                _ => Ok(None),
             }
         } else {
             Ok(None)
@@ -1890,7 +1939,8 @@ impl Parser {
     /// Check if a string is a known chip-specific command
     fn is_chip_command(&self, cmd: &str) -> bool {
         // FM Chip Commands (operators)
-        matches!(cmd,
+        matches!(
+            cmd,
             "AR" | "DR" | "SR" | "RR" | "SL" | "TL" | "KS" | "ML" | "DT" |
             "AL" | "FB" | "OP" |
             // PSG Commands
@@ -1908,12 +1958,12 @@ impl Parser {
     fn parse_chip_command(&mut self, cmd: &str) -> MmlResult<Option<MmlNode>> {
         // Parse command arguments (usually a single value or comma-separated values)
         let mut args = Vec::new();
-        
+
         // Check if next token is a number or operator specifier
         if let Some(Token::Number(n)) = self.current_token() {
             self.advance();
             args.push(n);
-            
+
             // Parse additional arguments if comma-separated
             while self.consume(Token::Comma) {
                 if let Some(Token::Number(n)) = self.current_token() {
@@ -1924,9 +1974,9 @@ impl Parser {
                 }
             }
         }
-        
+
         Ok(Some(MmlNode::ChipCommand {
-            chip: "Generic".to_string(),  // Will be resolved during codegen
+            chip: "Generic".to_string(), // Will be resolved during codegen
             command: cmd.to_string(),
             args,
         }))
@@ -1955,7 +2005,7 @@ mod tests {
     fn test_parse_basic_notes() {
         let source = "o4 c4 d4 e4 f4";
         let ast = parse(source).unwrap();
-        
+
         assert!(!ast.global_settings.is_empty());
     }
 
@@ -1964,7 +2014,7 @@ mod tests {
         // Simple song info with one key-value pair
         let source = "{ TitleName = MySong }";
         let ast = parse(source).unwrap();
-        
+
         assert_eq!(ast.get_metadata("TitleName"), Some(&"MySong".to_string()));
     }
 
@@ -1983,7 +2033,10 @@ mod tests {
         // rather than Identifier("C140"). The parser must reassemble the chip name.
         let source = "'@ P 1,\"sample.wav\",8000,100,C140,1400";
         let ast = parse(source).unwrap();
-        let inst = ast.pcm_instruments.get(&1).expect("instrument 1 should be parsed");
+        let inst = ast
+            .pcm_instruments
+            .get(&1)
+            .expect("instrument 1 should be parsed");
         assert_eq!(inst.chip, "C140");
         assert_eq!(inst.option, Some(1400));
     }
@@ -1994,7 +2047,10 @@ mod tests {
         // Identifier token — verify the existing path still works correctly.
         let source = "'@ P 2,\"sample.wav\",8000,100,Rf5c164,1400";
         let ast = parse(source).unwrap();
-        let inst = ast.pcm_instruments.get(&2).expect("instrument 2 should be parsed");
+        let inst = ast
+            .pcm_instruments
+            .get(&2)
+            .expect("instrument 2 should be parsed");
         assert_eq!(inst.chip, "Rf5c164");
         assert_eq!(inst.option, Some(1400));
     }

@@ -71,7 +71,11 @@ impl ZgmGenerator {
         self.write_track_division(&mut output)?;
 
         let eof_offset = output.len().saturating_sub(1) as u32;
-        let define_offset = if self.define_division.is_empty() { 0 } else { 0x40u32 };
+        let define_offset = if self.define_division.is_empty() {
+            0
+        } else {
+            0x40u32
+        };
         let track_offset = if self.track_division.is_empty() {
             0
         } else {
@@ -109,7 +113,7 @@ impl ZgmGenerator {
     }
 
     /// Write Define division
-    /// 
+    ///
     /// The Define division contains instrument definitions, PCM data,
     /// and other setup information.
     fn write_define_division(&self, output: &mut Vec<u8>) -> MmlResult<()> {

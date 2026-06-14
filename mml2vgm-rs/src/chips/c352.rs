@@ -135,7 +135,8 @@ impl SoundChipEmulator for C352 {
                 if addr % 8 == 3 {
                     self.channels[ch].pitch = (self.channels[ch].pitch & 0xFF00) | (data as u16);
                 } else {
-                    self.channels[ch].pitch = (self.channels[ch].pitch & 0x00FF) | ((data as u16) << 8);
+                    self.channels[ch].pitch =
+                        (self.channels[ch].pitch & 0x00FF) | ((data as u16) << 8);
                 }
             }
             _ => {}
@@ -150,25 +151,65 @@ impl SoundChipEmulator for C352 {
     // 32 channels × 16 bytes each = 0x200 bytes of register space.
     fn write_port(&mut self, addr_hi: u8, addr_lo: u8, data: u8) {
         let addr16 = ((addr_hi as usize) << 8) | addr_lo as usize;
-        if addr16 >= self.regs.len() { return; }
+        if addr16 >= self.regs.len() {
+            return;
+        }
         self.regs[addr16] = data;
         let ch = addr16 / 16;
-        if ch >= 32 { return; }
+        if ch >= 32 {
+            return;
+        }
         match addr16 % 16 {
-            0x00 => { self.channels[ch].volume = data; }
-            0x04 => { self.channels[ch].pitch = (self.channels[ch].pitch & 0xFF00) | data as u16; }
-            0x05 => { self.channels[ch].pitch = (self.channels[ch].pitch & 0x00FF) | ((data as u16) << 8); }
-            0x06 => { self.channels[ch].start_addr = (self.channels[ch].start_addr & 0xFFFF00) | data as u32; }
-            0x07 => { self.channels[ch].start_addr = (self.channels[ch].start_addr & 0xFF00FF) | ((data as u32) << 8); }
-            0x08 => { self.channels[ch].start_addr = (self.channels[ch].start_addr & 0x00FFFF) | ((data as u32) << 16); }
+            0x00 => {
+                self.channels[ch].volume = data;
+            }
+            0x04 => {
+                self.channels[ch].pitch = (self.channels[ch].pitch & 0xFF00) | data as u16;
+            }
+            0x05 => {
+                self.channels[ch].pitch = (self.channels[ch].pitch & 0x00FF) | ((data as u16) << 8);
+            }
+            0x06 => {
+                self.channels[ch].start_addr =
+                    (self.channels[ch].start_addr & 0xFFFF00) | data as u32;
+            }
+            0x07 => {
+                self.channels[ch].start_addr =
+                    (self.channels[ch].start_addr & 0xFF00FF) | ((data as u32) << 8);
+            }
+            0x08 => {
+                self.channels[ch].start_addr =
+                    (self.channels[ch].start_addr & 0x00FFFF) | ((data as u32) << 16);
+            }
             // Flags: bit 7 = key-on, bit 5 = loop enable
-            0x09 => { self.channels[ch].active = (data & 0x80) != 0; self.channels[ch].loop_enabled = (data & 0x20) != 0; self.channels[ch].flags = data; }
-            0x0A => { self.channels[ch].loop_addr = (self.channels[ch].loop_addr & 0xFFFF00) | data as u32; }
-            0x0B => { self.channels[ch].loop_addr = (self.channels[ch].loop_addr & 0xFF00FF) | ((data as u32) << 8); }
-            0x0C => { self.channels[ch].loop_addr = (self.channels[ch].loop_addr & 0x00FFFF) | ((data as u32) << 16); }
-            0x0D => { self.channels[ch].end_addr = (self.channels[ch].end_addr & 0xFFFF00) | data as u32; }
-            0x0E => { self.channels[ch].end_addr = (self.channels[ch].end_addr & 0xFF00FF) | ((data as u32) << 8); }
-            0x0F => { self.channels[ch].end_addr = (self.channels[ch].end_addr & 0x00FFFF) | ((data as u32) << 16); }
+            0x09 => {
+                self.channels[ch].active = (data & 0x80) != 0;
+                self.channels[ch].loop_enabled = (data & 0x20) != 0;
+                self.channels[ch].flags = data;
+            }
+            0x0A => {
+                self.channels[ch].loop_addr =
+                    (self.channels[ch].loop_addr & 0xFFFF00) | data as u32;
+            }
+            0x0B => {
+                self.channels[ch].loop_addr =
+                    (self.channels[ch].loop_addr & 0xFF00FF) | ((data as u32) << 8);
+            }
+            0x0C => {
+                self.channels[ch].loop_addr =
+                    (self.channels[ch].loop_addr & 0x00FFFF) | ((data as u32) << 16);
+            }
+            0x0D => {
+                self.channels[ch].end_addr = (self.channels[ch].end_addr & 0xFFFF00) | data as u32;
+            }
+            0x0E => {
+                self.channels[ch].end_addr =
+                    (self.channels[ch].end_addr & 0xFF00FF) | ((data as u32) << 8);
+            }
+            0x0F => {
+                self.channels[ch].end_addr =
+                    (self.channels[ch].end_addr & 0x00FFFF) | ((data as u32) << 16);
+            }
             _ => {}
         }
     }

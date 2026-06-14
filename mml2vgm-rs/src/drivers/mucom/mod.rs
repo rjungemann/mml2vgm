@@ -63,7 +63,7 @@ use crate::drivers::{
     DiagnosticSeverity, DriverCompileOptions, DriverCompileResult, DriverDiagnostic,
     DriverOutputFormat, DriverToken, ExternalDriver,
 };
-use crate::{CompileOptions, OutputFormat, SoundChip, error::MmlError};
+use crate::{error::MmlError, CompileOptions, OutputFormat, SoundChip};
 
 /// Mucom88 Driver implementation
 pub struct MucomDriver;
@@ -105,46 +105,48 @@ impl ExternalDriver for MucomDriver {
         let content_trimmed = content.trim();
 
         // High confidence: mucom88 directive or version
-        if content_lower.contains("mucom88") || content_lower.contains("mucom") && content_lower.contains("88")
+        if content_lower.contains("mucom88")
+            || content_lower.contains("mucom") && content_lower.contains("88")
         {
             return 95;
         }
 
         // High confidence: #MUCOM directive
-        if content_trimmed.starts_with("#mucom") || content_lower.contains("#mucom")
-        {
+        if content_trimmed.starts_with("#mucom") || content_lower.contains("#mucom") {
             return 95;
         }
 
         // High confidence: YM2612 specific
-        if content_lower.contains("ym2612") || content_lower.contains("opn2")
-        {
+        if content_lower.contains("ym2612") || content_lower.contains("opn2") {
             return 90;
         }
 
         // Medium confidence: Sega/Genesis mention
-        if content_lower.contains("sega") || content_lower.contains("genesis") || content_lower.contains("mega drive")
+        if content_lower.contains("sega")
+            || content_lower.contains("genesis")
+            || content_lower.contains("mega drive")
         {
             return 75;
         }
 
         // Medium confidence: PSG mention
-        if content_lower.contains("psg") || content_lower.contains("sn76489")
-        {
+        if content_lower.contains("psg") || content_lower.contains("sn76489") {
             return 70;
         }
 
         // Low confidence: FM channel patterns (@0-@9)
         if content.contains('@') {
             let at_count = content.matches('@').count();
-            let digit_count = content.chars().filter(|c| c.is_digit(10)).count();
+            let digit_count = content.chars().filter(|c| c.is_ascii_digit()).count();
             if at_count > 0 && digit_count > at_count {
                 return 50;
             }
         }
 
         // Low confidence: instrument/voice commands
-        if content_lower.contains("#voice") || content_lower.contains("#w") || content_lower.contains("s")
+        if content_lower.contains("#voice")
+            || content_lower.contains("#w")
+            || content_lower.contains("s")
         {
             return 30;
         }
@@ -205,9 +207,11 @@ impl ExternalDriver for MucomDriver {
         };
 
         // Create compile options with YM2612 + SN76489 for Mega Drive
-        let mut compile_options = CompileOptions::default();
-        compile_options.format = output_format;
-        compile_options.target_chips = Some(vec![SoundChip::YM2612, SoundChip::SN76489]);
+        let compile_options = CompileOptions {
+            format: output_format,
+            target_chips: Some(vec![SoundChip::YM2612, SoundChip::SN76489]),
+            ..Default::default()
+        };
 
         let compiler = crate::compiler::compiler::MmlCompiler::new(compile_options);
 
@@ -240,10 +244,15 @@ impl ExternalDriver for MucomDriver {
 /// Token for mucom88 syntax highlighting
 #[derive(Debug, Clone)]
 pub struct MucomToken {
+    /// Token type.
     pub token_type: String,
+    /// Value.
     pub value: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
@@ -292,14 +301,26 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 }
             }
 
-            tokens.push(create_driver_token(token_type, note_str, start_line, start_column, length));
+            tokens.push(create_driver_token(
+                token_type,
+                note_str,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
 
         // Rest
         if c == 'R' || c == 'r' {
-            tokens.push(create_driver_token("rest".to_string(), "r".to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                "rest".to_string(),
+                "r".to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
@@ -309,12 +330,12 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             // Read part number if present
             let mut value = "@".to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     let mut num_str = String::new();
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             num_str.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -324,8 +345,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     value.push_str(&num_str);
                 }
             }
-            
-            tokens.push(create_driver_token("part_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "part_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -334,7 +361,7 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == '#' {
             let mut directive = "#".to_string();
             let mut length = 1;
-            
+
             while let Some(&next_c) = chars.peek() {
                 if next_c.is_alphabetic() {
                     directive.push(chars.next().unwrap());
@@ -343,8 +370,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     break;
                 }
             }
-            
-            tokens.push(create_driver_token("directive".to_string(), directive, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "directive".to_string(),
+                directive,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -353,15 +386,21 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'O' || c == 'o' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
             }
-            
-            tokens.push(create_driver_token("octave_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "octave_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -370,15 +409,15 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'V' || c == 'v' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             // Check for + or -
             if let Some(&next_c) = chars.peek() {
                 if next_c == '+' || next_c == '-' {
                     value.push(chars.next().unwrap());
                     length += 1;
-                } else if next_c.is_digit(10) {
+                } else if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -387,8 +426,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                 }
             }
-            
-            tokens.push(create_driver_token("volume_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "volume_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -397,11 +442,11 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'L' || c == 'l' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -410,8 +455,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                 }
             }
-            
-            tokens.push(create_driver_token("length_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "length_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -420,11 +471,11 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'T' || c == 't' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -433,8 +484,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                 }
             }
-            
-            tokens.push(create_driver_token("tempo_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "tempo_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -448,7 +505,13 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 ']' => "loop_end_infinite",
                 _ => "unknown",
             };
-            tokens.push(create_driver_token(token_type.to_string(), c.to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                token_type.to_string(),
+                c.to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
@@ -457,22 +520,34 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'Q' || c == 'q' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
             }
-            
-            tokens.push(create_driver_token("quantize_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "quantize_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
 
         // Tie (_)
         if c == '_' {
-            tokens.push(create_driver_token("tie".to_string(), "_".to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                "tie".to_string(),
+                "_".to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
@@ -480,21 +555,39 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         // Octave up/down
         if c == '>' || c == '<' {
             let token_type = if c == '>' { "octave_up" } else { "octave_down" };
-            tokens.push(create_driver_token(token_type.to_string(), c.to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                token_type.to_string(),
+                c.to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
 
         // Dot
         if c == '.' {
-            tokens.push(create_driver_token("dot".to_string(), ".".to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                "dot".to_string(),
+                ".".to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
 
         // Bar
         if c == '|' {
-            tokens.push(create_driver_token("bar".to_string(), "|".to_string(), start_line, start_column, 1));
+            tokens.push(create_driver_token(
+                "bar".to_string(),
+                "|".to_string(),
+                start_line,
+                start_column,
+                1,
+            ));
             column += 1;
             continue;
         }
@@ -508,22 +601,34 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 }
                 comment.push(chars.next().unwrap());
             }
-            tokens.push(create_driver_token("comment".to_string(), comment.clone(), start_line, start_column, comment.len() + 1));
+            tokens.push(create_driver_token(
+                "comment".to_string(),
+                comment.clone(),
+                start_line,
+                start_column,
+                comment.len() + 1,
+            ));
             column += comment.len() + 1;
             continue;
         }
 
         // Numbers (standalone)
-        if c.is_digit(10) {
+        if c.is_ascii_digit() {
             let mut num_str = c.to_string();
             while let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     num_str.push(chars.next().unwrap());
                 } else {
                     break;
                 }
             }
-            tokens.push(create_driver_token("number".to_string(), num_str.clone(), start_line, start_column, num_str.len()));
+            tokens.push(create_driver_token(
+                "number".to_string(),
+                num_str.clone(),
+                start_line,
+                start_column,
+                num_str.len(),
+            ));
             column += num_str.len();
             continue;
         }
@@ -532,11 +637,11 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if c == 'S' || c == 's' {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -545,8 +650,14 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                 }
             }
-            
-            tokens.push(create_driver_token("instrument_cmd".to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                "instrument_cmd".to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
@@ -555,15 +666,15 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         if "YPWMN&".contains(c) {
             let mut value = c.to_string();
             let mut length = 1;
-            
+
             if let Some(&next_c) = chars.peek() {
-                if next_c == '+' || next_c == '-' || next_c.is_digit(10) {
+                if next_c == '+' || next_c == '-' || next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
-                    
+
                     // Continue reading digits for multi-digit values
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -572,7 +683,7 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                 }
             }
-            
+
             let token_type = match c {
                 'Y' => "volume_mode_cmd",
                 'P' => "pan_cmd",
@@ -582,14 +693,26 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 '&' => "detune_cmd",
                 _ => "command",
             };
-            
-            tokens.push(create_driver_token(token_type.to_string(), value, start_line, start_column, length));
+
+            tokens.push(create_driver_token(
+                token_type.to_string(),
+                value,
+                start_line,
+                start_column,
+                length,
+            ));
             column += length;
             continue;
         }
 
         // Default: unknown token
-        tokens.push(create_driver_token("unknown".to_string(), c.to_string(), start_line, start_column, c.len_utf8()));
+        tokens.push(create_driver_token(
+            "unknown".to_string(),
+            c.to_string(),
+            start_line,
+            start_column,
+            c.len_utf8(),
+        ));
         column += 1;
     }
 
@@ -597,7 +720,13 @@ fn mucom_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 }
 
 /// Helper to create a DriverToken
-fn create_driver_token(token_type: String, value: String, line: usize, column: usize, length: usize) -> DriverToken {
+fn create_driver_token(
+    token_type: String,
+    value: String,
+    line: usize,
+    column: usize,
+    length: usize,
+) -> DriverToken {
     DriverToken {
         token_type,
         value,
@@ -614,90 +743,153 @@ fn create_driver_token(token_type: String, value: String, line: usize, column: u
 /// Parse error for mucom88
 #[derive(Debug, Clone)]
 pub struct MucomParseError {
+    /// Message.
     pub message: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
 /// AST node for mucom88
 #[derive(Debug, Clone)]
 pub enum MucomAstNode {
+    /// Note.
     Note {
+        /// Note.
         note: char,
+        /// Sharp.
         sharp: bool,
+        /// Octave.
         octave: Option<u8>,
+        /// Duration.
         duration: Option<u8>,
+        /// Tie.
         tie: bool,
+        /// Dotted.
         dotted: bool,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Rest.
     Rest {
+        /// Duration.
         duration: Option<u8>,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Part.
     Part {
+        /// Part num.
         part_num: u8,
+        /// Commands.
         commands: Vec<MucomAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Part Select.
     PartSelect {
+        /// Part num.
         part_num: u8,
+        /// Line.
         line: usize,
     },
+    /// Octave.
     Octave {
+        /// Octave.
         octave: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume.
     Volume {
+        /// Volume.
         volume: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume Change.
     VolumeChange {
+        /// Delta.
         delta: i8,
+        /// Line.
         line: usize,
     },
+    /// Length.
     Length {
+        /// Length.
         length: u8,
+        /// Line.
         line: usize,
     },
+    /// Tempo.
     Tempo {
+        /// Tempo.
         tempo: u8,
+        /// Line.
         line: usize,
     },
+    /// Instrument.
     Instrument {
+        /// Instrument.
         instrument: u8,
+        /// Line.
         line: usize,
     },
+    /// Loop.
     Loop {
+        /// Count.
         count: Option<u8>,
+        /// Body.
         body: Vec<MucomAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Infinite.
     LoopInfinite {
+        /// Body.
         body: Vec<MucomAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Break.
     LoopBreak {
+        /// Line.
         line: usize,
     },
+    /// Directive.
     Directive {
+        /// Name.
         name: String,
+        /// Value.
         value: Option<String>,
+        /// Line.
         line: usize,
     },
+    /// Comment.
     Comment {
+        /// Text.
         text: String,
+        /// Line.
         line: usize,
     },
+    /// Bar.
     Bar {
+        /// Line.
         line: usize,
     },
 }
 
 /// Parse mucom88 content into AST
+// `current_part`/`current_length`/`current_volume` track parser state that is not
+// yet consumed by AST construction; retained for upcoming stateful handling.
+#[allow(unused_variables, unused_assignments)]
 fn mucom_parse(content: &str) -> Result<Vec<MucomAstNode>, Vec<MucomParseError>> {
     // For now, do basic parsing - full implementation will come later
     let mut errors = Vec::new();
@@ -729,7 +921,7 @@ fn mucom_parse(content: &str) -> Result<Vec<MucomAstNode>, Vec<MucomParseError>>
                 let part_str = token.value.trim_start_matches('@');
                 let part_num = part_str.parse::<u8>().unwrap_or(0);
                 current_part = Some(part_num);
-                
+
                 ast.push(MucomAstNode::PartSelect {
                     part_num,
                     line: token.line,
@@ -912,9 +1104,7 @@ fn mucom_parse(content: &str) -> Result<Vec<MucomAstNode>, Vec<MucomParseError>>
 
             "loop_end" | "loop_end_infinite" => {
                 // These should be handled by loop_start, but add a break for safety
-                ast.push(MucomAstNode::LoopBreak {
-                    line: token.line,
-                });
+                ast.push(MucomAstNode::LoopBreak { line: token.line });
             }
 
             "directive" => {
@@ -1005,7 +1195,7 @@ mod tests {
         let result = MucomDriver.tokenize(content);
         assert!(result.is_ok());
         let tokens = result.unwrap();
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
 
         // Check for part command
         assert!(tokens.iter().any(|t| t.token_type == "part_cmd"));
@@ -1057,6 +1247,8 @@ mod tests {
         assert!(result.is_ok());
         let ast = result.unwrap();
         // Should have at least one PartSelect node
-        assert!(ast.iter().any(|n| matches!(n, MucomAstNode::PartSelect { .. })));
+        assert!(ast
+            .iter()
+            .any(|n| matches!(n, MucomAstNode::PartSelect { .. })));
     }
 }

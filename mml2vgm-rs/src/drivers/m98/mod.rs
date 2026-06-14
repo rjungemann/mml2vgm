@@ -4,10 +4,10 @@
 //! M98 is a simplified MML format targeting YM2203 and YM2608 sound chips.
 
 use crate::drivers::{
-    DiagnosticSeverity, DriverCompileOptions, DriverCompileResult, DriverDiagnostic, DriverInfo,
+    DiagnosticSeverity, DriverCompileOptions, DriverCompileResult, DriverDiagnostic,
     DriverOutputFormat, DriverToken, ExternalDriver,
 };
-use crate::{CompileOptions, OutputFormat, SoundChip, error::MmlError};
+use crate::{error::MmlError, CompileOptions, OutputFormat, SoundChip};
 
 /// M98 Driver implementation
 pub struct M98Driver;
@@ -49,7 +49,9 @@ impl ExternalDriver for M98Driver {
         let content_lower = content.to_lowercase();
 
         // High confidence: M98 directive or comment
-        if content_lower.contains("m98") || content_lower.contains("m-98") || content_lower.contains("pc-98")
+        if content_lower.contains("m98")
+            || content_lower.contains("m-98")
+            || content_lower.contains("pc-98")
         {
             return 90;
         }
@@ -57,13 +59,17 @@ impl ExternalDriver for M98Driver {
         // Medium confidence: YM2203/YM2608 specific commands
         if content_lower.contains("@") {
             // Check if @ commands look like M98 part selectors
-            if content.matches('@').count() > 0 && content.chars().filter(|c| c.is_digit(10)).count() > 0 {
+            if content.matches('@').count() > 0
+                && content.chars().filter(|c| c.is_ascii_digit()).count() > 0
+            {
                 return 60;
             }
         }
 
         // Low confidence: generic MML with YM2203/YM2608 mention
-        if content_lower.contains("ym2203") || content_lower.contains("ym2608") || content_lower.contains("opna")
+        if content_lower.contains("ym2203")
+            || content_lower.contains("ym2608")
+            || content_lower.contains("opna")
         {
             return 40;
         }
@@ -75,13 +81,13 @@ impl ExternalDriver for M98Driver {
         // Parse and validate the M98 content
         // For now, just do basic validation
         // A proper implementation would parse and validate the AST
-        
+
         // Check for invalid characters
         for (line_idx, line) in content.lines().enumerate() {
             for (col_idx, c) in line.chars().enumerate() {
                 // Allow alphanumeric, spaces, and MML-specific characters
-                if !c.is_alphanumeric() && !c.is_whitespace() && 
-                   !"#@\\|;,=+-[].<>/?{}".contains(c) {
+                if !c.is_alphanumeric() && !c.is_whitespace() && !"#@\\|;,=+-[].<>/?{}".contains(c)
+                {
                     return Ok(vec![DriverDiagnostic {
                         message: format!("Invalid character: {}", c),
                         severity: DiagnosticSeverity::Error,
@@ -92,7 +98,7 @@ impl ExternalDriver for M98Driver {
                 }
             }
         }
-        
+
         Ok(Vec::new())
     }
 
@@ -107,7 +113,7 @@ impl ExternalDriver for M98Driver {
     ) -> Result<DriverCompileResult, MmlError> {
         // For now, use the existing mml2vgm compiler with YM2608 target
         // In the future, implement a dedicated M98 compiler
-        
+
         // Convert output format
         let output_format = match options.output_format {
             DriverOutputFormat::VGM => OutputFormat::VGM,
@@ -117,9 +123,11 @@ impl ExternalDriver for M98Driver {
         };
 
         // Create compile options with YM2608 as default (most common for PC-9801)
-        let mut compile_options = CompileOptions::default();
-        compile_options.format = output_format;
-        compile_options.target_chips = Some(vec![SoundChip::YM2608, SoundChip::SN76489]);
+        let compile_options = CompileOptions {
+            format: output_format,
+            target_chips: Some(vec![SoundChip::YM2608, SoundChip::SN76489]),
+            ..Default::default()
+        };
 
         let compiler = crate::compiler::compiler::MmlCompiler::new(compile_options);
 
@@ -152,10 +160,15 @@ impl ExternalDriver for M98Driver {
 /// Token for M98 syntax highlighting
 #[derive(Debug, Clone)]
 pub struct M98Token {
+    /// Token type.
     pub token_type: String,
+    /// Value.
     pub value: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
@@ -170,7 +183,7 @@ fn m98_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
     while let Some(c) = chars.next() {
         let start_line = line;
         let start_column = column;
-        let start_pos = pos;
+        let _start_pos = pos;
 
         // Handle newlines
         if c == '\n' {
@@ -328,7 +341,7 @@ fn m98_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
         // Comment (;)
         if c == ';' {
-            let start_pos = pos;
+            let _start_pos = pos;
             let mut comment_chars: Vec<char> = Vec::new();
             while let Some(&next_c) = chars.peek() {
                 if next_c == '\n' {
@@ -350,11 +363,11 @@ fn m98_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         }
 
         // Numbers
-        if c.is_digit(10) {
-            let start_pos = pos;
+        if c.is_ascii_digit() {
+            let _start_pos = pos;
             let mut num_chars: Vec<char> = vec![c];
             while let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     num_chars.push(chars.next().unwrap());
                 } else {
                     break;
@@ -488,7 +501,7 @@ mod tests {
         let result = M98Driver.tokenize(content);
         assert!(result.is_ok());
         let tokens = result.unwrap();
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
 
         // Check for part command
         assert!(tokens.iter().any(|t| t.token_type == "part_cmd"));

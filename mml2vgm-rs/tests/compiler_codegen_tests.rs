@@ -19,6 +19,7 @@ use mml2vgm::compiler::compiler::MmlCompiler;
 use mml2vgm::{CompileOptions, OutputFormat};
 
 const SN76489_CLOCK: u32 = 3_579_545;
+#[allow(dead_code)]
 const SAMPLE_RATE: u32 = 44100;
 
 // ── VGM command extraction helpers ───────────────────────────────────────────
@@ -34,7 +35,11 @@ struct VgmCmd {
 fn extract_vgm_commands(data: &[u8]) -> Vec<VgmCmd> {
     let data_offset = if data.len() > 0x40 {
         let raw = u32::from_le_bytes([data[0x34], data[0x35], data[0x36], data[0x37]]);
-        if raw == 0 { 0x40 } else { (raw as usize) + 0x34 }
+        if raw == 0 {
+            0x40
+        } else {
+            (raw as usize) + 0x34
+        }
     } else {
         0x40
     };
@@ -46,49 +51,82 @@ fn extract_vgm_commands(data: &[u8]) -> Vec<VgmCmd> {
         let op = data[i];
         match op {
             0x50 if i + 1 < data.len() => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i + 1]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1]],
+                });
                 i += 2;
             }
             0x51..=0x5F | 0xA0 | 0xB0..=0xBF if i + 2 < data.len() => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i + 1], data[i + 2]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1], data[i + 2]],
+                });
                 i += 3;
             }
             0x52 | 0x53 if i + 2 < data.len() => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i + 1], data[i + 2]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1], data[i + 2]],
+                });
                 i += 3;
             }
             0x61 if i + 2 < data.len() => {
                 let wait = u16::from_le_bytes([data[i + 1], data[i + 2]]);
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i + 1], data[i + 2]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1], data[i + 2]],
+                });
                 let _ = wait;
                 i += 3;
             }
             0x62 => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![],
+                });
                 i += 1;
             }
             0x63 => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![],
+                });
                 i += 1;
             }
             0x66 => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![],
+                });
                 break;
             }
             0x67 if i + 6 < data.len() => {
-                let len = u32::from_le_bytes([data[i+2], data[i+3], data[i+4], data[i+5]]) as usize;
-                cmds.push(VgmCmd { opcode: op, payload: data[i+2..i+6+len.min(data.len()-i-6)].to_vec() });
+                let len = u32::from_le_bytes([data[i + 2], data[i + 3], data[i + 4], data[i + 5]])
+                    as usize;
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: data[i + 2..i + 6 + len.min(data.len() - i - 6)].to_vec(),
+                });
                 i += 7 + len;
             }
             0xC0..=0xC4 | 0xD0..=0xD6 if i + 3 < data.len() => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i+1], data[i+2], data[i+3]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1], data[i + 2], data[i + 3]],
+                });
                 i += 4;
             }
             0xE0..=0xE1 if i + 3 < data.len() => {
-                cmds.push(VgmCmd { opcode: op, payload: vec![data[i+1], data[i+2], data[i+3]] });
+                cmds.push(VgmCmd {
+                    opcode: op,
+                    payload: vec![data[i + 1], data[i + 2], data[i + 3]],
+                });
                 i += 4;
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
     cmds
@@ -196,7 +234,8 @@ fn psg_multi_note_all_tones_present() {
     let cmds = extract_vgm_commands(&vgm);
     let writes = sn76489_writes(&cmds);
 
-    for midi in [60u8, 64, 67] { // C4, E4, G4
+    for midi in [60u8, 64, 67] {
+        // C4, E4, G4
         let divider = midi_to_psg_divider(midi);
         let latch = psg_latch_tone(divider);
         assert!(
@@ -256,10 +295,11 @@ fn wait_total_matches_vgm_header_total_samples() {
 fn tempo_affects_wait_duration() {
     // Slower tempo → longer wait for same note value
     let vgm_120 = compile_vgm("@0 t120 o4 c4");
-    let vgm_60  = compile_vgm("@0 t60  o4 c4");
+    let vgm_60 = compile_vgm("@0 t60  o4 c4");
 
-    let t120 = u32::from_le_bytes([vgm_120[0x18], vgm_120[0x19], vgm_120[0x1A], vgm_120[0x1B]]) as u64;
-    let t60  = u32::from_le_bytes([vgm_60[0x18],  vgm_60[0x19],  vgm_60[0x1A],  vgm_60[0x1B]])  as u64;
+    let t120 =
+        u32::from_le_bytes([vgm_120[0x18], vgm_120[0x19], vgm_120[0x1A], vgm_120[0x1B]]) as u64;
+    let t60 = u32::from_le_bytes([vgm_60[0x18], vgm_60[0x19], vgm_60[0x1A], vgm_60[0x1B]]) as u64;
 
     assert!(
         t60 > t120,
@@ -270,11 +310,21 @@ fn tempo_affects_wait_duration() {
 #[test]
 fn dotted_note_is_longer_than_plain() {
     // Dotted quarter = 1.5x regular quarter
-    let vgm_plain  = compile_vgm("@0 t120 o4 c4");
+    let vgm_plain = compile_vgm("@0 t120 o4 c4");
     let vgm_dotted = compile_vgm("@0 t120 o4 c4.");
 
-    let t_plain  = u32::from_le_bytes([vgm_plain[0x18],  vgm_plain[0x19],  vgm_plain[0x1A],  vgm_plain[0x1B]])  as u64;
-    let t_dotted = u32::from_le_bytes([vgm_dotted[0x18], vgm_dotted[0x19], vgm_dotted[0x1A], vgm_dotted[0x1B]]) as u64;
+    let t_plain = u32::from_le_bytes([
+        vgm_plain[0x18],
+        vgm_plain[0x19],
+        vgm_plain[0x1A],
+        vgm_plain[0x1B],
+    ]) as u64;
+    let t_dotted = u32::from_le_bytes([
+        vgm_dotted[0x18],
+        vgm_dotted[0x19],
+        vgm_dotted[0x1A],
+        vgm_dotted[0x1B],
+    ]) as u64;
 
     assert!(
         t_dotted > t_plain,
@@ -295,7 +345,11 @@ fn vgm_ends_with_eof_command() {
     let vgm = compile_vgm("@0 t120 o4 c4");
     let cmds = extract_vgm_commands(&vgm);
     let last = cmds.last().map(|c| c.opcode);
-    assert_eq!(last, Some(0x66), "VGM command stream must end with EOF (0x66)");
+    assert_eq!(
+        last,
+        Some(0x66),
+        "VGM command stream must end with EOF (0x66)"
+    );
 }
 
 #[test]
@@ -305,10 +359,10 @@ fn vgm_tone_write_precedes_wait_for_first_note() {
     let cmds = extract_vgm_commands(&vgm);
 
     let first_write_idx = cmds.iter().position(|c| c.opcode == 0x50);
-    let first_wait_idx  = cmds.iter().position(|c| matches!(c.opcode, 0x61 | 0x62 | 0x63));
+    let first_wait_idx = cmds.iter().position(|c| matches!(c.opcode, 0x61..=0x63));
 
     assert!(first_write_idx.is_some(), "no SN76489 write found");
-    assert!(first_wait_idx.is_some(),  "no wait command found");
+    assert!(first_wait_idx.is_some(), "no wait command found");
     assert!(
         first_write_idx.unwrap() < first_wait_idx.unwrap(),
         "tone write (idx={}) should precede first wait (idx={})",
@@ -327,9 +381,18 @@ fn sequential_notes_produce_multiple_write_groups() {
     let c4_latch = psg_latch_tone(midi_to_psg_divider(60));
     let g4_latch = psg_latch_tone(midi_to_psg_divider(67));
 
-    assert_ne!(c4_latch, g4_latch, "C4 and G4 must have different latch bytes");
-    assert!(writes.contains(&c4_latch), "C4 latch {c4_latch:#04x} missing from writes");
-    assert!(writes.contains(&g4_latch), "G4 latch {g4_latch:#04x} missing from writes");
+    assert_ne!(
+        c4_latch, g4_latch,
+        "C4 and G4 must have different latch bytes"
+    );
+    assert!(
+        writes.contains(&c4_latch),
+        "C4 latch {c4_latch:#04x} missing from writes"
+    );
+    assert!(
+        writes.contains(&g4_latch),
+        "G4 latch {g4_latch:#04x} missing from writes"
+    );
 }
 
 // ── CompileInfo accuracy ──────────────────────────────────────────────────────
@@ -355,8 +418,12 @@ fn compile_info_duration_proportional_to_note_count() {
         format: OutputFormat::VGM,
         ..Default::default()
     });
-    let r1 = compiler.compile_from_source("@0 t120 o4 c4").expect("compile failed");
-    let r4 = compiler.compile_from_source("@0 t120 o4 c4 d4 e4 f4").expect("compile failed");
+    let r1 = compiler
+        .compile_from_source("@0 t120 o4 c4")
+        .expect("compile failed");
+    let r4 = compiler
+        .compile_from_source("@0 t120 o4 c4 d4 e4 f4")
+        .expect("compile failed");
 
     assert!(
         r4.info.duration_seconds > r1.info.duration_seconds,
@@ -443,7 +510,9 @@ fn ym2612_key_on_register_written() {
     let cmds = extract_vgm_commands(&vgm);
     let writes = ym2612_port0_writes(&cmds);
 
-    let has_key_on = writes.iter().any(|&(addr, data)| addr == 0x28 && data & 0xF0 != 0);
+    let has_key_on = writes
+        .iter()
+        .any(|&(addr, data)| addr == 0x28 && data & 0xF0 != 0);
     assert!(
         has_key_on,
         "VGM missing YM2612 key-on write (addr=0x28, data bits[7:4] non-zero); port0_writes={writes:?}"
@@ -485,7 +554,9 @@ fn ym2612_key_off_before_next_note() {
     let port0 = ym2612_port0_writes(&cmds);
 
     // Both key-on and key-off use addr 0x28; key-off has bits[7:4] == 0
-    let has_key_off = port0.iter().any(|&(addr, data)| addr == 0x28 && data & 0xF0 == 0);
+    let has_key_off = port0
+        .iter()
+        .any(|&(addr, data)| addr == 0x28 && data & 0xF0 == 0);
     assert!(
         has_key_off,
         "two sequential YM2612 notes must generate at least one key-off (addr=0x28, data[7:4]=0)"
@@ -546,19 +617,25 @@ fn psg_volume_off_written_after_note_ends() {
 #[test]
 fn psg_sharp_note_has_different_frequency_than_natural() {
     // C4 and C#4 must produce different SN76489 tone dividers
-    let vgm_c  = compile_vgm("@0 t120 o4 c4");
+    let vgm_c = compile_vgm("@0 t120 o4 c4");
     let vgm_cs = compile_vgm("@0 t120 o4 c+4");
 
-    let writes_c  = sn76489_writes(&extract_vgm_commands(&vgm_c));
+    let writes_c = sn76489_writes(&extract_vgm_commands(&vgm_c));
     let writes_cs = sn76489_writes(&extract_vgm_commands(&vgm_cs));
 
     // The latch bytes for the tone frequency should differ
-    let latch_c  = psg_latch_tone(midi_to_psg_divider(60)); // C4 = MIDI 60
+    let latch_c = psg_latch_tone(midi_to_psg_divider(60)); // C4 = MIDI 60
     let latch_cs = psg_latch_tone(midi_to_psg_divider(61)); // C#4 = MIDI 61
 
     assert_ne!(latch_c, latch_cs, "C4 and C#4 latch bytes must differ");
-    assert!(writes_c.contains(&latch_c),  "C4  latch {latch_c:#04x}  missing from writes");
-    assert!(writes_cs.contains(&latch_cs), "C#4 latch {latch_cs:#04x} missing from writes");
+    assert!(
+        writes_c.contains(&latch_c),
+        "C4  latch {latch_c:#04x}  missing from writes"
+    );
+    assert!(
+        writes_cs.contains(&latch_cs),
+        "C#4 latch {latch_cs:#04x} missing from writes"
+    );
 }
 
 #[test]
@@ -591,7 +668,10 @@ fn short_notes_use_0x70_style_waits() {
     let vgm = compile_vgm("@0 t240 o4 c32 d32 e32 f32");
     let cmds = extract_vgm_commands(&vgm);
     let total = total_wait_samples(&cmds);
-    assert!(total > 0, "fast notes at high BPM should still produce non-zero total samples");
+    assert!(
+        total > 0,
+        "fast notes at high BPM should still produce non-zero total samples"
+    );
 }
 
 #[test]
@@ -600,5 +680,8 @@ fn long_note_uses_0x61_wait() {
     let vgm = compile_vgm("@0 t60 o4 c1");
     let cmds = extract_vgm_commands(&vgm);
     let has_long_wait = cmds.iter().any(|c| c.opcode == 0x61);
-    assert!(has_long_wait, "a whole note at t60 should produce at least one 0x61 (long wait) command");
+    assert!(
+        has_long_wait,
+        "a whole note at t60 should produce at least one 0x61 (long wait) command"
+    );
 }

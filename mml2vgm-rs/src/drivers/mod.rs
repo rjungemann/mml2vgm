@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::error::MmlError;
 use crate::compiler::lexer;
+use crate::error::MmlError;
 
 // Re-export driver modules
 pub mod m98;
@@ -108,9 +108,13 @@ pub struct DriverDiagnostic {
 /// Severity level for diagnostics
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticSeverity {
+    /// Error.
     Error,
+    /// Warning.
     Warning,
+    /// Info.
     Info,
+    /// Hint.
     Hint,
 }
 
@@ -387,12 +391,14 @@ impl ExternalDriver for GwiDriver {
         use crate::OutputFormat;
 
         // Convert driver options to core compile options
-        let mut core_options = CompileOptions::default();
-        core_options.format = match options.output_format {
-            DriverOutputFormat::VGM => OutputFormat::VGM,
-            DriverOutputFormat::XGM => OutputFormat::XGM,
-            DriverOutputFormat::XGM2 => OutputFormat::XGM2,
-            DriverOutputFormat::ZGM => OutputFormat::ZGM,
+        let core_options = CompileOptions {
+            format: match options.output_format {
+                DriverOutputFormat::VGM => OutputFormat::VGM,
+                DriverOutputFormat::XGM => OutputFormat::XGM,
+                DriverOutputFormat::XGM2 => OutputFormat::XGM2,
+                DriverOutputFormat::ZGM => OutputFormat::ZGM,
+            },
+            ..Default::default()
         };
 
         let compiler = crate::compiler::compiler::MmlCompiler::new(core_options);
@@ -557,7 +563,7 @@ mod tests {
         let result = driver.tokenize(content);
         assert!(result.is_ok());
         let tokens = result.unwrap();
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
     }
 }
 

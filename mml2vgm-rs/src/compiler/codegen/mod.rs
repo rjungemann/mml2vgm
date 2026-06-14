@@ -9,14 +9,14 @@
 //! 2. A CodeGenerator is created with the appropriate format
 //! 3. The generator produces binary output with proper headers and command streams
 
+pub mod midi;
+/// Midi controller.
+pub mod midi_controller;
 pub mod vgm;
 pub mod xgm;
 pub mod zgm;
-pub mod midi;
-pub mod midi_controller;
 
 use crate::{MmlError, MmlResult, OutputFormat as LibOutputFormat, SoundChip};
-use std::path::Path;
 
 /// A single note event with timing and source location information
 #[derive(Debug, Clone, serde::Serialize)]
@@ -283,7 +283,7 @@ impl Default for VgmHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compiler::ast::{MmlAst, Note, PartDefinition, Rest, MmlNode};
+    use crate::compiler::ast::{MmlAst, MmlNode, Note, PartDefinition, Rest};
     use crate::CompileOptions;
 
     #[test]
@@ -307,18 +307,18 @@ mod tests {
     #[test]
     fn test_vgm_header_dmg_clock_offset() {
         let mut ast = MmlAst::new();
-        let mut part = PartDefinition {
+        let part = PartDefinition {
             name: "DMG1".to_string(),
             chip: Some("DMG".to_string()),
             tempo: Some(120),
             commands: vec![],
         };
         ast.parts.insert("DMG1".to_string(), part);
-        
+
         let options = CompileOptions::default();
         let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // Check DMG clock at offset 0x80
         let dmg_clock_bytes = &result[0x80..0x84];
         assert_eq!(dmg_clock_bytes, &4_194_304u32.to_le_bytes());
@@ -327,18 +327,18 @@ mod tests {
     #[test]
     fn test_vgm_header_nes_apu_clock_offset() {
         let mut ast = MmlAst::new();
-        let mut part = PartDefinition {
+        let part = PartDefinition {
             name: "NES1".to_string(),
             chip: Some("NES".to_string()),
             tempo: Some(120),
             commands: vec![],
         };
         ast.parts.insert("NES1".to_string(), part);
-        
+
         let options = CompileOptions::default();
         let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // Check NES APU clock at offset 0x84
         let nes_clock_bytes = &result[0x84..0x88];
         assert_eq!(nes_clock_bytes, &1_789_772u32.to_le_bytes());
@@ -347,68 +347,58 @@ mod tests {
     #[test]
     fn test_vgm_header_k051649_clock_offset() {
         let mut ast = MmlAst::new();
-        let mut part = PartDefinition {
+        let part = PartDefinition {
             name: "SCC1".to_string(),
             chip: Some("K051649".to_string()),
             tempo: Some(120),
             commands: vec![],
         };
         ast.parts.insert("SCC1".to_string(), part);
-        
+
         let options = CompileOptions::default();
         let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // Check K051649 clock at offset 0x9C
         let k051649_clock_bytes = &result[0x9C..0xA0];
         assert_eq!(k051649_clock_bytes, &1_789_772u32.to_le_bytes());
-        
+
         // Check K051649 flags at offset 0x94 - bit 31 should be set
         let k051649_flags_bytes = &result[0x94..0x98];
-        let flags = u32::from_le_bytes([k051649_flags_bytes[0], k051649_flags_bytes[1], k051649_flags_bytes[2], k051649_flags_bytes[3]]);
+        let flags = u32::from_le_bytes([
+            k051649_flags_bytes[0],
+            k051649_flags_bytes[1],
+            k051649_flags_bytes[2],
+            k051649_flags_bytes[3],
+        ]);
         assert!(flags & 0x80000000 != 0, "K051649 flag bit 31 should be set");
     }
 
     #[test]
     fn test_output_format_conversion() {
         use crate::OutputFormat as LibFormat;
-        
-        assert_eq!(
-            OutputFormat::from(LibFormat::VGM),
-            OutputFormat::Vgm
-        );
-        assert_eq!(
-            OutputFormat::from(LibFormat::XGM),
-            OutputFormat::Xgm
-        );
-        assert_eq!(
-            OutputFormat::from(LibFormat::XGM2),
-            OutputFormat::Xgm2
-        );
-        assert_eq!(
-            OutputFormat::from(LibFormat::ZGM),
-            OutputFormat::Zgm
-        );
-        assert_eq!(
-            OutputFormat::from(LibFormat::MID),
-            OutputFormat::Midi
-        );
+
+        assert_eq!(OutputFormat::from(LibFormat::VGM), OutputFormat::Vgm);
+        assert_eq!(OutputFormat::from(LibFormat::XGM), OutputFormat::Xgm);
+        assert_eq!(OutputFormat::from(LibFormat::XGM2), OutputFormat::Xgm2);
+        assert_eq!(OutputFormat::from(LibFormat::ZGM), OutputFormat::Zgm);
+        assert_eq!(OutputFormat::from(LibFormat::MID), OutputFormat::Midi);
     }
 
     #[test]
     fn test_vgm_generator_basic() {
         let ast = MmlAst::new();
         let options = CompileOptions::default();
-        
+
         let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // VGM header is 0x100 bytes
         assert!(result.len() >= 0x100);
-        
+
         // Check ident
         assert_eq!(&result[0..4], [b'V', b'g', b'm', b' ']);
-        
+
         // Check end of sound data marker (0x66)
         assert!(result.contains(&0x66));
     }
@@ -416,25 +406,25 @@ mod tests {
     #[test]
     fn test_vgm_generator_with_note() {
         let mut ast = MmlAst::new();
-        
+
         // Create a simple note
         let mut note = Note::new('C', 0, 4);
         note.duration = Some(480); // Quarter note at 120 BPM
-        
+
         // Create a part with the note
-        let mut part = PartDefinition {
+        let part = PartDefinition {
             name: "FM1".to_string(),
             chip: Some("YM2612".to_string()),
             tempo: Some(120),
             commands: vec![MmlNode::Note(note)],
         };
-        
+
         ast.parts.insert("FM1".to_string(), part);
-        
+
         let options = CompileOptions::default();
         let generator = vgm::VgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // Should generate some commands
         assert!(result.len() > 0x100);
     }
@@ -443,10 +433,10 @@ mod tests {
     fn test_xgm_generator_basic() {
         let ast = MmlAst::new();
         let options = CompileOptions::default();
-        
+
         let generator = xgm::XgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // XGM header
         assert!(result.len() >= 0x20);
         assert_eq!(&result[0..4], [b'X', b'G', b'M', b' ']);
@@ -463,7 +453,10 @@ mod tests {
             name: "FM1".to_string(),
             chip: Some("YM2612".to_string()),
             tempo: Some(120),
-            commands: vec![MmlNode::Tempo(crate::compiler::ast::Tempo { bpm: 120 }), MmlNode::Note(note)],
+            commands: vec![
+                MmlNode::Tempo(crate::compiler::ast::Tempo { bpm: 120 }),
+                MmlNode::Note(note),
+            ],
         };
 
         ast.parts.insert("FM1".to_string(), part);
@@ -506,10 +499,10 @@ mod tests {
     fn test_zgm_generator_basic() {
         let ast = MmlAst::new();
         let options = CompileOptions::default();
-        
+
         let generator = zgm::ZgmGenerator::from_ast(&ast, &options).unwrap();
         let result = generator.generate().unwrap();
-        
+
         // ZGM header
         assert!(result.len() >= 0x40);
         assert_eq!(&result[0..4], [b'Z', b'G', b'M', b' ']);
@@ -527,7 +520,14 @@ mod tests {
             name: "A1".to_string(),
             chip: Some("SN76489".to_string()),
             tempo: Some(150),
-            commands: vec![MmlNode::Note(note), MmlNode::Rest(Rest { duration: 60, dotted: false, span: None })],
+            commands: vec![
+                MmlNode::Note(note),
+                MmlNode::Rest(Rest {
+                    duration: 60,
+                    dotted: false,
+                    span: None,
+                }),
+            ],
         };
 
         ast.parts.insert("A1".to_string(), part);

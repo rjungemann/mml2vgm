@@ -4,7 +4,7 @@
 //! Rodio provides a simpler interface than CPAL for common use cases.
 
 use super::backend::AudioBackend;
-use crate::{MmlError, MmlResult};
+use crate::MmlResult;
 
 /// Rodio audio backend for convenient playback
 ///

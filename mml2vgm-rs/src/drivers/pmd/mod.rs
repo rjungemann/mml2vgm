@@ -68,7 +68,7 @@ use crate::drivers::{
     DiagnosticSeverity, DriverCompileOptions, DriverCompileResult, DriverDiagnostic,
     DriverOutputFormat, DriverToken, ExternalDriver,
 };
-use crate::{CompileOptions, OutputFormat, SoundChip, error::MmlError};
+use crate::{error::MmlError, CompileOptions, OutputFormat, SoundChip};
 
 /// PMD Driver implementation
 pub struct PMDDriver;
@@ -114,50 +114,47 @@ impl ExternalDriver for PMDDriver {
         let content_trimmed = content.trim();
 
         // High confidence: PMD-specific directives
-        if content_trimmed.starts_with("@music") || content_lower.contains("@music")
-        {
+        if content_trimmed.starts_with("@music") || content_lower.contains("@music") {
             return 95;
         }
 
         // High confidence: PPZ format marker
-        if content_lower.contains("@ppz")
-        {
+        if content_lower.contains("@ppz") {
             return 95;
         }
 
         // High confidence: PMD mention
-        if content_lower.contains("pmd") && !content_lower.contains("mucompmd")
-        {
+        if content_lower.contains("pmd") && !content_lower.contains("mucompmd") {
             return 90;
         }
 
         // Medium confidence: PMD-specific patterns
-        if content_lower.contains("@part") || content_lower.contains("@voice")
-        {
+        if content_lower.contains("@part") || content_lower.contains("@voice") {
             return 80;
         }
 
         // Medium confidence: rhythm section
-        if content_lower.contains("@rhythm") || content_lower.contains("@adpcm")
-        {
+        if content_lower.contains("@rhythm") || content_lower.contains("@adpcm") {
             return 80;
         }
 
         // Medium confidence: YM2203/YM2608 specific
-        if content_lower.contains("ym2203") || content_lower.contains("ym2608")
-        {
+        if content_lower.contains("ym2203") || content_lower.contains("ym2608") {
             return 70;
         }
 
         // Medium confidence: PC-9801 mention
-        if content_lower.contains("pc-98") || content_lower.contains("pc98")
-        {
+        if content_lower.contains("pc-98") || content_lower.contains("pc98") {
             return 65;
         }
 
         // Low confidence: rhythm instrument names
-        if content_lower.contains("bd") || content_lower.contains("sd") || content_lower.contains("tom")
-            || content_lower.contains("hh") || content_lower.contains("cym") || content_lower.contains("rim")
+        if content_lower.contains("bd")
+            || content_lower.contains("sd")
+            || content_lower.contains("tom")
+            || content_lower.contains("hh")
+            || content_lower.contains("cym")
+            || content_lower.contains("rim")
         {
             return 30;
         }
@@ -221,9 +218,11 @@ impl ExternalDriver for PMDDriver {
         let target_chips = detect_target_chips(content);
 
         // Create compile options
-        let mut compile_options = CompileOptions::default();
-        compile_options.format = output_format;
-        compile_options.target_chips = Some(target_chips);
+        let compile_options = CompileOptions {
+            format: output_format,
+            target_chips: Some(target_chips),
+            ..Default::default()
+        };
 
         let compiler = crate::compiler::compiler::MmlCompiler::new(compile_options);
 
@@ -252,19 +251,17 @@ impl ExternalDriver for PMDDriver {
 /// Detect target chips from PMD content
 fn detect_target_chips(content: &str) -> Vec<SoundChip> {
     let content_lower = content.to_lowercase();
-    
+
     // Check for YM2608 (most common for PMD with rhythm/ADPCM)
-    if content_lower.contains("ym2608") || content_lower.contains("opna")
-    {
+    if content_lower.contains("ym2608") || content_lower.contains("opna") {
         return vec![SoundChip::YM2608, SoundChip::SN76489];
     }
-    
+
     // Check for YM2203
-    if content_lower.contains("ym2203")
-    {
+    if content_lower.contains("ym2203") {
         return vec![SoundChip::YM2203, SoundChip::SN76489];
     }
-    
+
     // Default to YM2608 for PMD (most PMD files target YM2608)
     vec![SoundChip::YM2608, SoundChip::SN76489]
 }
@@ -276,10 +273,15 @@ fn detect_target_chips(content: &str) -> Vec<SoundChip> {
 /// Token for PMD syntax highlighting
 #[derive(Debug, Clone)]
 pub struct PMDToken {
+    /// Token type.
     pub token_type: String,
+    /// Value.
     pub value: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
@@ -345,9 +347,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
             // Check for duration number
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -404,9 +406,12 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                     }
                     // Check for @MUSIC, @PPZ, @PART, @VOICE, @RHYTHM, @ADPCM, @TEMPO, @VOLUME
                     let directive_upper = value.to_uppercase();
-                    if directive_upper == "@MUSIC" || directive_upper == "@PPZ"
-                        || directive_upper == "@RHYTHM" || directive_upper == "@ADPCM"
-                        || directive_upper == "@TEMPO" || directive_upper == "@VOLUME"
+                    if directive_upper == "@MUSIC"
+                        || directive_upper == "@PPZ"
+                        || directive_upper == "@RHYTHM"
+                        || directive_upper == "@ADPCM"
+                        || directive_upper == "@TEMPO"
+                        || directive_upper == "@VOLUME"
                     {
                         // Skip whitespace and read argument if present
                         while let Some(&next_c) = chars.peek() {
@@ -418,9 +423,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                         }
                         // Read number argument
                         if let Some(&next_c) = chars.peek() {
-                            if next_c.is_digit(10) {
+                            if next_c.is_ascii_digit() {
                                 while let Some(&d) = chars.peek() {
-                                    if d.is_digit(10) {
+                                    if d.is_ascii_digit() {
                                         value.push(chars.next().unwrap());
                                         length += 1;
                                     } else {
@@ -439,10 +444,10 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                         column += length;
                         continue;
                     }
-                } else if next_c.is_digit(10) {
+                } else if next_c.is_ascii_digit() {
                     // Read part number
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -479,7 +484,7 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
@@ -505,9 +510,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
                 if next_c == '+' || next_c == '-' {
                     value.push(chars.next().unwrap());
                     length += 1;
-                } else if next_c.is_digit(10) {
+                } else if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -534,9 +539,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -563,9 +568,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -592,7 +597,7 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                 }
@@ -625,9 +630,9 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
             if c == '(' {
                 if let Some(&next_c) = chars.peek() {
-                    if next_c.is_digit(10) {
+                    if next_c.is_ascii_digit() {
                         while let Some(&d) = chars.peek() {
-                            if d.is_digit(10) {
+                            if d.is_ascii_digit() {
                                 value.push(chars.next().unwrap());
                                 length += 1;
                             } else {
@@ -655,11 +660,11 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             let mut length = 1;
 
             if let Some(&next_c) = chars.peek() {
-                if next_c == '+' || next_c == '-' || next_c.is_digit(10) {
+                if next_c == '+' || next_c == '-' || next_c.is_ascii_digit() {
                     value.push(chars.next().unwrap());
                     length += 1;
                     while let Some(&d) = chars.peek() {
-                        if d.is_digit(10) {
+                        if d.is_ascii_digit() {
                             value.push(chars.next().unwrap());
                             length += 1;
                         } else {
@@ -695,11 +700,7 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
 
         // Octave up/down
         if c == '>' || c == '<' {
-            let token_type = if c == '>' {
-                "octave_up"
-            } else {
-                "octave_down"
-            };
+            let token_type = if c == '>' { "octave_up" } else { "octave_down" };
             tokens.push(create_driver_token(
                 token_type.to_string(),
                 c.to_string(),
@@ -758,10 +759,10 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
         }
 
         // Numbers (standalone)
-        if c.is_digit(10) {
+        if c.is_ascii_digit() {
             let mut num_str = c.to_string();
             while let Some(&next_c) = chars.peek() {
-                if next_c.is_digit(10) {
+                if next_c.is_ascii_digit() {
                     num_str.push(chars.next().unwrap());
                 } else {
                     break;
@@ -777,8 +778,6 @@ fn pmd_tokenize(content: &str) -> Result<Vec<DriverToken>, MmlError> {
             column += num_str.len();
             continue;
         }
-
-
 
         // Rhythm instruments (BD, SD, TOM, HH, CYM, RIM)
         // These are typically in PMD rhythm sections
@@ -838,97 +837,165 @@ fn create_driver_token(
 /// Parse error for PMD
 #[derive(Debug, Clone)]
 pub struct PMDParseError {
+    /// Message.
     pub message: String,
+    /// Line.
     pub line: usize,
+    /// Column.
     pub column: usize,
+    /// Length.
     pub length: usize,
 }
 
 /// AST node for PMD
 #[derive(Debug, Clone)]
 pub enum PMDAstNode {
+    /// Note.
     Note {
+        /// Note.
         note: char,
+        /// Sharp.
         sharp: bool,
+        /// Octave.
         octave: Option<u8>,
+        /// Duration.
         duration: Option<u8>,
+        /// Tie.
         tie: bool,
+        /// Dotted.
         dotted: bool,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Rest.
     Rest {
+        /// Duration.
         duration: Option<u8>,
+        /// Line.
         line: usize,
+        /// Column.
         column: usize,
     },
+    /// Part.
     Part {
+        /// Part num.
         part_num: u8,
+        /// Commands.
         commands: Vec<PMDAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Part Select.
     PartSelect {
+        /// Part num.
         part_num: u8,
+        /// Line.
         line: usize,
     },
+    /// Part End.
     PartEnd {
+        /// Line.
         line: usize,
     },
+    /// Octave.
     Octave {
+        /// Octave.
         octave: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume.
     Volume {
+        /// Volume.
         volume: u8,
+        /// Line.
         line: usize,
     },
+    /// Volume Change.
     VolumeChange {
+        /// Delta.
         delta: i8,
+        /// Line.
         line: usize,
     },
+    /// Length.
     Length {
+        /// Length.
         length: u8,
+        /// Line.
         line: usize,
     },
+    /// Tempo.
     Tempo {
+        /// Tempo.
         tempo: u8,
+        /// Line.
         line: usize,
     },
+    /// Note Shift.
     NoteShift {
+        /// Shift.
         shift: i8,
+        /// Line.
         line: usize,
     },
+    /// Loop.
     Loop {
+        /// Count.
         count: Option<u8>,
+        /// Body.
         body: Vec<PMDAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Infinite.
     LoopInfinite {
+        /// Body.
         body: Vec<PMDAstNode>,
+        /// Line.
         line: usize,
     },
+    /// Loop Break.
     LoopBreak {
+        /// Line.
         line: usize,
     },
+    /// Directive.
     Directive {
+        /// Name.
         name: String,
+        /// Value.
         value: Option<String>,
+        /// Line.
         line: usize,
     },
+    /// Rhythm Instrument.
     RhythmInstrument {
+        /// Instrument.
         instrument: String,
+        /// Line.
         line: usize,
     },
+    /// Comment.
     Comment {
+        /// Text.
         text: String,
+        /// Line.
         line: usize,
     },
+    /// Bar.
     Bar {
+        /// Line.
         line: usize,
     },
 }
 
 /// Parse PMD content into AST
+// `current_part`/`current_length`/`current_volume` track parser state that is not
+// yet consumed by AST construction; retained for upcoming stateful handling.
+#[allow(unused_variables, unused_assignments)]
 fn pmd_parse(content: &str) -> Result<Vec<PMDAstNode>, Vec<PMDParseError>> {
     let mut errors = Vec::new();
     let mut ast = Vec::new();
@@ -957,9 +1024,7 @@ fn pmd_parse(content: &str) -> Result<Vec<PMDAstNode>, Vec<PMDParseError>> {
             "part_cmd" => {
                 // Check for @@ (part end)
                 if token.value == "@@" {
-                    ast.push(PMDAstNode::PartEnd {
-                        line: token.line,
-                    });
+                    ast.push(PMDAstNode::PartEnd { line: token.line });
                     continue;
                 }
 
@@ -1099,7 +1164,9 @@ fn pmd_parse(content: &str) -> Result<Vec<PMDAstNode>, Vec<PMDParseError>> {
 
             "loop_start" => {
                 // Handle (n or (
-                let count = if token.value.len() > 1 && token.value.chars().nth(1).unwrap().is_digit(10) {
+                let count = if token.value.len() > 1
+                    && token.value.chars().nth(1).unwrap().is_ascii_digit()
+                {
                     let c: u8 = token.value.get(1..).unwrap().parse().unwrap_or(1);
                     Some(c)
                 } else {
@@ -1161,18 +1228,21 @@ fn pmd_parse(content: &str) -> Result<Vec<PMDAstNode>, Vec<PMDParseError>> {
             }
 
             "loop_end" | "loop_end_infinite" => {
-                ast.push(PMDAstNode::LoopBreak {
-                    line: token.line,
-                });
+                ast.push(PMDAstNode::LoopBreak { line: token.line });
             }
 
             "directive" => {
-                let name = token.value.split_whitespace().next().unwrap_or("").to_string();
+                let name = token
+                    .value
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 let value = token.value.get(name.len()..).map(|s| s.trim().to_string());
-                
+
                 // Clean up the name by removing @
                 let clean_name = name.trim_start_matches('@').to_string();
-                
+
                 ast.push(PMDAstNode::Directive {
                     name: clean_name,
                     value,
@@ -1280,7 +1350,7 @@ mod tests {
         let result = PMDDriver.tokenize(content);
         assert!(result.is_ok());
         let tokens = result.unwrap();
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
 
         // Check for part command
         assert!(tokens.iter().any(|t| t.token_type == "part_cmd"));
@@ -1342,7 +1412,9 @@ mod tests {
         let result = pmd_parse(content);
         assert!(result.is_ok());
         let ast = result.unwrap();
-        assert!(ast.iter().any(|n| matches!(n, PMDAstNode::PartSelect { .. })));
+        assert!(ast
+            .iter()
+            .any(|n| matches!(n, PMDAstNode::PartSelect { .. })));
     }
 
     #[test]

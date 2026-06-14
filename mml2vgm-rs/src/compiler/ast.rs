@@ -3,7 +3,7 @@
 //! This module contains the AST structures for representing MML source code.
 //! The AST is built by the parser and used by the semantic analyzer and code generator.
 
-use crate::{MmlError, MmlResult, Position, Span};
+use crate::{MmlError, Position, Span};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -31,6 +31,7 @@ pub struct Note {
 }
 
 impl Note {
+    /// New.
     pub fn new(letter: char, accidental: i8, octave: u8) -> Self {
         Self {
             letter: letter.to_ascii_uppercase(),
@@ -106,7 +107,9 @@ pub struct Octave {
 /// Octave shift (relative)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OctaveShift {
+    /// Up.
     Up,
+    /// Down.
     Down,
 }
 
@@ -124,6 +127,7 @@ pub struct InstrumentSelection {
 /// - Q (uppercase): proportional, note sounds for value/8 of duration (Q8 = full note)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Quantize {
+    /// Value.
     pub value: u8,
     /// true = uppercase Q (GatetimeDiv, proportional), false = lowercase q (Gatetime, absolute)
     pub proportional: bool,
@@ -154,33 +158,46 @@ pub struct PartDefinition {
 /// Metadata entry (song info)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metadata {
+    /// Key.
     pub key: String,
+    /// Value.
     pub value: String,
 }
 
 /// Include directive
 #[derive(Debug, Clone, PartialEq)]
 pub struct Include {
+    /// Path.
     pub path: PathBuf,
 }
 
 /// Instrument definition for FM synthesis
 #[derive(Debug, Clone, PartialEq)]
 pub struct FmInstrument {
+    /// Number.
     pub number: u32,
+    /// Name.
     pub name: String,
+    /// Parameters.
     pub parameters: Vec<u32>,
 }
 
 /// Instrument definition for PCM
 #[derive(Debug, Clone, PartialEq)]
 pub struct PcmInstrument {
+    /// Number.
     pub number: u32,
+    /// Name.
     pub name: String,
+    /// Filename.
     pub filename: PathBuf,
+    /// Frequency.
     pub frequency: u32,
+    /// Volume.
     pub volume: u8,
+    /// Chip.
     pub chip: String,
+    /// Option.
     pub option: Option<u32>,
 }
 
@@ -198,6 +215,7 @@ pub enum OpxMode {
 }
 
 impl OpxMode {
+    /// Operator count.
     pub fn operator_count(&self) -> usize {
         match self {
             Self::X4 => 4,
@@ -211,20 +229,35 @@ impl OpxMode {
 /// OPX (YMF271) single-operator parameters (one row: AR DR SR RR SL TL KS ML DT WF ACC FB LFO AMS PMS)
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OpxOperator {
+    /// Ar.
     pub ar: u8,
+    /// Dr.
     pub dr: u8,
+    /// Sr.
     pub sr: u8,
+    /// Rr.
     pub rr: u8,
+    /// Sl.
     pub sl: u8,
+    /// Tl.
     pub tl: u8,
+    /// Ks.
     pub ks: u8,
+    /// Ml.
     pub ml: u8,
+    /// Dt.
     pub dt: u8,
+    /// Wf.
     pub wf: u8,
+    /// Acc.
     pub acc: u8,
+    /// Fb.
     pub fb: u8,
+    /// Lfo.
     pub lfo: u8,
+    /// Ams.
     pub ams: u8,
+    /// Pms.
     pub pms: u8,
 }
 
@@ -233,9 +266,21 @@ impl OpxOperator {
     pub fn from_params(p: &[u32]) -> Self {
         let g = |i: usize| p.get(i).copied().unwrap_or(0) as u8;
         Self {
-            ar: g(0), dr: g(1), sr: g(2), rr: g(3), sl: g(4),
-            tl: g(5), ks: g(6), ml: g(7), dt: g(8), wf: g(9),
-            acc: g(10), fb: g(11), lfo: g(12), ams: g(13), pms: g(14),
+            ar: g(0),
+            dr: g(1),
+            sr: g(2),
+            rr: g(3),
+            sl: g(4),
+            tl: g(5),
+            ks: g(6),
+            ml: g(7),
+            dt: g(8),
+            wf: g(9),
+            acc: g(10),
+            fb: g(11),
+            lfo: g(12),
+            ams: g(13),
+            pms: g(14),
         }
     }
 }
@@ -247,7 +292,9 @@ impl OpxOperator {
 /// OPN/OPM field set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpxInstrument {
+    /// Number.
     pub number: u32,
+    /// Name.
     pub name: Option<String>,
     /// X1 / X2 / X3 / X4
     pub mode: OpxMode,
@@ -260,21 +307,27 @@ pub struct OpxInstrument {
 /// Envelope definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
+    /// Number.
     pub number: u32,
+    /// Parameters.
     pub parameters: Vec<u32>,
 }
 
 /// Arpeggio definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct Arpeggio {
+    /// Number.
     pub number: u32,
+    /// Notes.
     pub notes: Vec<Note>,
 }
 
 /// Alias definition
 #[derive(Debug, Clone, PartialEq)]
 pub struct Alias {
+    /// Name.
     pub name: String,
+    /// Expansion.
     pub expansion: String,
 }
 
@@ -419,8 +472,11 @@ pub enum MmlNode {
     Comment(String),
     /// Chip-specific command
     ChipCommand {
+        /// Chip.
         chip: String,
+        /// Command.
         command: String,
+        /// Args.
         args: Vec<u32>,
     },
     /// MIDI Control Change
@@ -467,6 +523,7 @@ pub struct MmlAst {
 }
 
 impl MmlAst {
+    /// New.
     pub fn new() -> Self {
         Self::default()
     }
@@ -500,7 +557,9 @@ impl MmlAst {
 /// Error context for parsing errors
 #[derive(Debug, Clone)]
 pub struct ParseError {
+    /// Position.
     pub position: Position,
+    /// Message.
     pub message: String,
 }
 
@@ -557,7 +616,11 @@ mod tests {
             tempo: Some(120),
             commands: vec![
                 MmlNode::Note(Note::new('C', 0, 4)),
-                MmlNode::Rest(Rest { duration: 4, dotted: false, span: None }),
+                MmlNode::Rest(Rest {
+                    duration: 4,
+                    dotted: false,
+                    span: None,
+                }),
             ],
         };
 

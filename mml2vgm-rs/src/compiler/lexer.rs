@@ -3,7 +3,7 @@
 //! This module provides tokenization of MML (Music Macro Language) source code.
 //! It handles the full MML syntax including notes, commands, definitions, and metadata.
 
-use crate::{MmlError, MmlResult, Position};
+use crate::{MmlResult, Position};
 
 /// Token types for MML
 #[derive(Debug, PartialEq, Clone)]
@@ -15,7 +15,7 @@ pub enum Token {
     StringLiteral(String),
     /// Identifier (alphanumeric + underscore, hyphen)
     Identifier(String),
-    
+
     // Structure
     /// Song info block start: {
     LeftBrace,
@@ -35,7 +35,7 @@ pub enum Token {
     LeftParen,
     /// Right paren: )
     RightParen,
-    
+
     // Notes
     /// Note: C, D, E, F, G, A, B
     Note(char),
@@ -47,7 +47,7 @@ pub enum Token {
     Flat,
     /// Rest: r or R
     Rest,
-    
+
     // Duration and timing
     /// Duration number (1, 2, 4, 8, 16, 32, 64, 128)
     Duration(u32),
@@ -55,7 +55,7 @@ pub enum Token {
     Dot,
     /// Tie modifier: _
     Underscore,
-    
+
     // Octave
     /// Octave up: >
     GreaterThan,
@@ -63,19 +63,19 @@ pub enum Token {
     LessThan,
     /// Octave command: o
     OctaveCommand,
-    
+
     // Volume
     /// Volume command: v
     VolumeCommand,
-    
+
     // Tempo
     /// Tempo command: t or T
     TempoCommand,
-    
+
     // Length
     /// Length command: l
     LengthCommand,
-    
+
     // Instrument
     /// Instrument/Definition command: @
     AtSign,
@@ -121,7 +121,7 @@ pub enum Token {
     LocalControlCommand,
     /// Drum note: D
     DrumNoteCommand,
-    
+
     // Special
     /// Bar line: |
     Bar,
@@ -147,6 +147,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    /// New.
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
@@ -165,8 +166,8 @@ impl<'a> Lexer<'a> {
     fn next_char(&self) -> Option<char> {
         // Skip the current character and get the next one
         let mut iter = self.source[self.position..].chars();
-        let _current = iter.next()?;  // Get current (might be multi-byte)
-        iter.next()  // Get next
+        let _current = iter.next()?; // Get current (might be multi-byte)
+        iter.next() // Get next
     }
 
     /// Peek at the current character without advancing
@@ -232,7 +233,7 @@ impl<'a> Lexer<'a> {
     fn read_string(&mut self) -> String {
         let quote_char = self.current_char().unwrap_or('"');
         self.advance(); // Skip opening quote
-        
+
         let mut result = String::new();
         while let Some(c) = self.current_char() {
             if c == quote_char {
@@ -289,34 +290,44 @@ impl<'a> Lexer<'a> {
     /// Next token
     pub fn next_token(&mut self) -> MmlResult<Token> {
         self.skip_whitespace();
-        
+
         if self.is_eof() {
             return Ok(Token::Eof);
         }
 
         let c = self.current_char().unwrap();
-        
+
         // Two-character tokens first
         if c == '\'' {
             // Check if this is the start of a definition line
             self.advance();
             return Ok(Token::Apostrophe);
         }
-        
+
         // Check for notes first (C, D, E, F, G, A, B) - these take priority.
         // Exception: if the note letter is UPPERCASE and followed by an UPPERCASE non-note letter
         // (e.g. "EON", "EX2"), fall through to the identifier check.
         // Lowercase note letters always produce a Note token (e.g. 'c', 'e', 'g' in music).
         let c_upper = c.to_ascii_uppercase();
-        if c_upper == 'C' || c_upper == 'D' || c_upper == 'E' || c_upper == 'F' ||
-           c_upper == 'G' || c_upper == 'A' || c_upper == 'B' {
+        if c_upper == 'C'
+            || c_upper == 'D'
+            || c_upper == 'E'
+            || c_upper == 'F'
+            || c_upper == 'G'
+            || c_upper == 'A'
+            || c_upper == 'B'
+        {
             let letter = c_upper;
             if let Some(next_c) = self.next_char() {
                 // Only fall through to identifier if BOTH this letter and the next are uppercase.
                 // This lets "EON", "EX2" etc. parse as identifiers while 'c','e' in music stay as notes.
                 let next_upper = next_c.to_ascii_uppercase();
-                let next_is_note = next_upper == 'C' || next_upper == 'D' || next_upper == 'E'
-                    || next_upper == 'F' || next_upper == 'G' || next_upper == 'A'
+                let next_is_note = next_upper == 'C'
+                    || next_upper == 'D'
+                    || next_upper == 'E'
+                    || next_upper == 'F'
+                    || next_upper == 'G'
+                    || next_upper == 'A'
                     || next_upper == 'B';
                 if c.is_uppercase() && next_c.is_alphabetic() && !next_is_note {
                     // Fall through to identifier check below:
@@ -332,7 +343,7 @@ impl<'a> Lexer<'a> {
                 return Ok(Token::Note(letter));
             }
         }
-        
+
         // Check for identifiers (including commands like INCLUDE, alias, etc.)
         // Lowercase single-letter MML command chars must NOT be combined into a multi-letter
         // identifier — they fall through to the command match below. Uppercase variants are
@@ -341,31 +352,58 @@ impl<'a> Lexer<'a> {
         let c_is_lowercase_mml_cmd = matches!(c, 'r' | 'v' | 't' | 'l' | 'o');
         if !c_is_lowercase_mml_cmd && (c.is_alphabetic() || c == '_') {
             let next_c = self.next_char();
-            if next_c.map_or(false, |nc| nc.is_alphabetic() || nc == '_' || nc == '-' || nc == '=') {
+            if next_c.is_some_and(|nc| nc.is_alphabetic() || nc == '_' || nc == '-' || nc == '=') {
                 let ident = self.read_identifier();
                 return Ok(Token::Identifier(ident));
             }
         }
-        
+
         // Single character tokens
         match c {
             // Structure
-            '{' => { self.advance(); Ok(Token::LeftBrace) }
-            '}' => { self.advance(); Ok(Token::RightBrace) }
-            '=' => { self.advance(); Ok(Token::Equals) }
-            ',' => { self.advance(); Ok(Token::Comma) }
-            '[' => { self.advance(); Ok(Token::LeftBracket) }
-            ']' => { self.advance(); Ok(Token::RightBracket) }
-            '(' => { self.advance(); Ok(Token::LeftParen) }
-            ')' => { self.advance(); Ok(Token::RightParen) }
-            '$' => { self.advance(); Ok(Token::LoopMarker) }
-            
+            '{' => {
+                self.advance();
+                Ok(Token::LeftBrace)
+            }
+            '}' => {
+                self.advance();
+                Ok(Token::RightBrace)
+            }
+            '=' => {
+                self.advance();
+                Ok(Token::Equals)
+            }
+            ',' => {
+                self.advance();
+                Ok(Token::Comma)
+            }
+            '[' => {
+                self.advance();
+                Ok(Token::LeftBracket)
+            }
+            ']' => {
+                self.advance();
+                Ok(Token::RightBracket)
+            }
+            '(' => {
+                self.advance();
+                Ok(Token::LeftParen)
+            }
+            ')' => {
+                self.advance();
+                Ok(Token::RightParen)
+            }
+            '$' => {
+                self.advance();
+                Ok(Token::LoopMarker)
+            }
+
             // Rest
             'r' | 'R' => {
                 self.advance();
                 Ok(Token::Rest)
             }
-            
+
             // Accidentals (only if not part of note)
             '#' => {
                 self.advance();
@@ -375,7 +413,7 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(Token::Flat)
             }
-            
+
             // Duration and timing
             '.' => {
                 self.advance();
@@ -385,7 +423,7 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(Token::Underscore)
             }
-            
+
             // Octave
             '>' => {
                 self.advance();
@@ -399,25 +437,25 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(Token::OctaveCommand)
             }
-            
+
             // Volume
             'v' | 'V' => {
                 self.advance();
                 Ok(Token::VolumeCommand)
             }
-            
+
             // Tempo
             't' | 'T' => {
                 self.advance();
                 Ok(Token::TempoCommand)
             }
-            
+
             // Length
             'l' | 'L' => {
                 self.advance();
                 Ok(Token::LengthCommand)
             }
-            
+
             // MIDI note number command
             'n' | 'N' => {
                 self.advance();
@@ -445,10 +483,14 @@ impl<'a> Lexer<'a> {
                     }
                     Some('p') => {
                         self.advance();
-                        // Check if it's 'pg' for program change, 'pr' for program, or 'pan'
+                        // Check if it's 'pg' for program change, 'pr' for program,
+                        // 'pan', or 'portamento'
                         if self.peek_char() == Some('g') {
                             self.advance();
                             Token::ProgramChangeCommand
+                        } else if self.peek_chars(9) == Some("ortamento") {
+                            self.advance_n(9);
+                            Token::PortamentoCommand
                         } else if self.peek_char() == Some('r') {
                             self.advance();
                             Token::MidiProgramCommand
@@ -471,8 +513,20 @@ impl<'a> Lexer<'a> {
                     }
                     Some('a') => {
                         self.advance();
-                        // Check if it's 'at' for aftertouch
-                        if self.peek_char() == Some('t') {
+                        // Check for 'allSoundOff', 'allNotesOff', or 'at' (aftertouch)
+                        if self.peek_chars(7) == Some("llSound") {
+                            self.advance_n(7);
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                            }
+                            Token::AllSoundOffCommand
+                        } else if self.peek_chars(7) == Some("llNotes") {
+                            self.advance_n(7);
+                            if self.peek_chars(3) == Some("Off") {
+                                self.advance_n(3);
+                            }
+                            Token::AllNotesOffCommand
+                        } else if self.peek_char() == Some('t') {
                             self.advance();
                             Token::AftertouchCommand
                         } else {
@@ -547,17 +601,6 @@ impl<'a> Lexer<'a> {
                             Token::Identifier("d".to_string())
                         }
                     }
-                    Some('p') => {
-                        self.advance();
-                        // Check for portamento, portOff
-                        if self.peek_chars(8) == Some("ortamento") {
-                            self.advance_n(8);
-                            Token::PortamentoCommand
-                        } else {
-                            // Already handled pg, pr, pan above
-                            Token::ProgramChangeCommand
-                        }
-                    }
                     Some('l') => {
                         self.advance();
                         // Check for localOn, localOff
@@ -567,7 +610,9 @@ impl<'a> Lexer<'a> {
                             if self.peek_char() == Some('O') && self.peek_chars(2) == Some("n") {
                                 self.advance_n(2);
                                 Token::LocalControlCommand
-                            } else if self.peek_char() == Some('f') && self.peek_chars(2) == Some("ff") {
+                            } else if self.peek_char() == Some('f')
+                                && self.peek_chars(2) == Some("ff")
+                            {
                                 self.advance_n(3);
                                 Token::LocalControlCommand
                             } else {
@@ -575,32 +620,6 @@ impl<'a> Lexer<'a> {
                             }
                         } else {
                             Token::Identifier("l".to_string())
-                        }
-                    }
-                    Some('a') => {
-                        self.advance();
-                        // Check for allSoundOff, allNotesOff
-                        if self.peek_chars(8) == Some("llSound") {
-                            self.advance_n(8);
-                            if self.peek_chars(3) == Some("Off") {
-                                self.advance_n(3);
-                                Token::AllSoundOffCommand
-                            } else {
-                                Token::AllSoundOffCommand
-                            }
-                        } else if self.peek_chars(7) == Some("llNotes") {
-                            self.advance_n(7);
-                            if self.peek_chars(3) == Some("Off") {
-                                self.advance_n(3);
-                                Token::AllNotesOffCommand
-                            } else {
-                                Token::AllNotesOffCommand
-                            }
-                        } else if self.peek_char() == Some('t') {
-                            self.advance();
-                            Token::AftertouchCommand
-                        } else {
-                            Token::Identifier("a".to_string())
                         }
                     }
                     Some('r') => {
@@ -622,31 +641,31 @@ impl<'a> Lexer<'a> {
                 };
                 Ok(next_token)
             }
-            
+
             // Bar
             '|' => {
                 self.advance();
                 Ok(Token::Bar)
             }
-            
+
             // String literal
             '\"' => {
                 let s = self.read_string();
                 Ok(Token::StringLiteral(s))
             }
-            
+
             // Numbers
             _ if c.is_ascii_digit() => {
                 let num = self.read_number();
                 Ok(Token::Number(num))
             }
-            
+
             // Single-letter identifiers (fallback for commands that aren't special-cased)
             _ if c.is_alphabetic() || c == '_' => {
                 let ident = self.read_identifier();
                 Ok(Token::Identifier(ident))
             }
-            
+
             // Newline - skip and continue
             '\n' | '\r' => {
                 self.advance();
@@ -661,7 +680,7 @@ impl<'a> Lexer<'a> {
                 // Recursively get next token
                 self.next_token()
             }
-            
+
             // '+' is an alternative sharp symbol (MML C# format: c+4 = C-sharp quarter note)
             '+' => {
                 self.advance();
@@ -702,23 +721,23 @@ impl<'a> Lexer<'a> {
 pub fn tokenize(source: &str) -> MmlResult<Vec<(Token, Position)>> {
     let mut lexer = Lexer::new(source);
     let mut tokens = Vec::new();
-    
+
     loop {
         let pos = lexer.position();
         let token = lexer.next_token()?;
         let is_whitespace = matches!(&token, Token::Whitespace(_));
         let is_eof = matches!(&token, Token::Eof);
-        
+
         // Skip whitespace tokens unless they're meaningful
         if !is_whitespace && !is_eof {
             tokens.push((token, pos));
         }
-        
+
         if is_eof {
             break;
         }
     }
-    
+
     Ok(tokens)
 }
 
@@ -730,7 +749,7 @@ mod tests {
     fn test_basic_notes() {
         let source = "o4 c4 d4 e4 f4";
         let tokens = tokenize(source).unwrap();
-        
+
         // Should have: OctaveCommand, Number(4), Note('c'), Number(4), Note('d'), Number(4), ...
         assert!(tokens.len() >= 5);
     }
@@ -739,7 +758,7 @@ mod tests {
     fn test_song_info_block() {
         let source = "{ TitleName = Test ComposerJ = Author }";
         let tokens = tokenize(source).unwrap();
-        
+
         assert_eq!(tokens[0].0, Token::LeftBrace);
         // Find the equals sign
         assert!(tokens.iter().any(|(t, _)| matches!(t, Token::Equals)));
@@ -750,7 +769,7 @@ mod tests {
     fn test_definition_line() {
         let source = "'A1 T120";
         let tokens = tokenize(source).unwrap();
-        
+
         assert_eq!(tokens[0].0, Token::Apostrophe);
         // A1 is tokenized as Note('A') + Number(1) because 'A' is a note letter
         assert_eq!(tokens[1].0, Token::Note('A'));
@@ -764,7 +783,7 @@ mod tests {
     fn test_rest() {
         let source = "r4";
         let tokens = tokenize(source).unwrap();
-        
+
         assert_eq!(tokens[0].0, Token::Rest);
         assert_eq!(tokens[1].0, Token::Number(4));
     }
@@ -773,7 +792,7 @@ mod tests {
     fn test_sharp_flat() {
         let source = "c#4 db4";
         let tokens = tokenize(source).unwrap();
-        
+
         // c#4 is: Note('c'), Sharp, Number(4)
         // db4 is: Note('d'), Note('b'), Number(4) - because 'b' is read as Note
         // This is a limitation of the current lexer
@@ -785,7 +804,7 @@ mod tests {
     fn test_string_literal() {
         let source = "\"Hello World\"";
         let tokens = tokenize(source).unwrap();
-        
+
         assert_eq!(tokens[0].0, Token::StringLiteral("Hello World".to_string()));
     }
 }

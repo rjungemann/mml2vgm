@@ -1,7 +1,7 @@
 //! MML compiler module
 //!
 //! This module contains the MML parsing and compilation logic.
-//! 
+//!
 //! # Submodules
 //! - `ast`: Abstract Syntax Tree definitions
 //! - `lexer`: Tokenizer for MML source code
@@ -11,6 +11,7 @@
 
 pub mod ast;
 pub mod codegen;
+#[allow(clippy::module_inception)]
 pub mod compiler;
 pub mod lexer;
 pub mod parser;

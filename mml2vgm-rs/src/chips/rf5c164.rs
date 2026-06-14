@@ -61,22 +61,22 @@ impl Default for PcmChannel {
 pub struct RF5C164 {
     /// Master clock rate in Hz (default: 7,670,453 Hz)
     clock_rate: u32,
-    
+
     /// Sample rate for output
     sample_rate: u32,
-    
+
     /// Clock divider
     clock_divider: f64,
-    
+
     /// Accumulated cycles
     accumulated_cycles: f64,
-    
+
     /// All 8 PCM channels
     channels: [PcmChannel; 8],
-    
+
     /// PCM data memory (2MB max, but typically 1MB on Mega CD)
     pcm_memory: Vec<u8>,
-    
+
     /// Register cache
     regs: [u8; 0x100],
 }
@@ -169,9 +169,11 @@ impl SoundChipEmulator for RF5C164 {
                 let ch = ((addr - 0x1A) / 2) as usize;
                 if ch < 8 {
                     if addr & 1 == 0 {
-                        self.channels[ch].start_addr = (self.channels[ch].start_addr & 0xFF00) | (data as u32);
+                        self.channels[ch].start_addr =
+                            (self.channels[ch].start_addr & 0xFF00) | (data as u32);
                     } else {
-                        self.channels[ch].start_addr = (self.channels[ch].start_addr & 0x00FF) | ((data as u32) << 8);
+                        self.channels[ch].start_addr =
+                            (self.channels[ch].start_addr & 0x00FF) | ((data as u32) << 8);
                     }
                 }
             }
@@ -260,11 +262,7 @@ impl SoundChipEmulator for RF5C164 {
                     } else {
                         1.0 - ((ch.pan - 8) as f32 / 8.0)
                     };
-                    let pan_right = if ch.pan > 8 {
-                        1.0
-                    } else {
-                        (ch.pan as f32 / 8.0)
-                    };
+                    let pan_right = if ch.pan > 8 { 1.0 } else { ch.pan as f32 / 8.0 };
 
                     left += sample * pan_left;
                     right += sample * pan_right;

@@ -6,11 +6,11 @@
 //! Run with: cargo test --test parser_stress -- --ignored --nocapture
 //! Or all at once: cargo test --test parser_stress -- --include-ignored --nocapture
 
-use std::time::Instant;
+use mml2vgm::compiler::compiler::MmlCompiler;
 use mml2vgm::compiler::lexer::tokenize;
 use mml2vgm::compiler::parser::Parser;
 use mml2vgm::{CompileOptions, OutputFormat};
-use mml2vgm::compiler::compiler::MmlCompiler;
+use std::time::Instant;
 
 /// Global timeout for every stress test in seconds.
 const STRESS_TIMEOUT_SECS: u64 = 30;
@@ -129,7 +129,11 @@ fn stress_max_tempo() {
             ..Default::default()
         });
         let result = compiler.compile_from_source(&source);
-        assert!(result.is_ok(), "max tempo compile failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "max tempo compile failed: {:?}",
+            result.err()
+        );
     });
 }
 
@@ -196,7 +200,12 @@ fn stress_multiformat_sequential() {
     let source = format!("t120 o4 l8 {}", notes);
 
     let overall_start = Instant::now();
-    let formats = [OutputFormat::VGM, OutputFormat::XGM, OutputFormat::XGM2, OutputFormat::ZGM];
+    let formats = [
+        OutputFormat::VGM,
+        OutputFormat::XGM,
+        OutputFormat::XGM2,
+        OutputFormat::ZGM,
+    ];
 
     for format in &formats {
         let compiler = MmlCompiler::new(CompileOptions {

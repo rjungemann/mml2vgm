@@ -50,14 +50,12 @@ pub mod live_player;
 pub use live_player::LivePlayer;
 
 // Instrument serialization (parsing/generating MML definitions)
+/// Instrument serializer.
 pub mod instrument_serializer;
 pub use instrument_serializer::{
-    FmInstrumentDef, PcmInstrumentDef, EnvelopeDef, ArpeggioDef,
-    parse_fm_instruments, serialize_fm_instrument,
-    parse_pcm_instruments, serialize_pcm_instrument,
-    parse_envelopes, serialize_envelope,
-    parse_arpeggios, serialize_arpeggio,
-    replace_definition_block, get_carrier_ops,
+    get_carrier_ops, parse_arpeggios, parse_envelopes, parse_fm_instruments, parse_pcm_instruments,
+    replace_definition_block, serialize_arpeggio, serialize_envelope, serialize_fm_instrument,
+    serialize_pcm_instrument, ArpeggioDef, EnvelopeDef, FmInstrumentDef, PcmInstrumentDef,
 };
 
 /// Declared implementation maturity for a chip or output format.
@@ -122,7 +120,9 @@ impl OutputFormat {
     /// Get the current implementation maturity for this format.
     pub fn support_tier(&self) -> SupportTier {
         match self {
-            OutputFormat::VGM | OutputFormat::XGM | OutputFormat::XGM2 | OutputFormat::ZGM => SupportTier::Partial,
+            OutputFormat::VGM | OutputFormat::XGM | OutputFormat::XGM2 | OutputFormat::ZGM => {
+                SupportTier::Partial
+            }
             OutputFormat::MID => SupportTier::Declared,
         }
     }
@@ -157,66 +157,98 @@ impl std::str::FromStr for OutputFormat {
 #[serde(rename_all = "lowercase")]
 pub enum SoundChip {
     // Mega Drive / Genesis
+    /// YM 2612.
     YM2612,
+    /// YM 2612 X.
     YM2612X,
+    /// YM 2612 X2.
     YM2612X2,
-    
+
     // PSG
+    /// SN 76489.
     SN76489,
+    /// SN 76489 X2.
     SN76489X2,
-    
+
     // PC Engine / TurboGrafx-16
+    /// YM 2608.
     YM2608,
-    
+
     // YM2609 (Extended)
+    /// YM 2609.
     YM2609,
-    
+
     // YM2610 / YM2610B
+    /// YM 2610 B.
     YM2610B,
-    
+
     // OPM Series
+    /// YM 2151.
     YM2151,
-    
+
     // OPL Series
+    /// YM 3526.
     YM3526,
+    /// Y8950.
     Y8950,
+    /// YM 3812.
     YM3812,
+    /// YMF 262.
     YMF262,
     // OPL4 (declared only — VGM opcodes 0x60/0x61)
+    /// YMF 271.
     YMF271,
-    
+
     // OPLL
+    /// YM 2413.
     YM2413,
-    
+
     // Other FM chips
+    /// YM 2203.
     YM2203,
-    
+
     // PCM chips
+    /// RF 5 C164.
     RF5C164,
+    /// Sega PCM.
     SegaPCM,
-    
+
     // Other
+    /// Hu C6280.
     HuC6280,
+    /// C140.
     C140,
+    /// C352.
     C352,
+    /// AY 8910.
     AY8910,
+    /// K051649.
     K051649,
+    /// K053260.
     K053260,
+    /// K054539.
     K054539,
+    /// Q Sound.
     QSound,
-    
+
     // Console chips
+    /// NES.
     NES,
+    /// DMG.
     DMG,
+    /// VRC 6.
     VRC6,
-    
+
     // POKEY (Atari)
+    /// POKEY.
     POKEY,
-    
+
     // MIDI
+    /// MIDI.
     MIDI,
-    
+
     // Special
+    /// CONDUCTOR.
     CONDUCTOR,
 }
 
@@ -342,11 +374,20 @@ impl SoundChip {
     pub fn is_fm(&self) -> bool {
         matches!(
             self,
-            SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2
-                | SoundChip::YM2608 | SoundChip::YM2609 | SoundChip::YM2610B
-                | SoundChip::YM2151 | SoundChip::YM3526 | SoundChip::Y8950
-                | SoundChip::YM3812 | SoundChip::YMF262 | SoundChip::YMF271
-                | SoundChip::YM2413 | SoundChip::YM2203
+            SoundChip::YM2612
+                | SoundChip::YM2612X
+                | SoundChip::YM2612X2
+                | SoundChip::YM2608
+                | SoundChip::YM2609
+                | SoundChip::YM2610B
+                | SoundChip::YM2151
+                | SoundChip::YM3526
+                | SoundChip::Y8950
+                | SoundChip::YM3812
+                | SoundChip::YMF262
+                | SoundChip::YMF271
+                | SoundChip::YM2413
+                | SoundChip::YM2203
         )
     }
 
@@ -354,12 +395,20 @@ impl SoundChip {
     pub fn supports_pcm(&self) -> bool {
         matches!(
             self,
-            SoundChip::YM2608 | SoundChip::YM2609 | SoundChip::YM2610B
-                | SoundChip::YM2612 | SoundChip::YM2612X | SoundChip::YM2612X2
-                | SoundChip::RF5C164 | SoundChip::SegaPCM
-                | SoundChip::C140 | SoundChip::C352
-                | SoundChip::K053260 | SoundChip::K054539
-                | SoundChip::QSound | SoundChip::Y8950
+            SoundChip::YM2608
+                | SoundChip::YM2609
+                | SoundChip::YM2610B
+                | SoundChip::YM2612
+                | SoundChip::YM2612X
+                | SoundChip::YM2612X2
+                | SoundChip::RF5C164
+                | SoundChip::SegaPCM
+                | SoundChip::C140
+                | SoundChip::C352
+                | SoundChip::K053260
+                | SoundChip::K054539
+                | SoundChip::QSound
+                | SoundChip::Y8950
         )
     }
 
@@ -410,7 +459,7 @@ impl std::str::FromStr for SoundChip {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s_upper = s.to_uppercase();
-        
+
         // Try to match by various name formats
         if s_upper == "YM2612" || s_upper == "OPN2" {
             Ok(SoundChip::YM2612)
@@ -626,19 +675,19 @@ pub struct CompileResult {
 pub struct CompileInfo {
     /// Number of parts compiled
     pub part_count: usize,
-    
+
     /// Total number of commands generated
     pub command_count: usize,
-    
+
     /// Estimated duration in samples
     pub duration_samples: u64,
-    
+
     /// Estimated duration in seconds
     pub duration_seconds: f64,
-    
+
     /// Chips used
     pub chips_used: Vec<SoundChip>,
-    
+
     /// File format version
     pub format_version: String,
 }
@@ -649,51 +698,57 @@ pub struct CompileInfo {
 pub struct VgmHeader {
     /// "Vgm " identifier
     pub identifier: [u8; 4],
-    
+
     /// EOF offset
     pub eof_offset: u32,
-    
+
     /// Version number
     pub version: u32,
-    
+
     /// SN76489 clock
     pub sn76489_clock: u32,
-    
+
     /// YM2413 clock
     pub ym2413_clock: u32,
-    
+
     /// GD3 offset
     pub gd3_offset: u32,
-    
+
     /// Total samples
     pub total_samples: u32,
-    
+
     /// Loop offset
     pub loop_offset: u32,
-    
+
     /// Loop samples
     pub loop_samples: u32,
-    
+
     /// Rate
     pub rate: u32,
-    
+
     /// SN76489 feedback
     pub sn76489_feedback: u16,
-    
+
     /// SN76489 shift register width
     pub sn76489_shift: u8,
-    
+
     /// SN76489 flags
     pub sn76489_flags: u8,
-    
+
     /// YM2612 clock
     pub ym2612_clock: u32,
-    
+
     /// YM2151 clock
     pub ym2151_clock: u32,
 
     /// Sega PCM clock (VGM header offset 0x38, version 1.51+)
     pub segapcm_clock: u32,
+}
+
+impl Default for VgmHeader {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VgmHeader {
@@ -754,7 +809,10 @@ mod tests {
         assert_eq!("SN76489".parse::<SoundChip>().unwrap(), SoundChip::SN76489);
         assert_eq!("DCSG".parse::<SoundChip>().unwrap(), SoundChip::SN76489);
         assert_eq!("AY8910".parse::<SoundChip>().unwrap(), SoundChip::AY8910);
-        assert_eq!("CONDUCTOR".parse::<SoundChip>().unwrap(), SoundChip::CONDUCTOR);
+        assert_eq!(
+            "CONDUCTOR".parse::<SoundChip>().unwrap(),
+            SoundChip::CONDUCTOR
+        );
     }
 
     #[test]
@@ -803,7 +861,7 @@ mod tests {
     fn test_vgm_header_to_bytes() {
         let header = VgmHeader::new();
         let bytes = header.to_bytes();
-        
+
         assert_eq!(&bytes[0..4], b"Vgm ");
         assert_eq!(bytes.len(), 0x80);
     }

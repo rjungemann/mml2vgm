@@ -61,61 +61,57 @@ impl Default for PsgChannel {
 pub struct SN76489 {
     /// Master clock rate in Hz (NTSC: 3,579,545 Hz)
     clock_rate: u32,
-    
+
     /// Sample rate for output
     sample_rate: u32,
-    
+
     /// Clock divider for sample rate conversion
     /// This is the number of chip clocks per audio sample
     clock_divider: f64,
-    
+
     /// Accumulated clock cycles
     accumulated_cycles: f64,
-    
+
     /// Tone channels (0-2)
     channels: [PsgChannel; 3],
-    
+
     /// Noise channel (3)
     noise_channel: PsgChannel,
-    
+
     /// Noise generator shift register
     noise_shift_register: u16,
-    
+
     /// Noise generator feedback mask
     noise_feedback: u16,
-    
+
     /// Noise generator mode
     noise_mode: NoiseMode,
-    
+
     /// Noise generator period (for periodic mode)
     noise_period: u8,
-    
+
     /// Last written register
     last_register: u8,
-    
+
     /// Stereo panning for each channel (left, right)
     /// Each channel can be panned to left, right, or both
     stereo_pan: [StereoPan; 4],
-    
+
     /// Output buffer for sample generation
+    #[allow(dead_code)]
     output_buffer: Vec<f32>,
 }
 
 /// Stereo panning mode for a channel
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum StereoPan {
     /// Output to left channel only
     Left,
     /// Output to right channel only
     Right,
     /// Output to both channels
+    #[default]
     Center,
-}
-
-impl Default for StereoPan {
-    fn default() -> Self {
-        StereoPan::Center
-    }
 }
 
 impl SN76489 {
@@ -208,11 +204,11 @@ impl SN76489 {
     fn update_noise(&mut self) {
         // For now, simple noise implementation
         // The actual SN76489 uses a 15-bit LFSR
-        
+
         // Check if noise should toggle
         if self.noise_channel.tone_counter >= self.noise_channel.tone_divider {
             self.noise_channel.tone_counter = 0;
-            
+
             // Toggle noise output based on LFSR
             // In periodic mode, use the noise_period
             // In white mode, use random pattern
@@ -319,7 +315,7 @@ impl SoundChipEmulator for SN76489 {
         }
     }
 
-    fn read(&self, addr: u8) -> u8 {
+    fn read(&self, _addr: u8) -> u8 {
         // SN76489 doesn't support reading registers
         // Return 0xFF as per specification
         0xFF
@@ -423,33 +419,33 @@ mod tests {
         // Clock once - counter goes from 0 to 1, no toggle yet
         chip.clock();
         assert_eq!(chip.channels[0].tone_counter, 1);
-        assert_eq!(chip.channels[0].output_state, false);
+        assert!(!chip.channels[0].output_state);
 
         // Clock again - counter is 1 >= 1, so toggle
         chip.clock();
-        assert_eq!(chip.channels[0].output_state, true);
+        assert!(chip.channels[0].output_state);
 
         // Clock again - counter was reset to 0, goes to 1, no toggle
         chip.clock();
-        assert_eq!(chip.channels[0].output_state, true);
+        assert!(chip.channels[0].output_state);
 
         // Clock again - counter is 1 >= 1, toggle back
         chip.clock();
-        assert_eq!(chip.channels[0].output_state, false);
+        assert!(!chip.channels[0].output_state);
     }
 
     #[test]
     fn test_sn76489_soundchip_trait() {
         let mut chip = SN76489::new();
-        
+
         // Verify trait methods work
         assert_eq!(chip.name(), "SN76489 (DCSG)");
         assert_eq!(chip.clock_rate(), 3_579_545);
-        
+
         chip.reset();
         chip.write(0x82, 0); // ch0 tone latch, low4=2
         chip.clock();
-        
+
         let mut buffer = [0.0f32; 2];
         chip.generate_samples(&mut buffer, 44100);
     }

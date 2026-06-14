@@ -1,50 +1,60 @@
 //! Sound chip emulation module
 
-pub mod ym2612;
-pub mod sn76489;
-pub mod ym2151;
-pub mod ym2608;
-pub mod rf5c164;
-pub mod ym2203;
-pub mod ym3526;
-pub mod y8950;
-pub mod ym3812;
-pub mod ymf262;
-pub mod segapcm;
+pub mod ay8910;
 pub mod c140;
 pub mod c352;
-pub mod ay8910;
-pub mod huc6280;
-pub mod ym2413;
-pub mod k051649;
-pub mod nes_apu;
-pub mod pokey;
 pub mod dmg;
-pub mod vrc6;
+pub mod huc6280;
+pub mod k051649;
 pub mod k053260;
 pub mod k054539;
+pub mod nes_apu;
+pub mod pokey;
 pub mod qsound;
+pub mod rf5c164;
+pub mod segapcm;
+pub mod sn76489;
+pub mod vrc6;
+pub mod y8950;
+pub mod ym2151;
+pub mod ym2203;
+pub mod ym2413;
+pub mod ym2608;
+pub mod ym2612;
+pub mod ym3526;
+pub mod ym3812;
+pub mod ymf262;
 pub mod ymf271;
-
-use crate::MmlResult;
 
 // Chip type enum for FFI
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Chip Type.
 pub enum ChipType {
+    /// YM 2151.
     YM2151,
+    /// YM 2612.
     YM2612,
+    /// SN 76489.
     SN76489,
+    /// OPL 2.
     OPL2,
+    /// OPL 3.
     OPL3,
+    /// Q Sound.
     QSound,
+    /// C140.
     C140,
+    /// POKEY.
     POKEY,
+    /// VRC 6.
     VRC6,
+    /// YMF 271.
     YMF271,
 }
 
 impl ChipType {
+    /// From index.
     pub fn from_index(index: usize) -> Option<Self> {
         match index {
             0 => Some(Self::YM2151),
@@ -61,6 +71,7 @@ impl ChipType {
         }
     }
 
+    /// All.
     pub fn all() -> &'static [Self] {
         &[
             Self::YM2151,
@@ -75,7 +86,8 @@ impl ChipType {
             Self::YMF271,
         ]
     }
-    
+
+    /// Name.
     pub fn name(&self) -> &'static str {
         match self {
             Self::YM2151 => "YM2151",
@@ -91,6 +103,7 @@ impl ChipType {
         }
     }
 
+    /// Short name.
     pub fn short_name(&self) -> &'static str {
         match self {
             Self::YM2151 => "FM (Arcade)",
@@ -105,12 +118,14 @@ impl ChipType {
             Self::YMF271 => "FM (OPX)",
         }
     }
-    
+
+    /// Param count.
     pub fn param_count(&self) -> usize {
         // Placeholder - actual counts should be determined per-chip
         64
     }
-    
+
+    /// Param name.
     pub fn param_name(&self, _param_id: usize) -> &'static str {
         // Placeholder
         "unknown"
@@ -120,7 +135,7 @@ impl ChipType {
 // Implement TryFrom<i32> for FFI compatibility
 impl std::convert::TryFrom<i32> for ChipType {
     type Error = ();
-    
+
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         Self::from_index(value as usize).ok_or(())
     }
@@ -129,12 +144,15 @@ impl std::convert::TryFrom<i32> for ChipType {
 /// Chip instance wrapper for FFI
 pub struct ChipInstance {
     chip: Box<dyn SoundChipEmulator>,
+    #[allow(dead_code)]
     sample_rate: f64,
     // Buffer for single-sample rendering
+    #[allow(dead_code)]
     sample_buffer: Vec<f32>,
 }
 
 impl ChipInstance {
+    /// New.
     pub fn new(chip: Box<dyn SoundChipEmulator>, sample_rate: f64) -> Self {
         Self {
             chip,
@@ -142,21 +160,25 @@ impl ChipInstance {
             sample_buffer: vec![0.0, 0.0],
         }
     }
-    
+
+    /// Reset.
     pub fn reset(&mut self) {
         self.chip.reset();
     }
-    
+
+    /// Render sample.
     pub fn render_sample(&mut self) -> (f64, f64) {
         // For now, return silence
         // In a real implementation, we'd render a single sample
         (0.0, 0.0)
     }
-    
+
+    /// Get param.
     pub fn get_param(&self, _param_id: usize) -> f32 {
         0.0
     }
-    
+
+    /// Set param.
     pub fn set_param(&mut self, _param_id: usize, _value: f32) {
         // Placeholder
     }
@@ -194,18 +216,32 @@ pub const CHIP_TYPES: &[ChipType] = &[
 
 /// Trait for all sound chips
 pub trait SoundChipEmulator {
+    /// Name.
     fn name(&self) -> &'static str;
+    /// Clock rate.
     fn clock_rate(&self) -> u32;
+    /// Reset.
     fn reset(&mut self);
+    /// Write.
     fn write(&mut self, addr: u8, data: u8);
-    fn read(&self, addr: u8) -> u8 { 0xFF }
+    /// Read.
+    fn read(&self, _addr: u8) -> u8 {
+        0xFF
+    }
+    /// Clock.
     fn clock(&mut self);
+    /// Generate samples.
     fn generate_samples(&mut self, buffer: &mut [f32], sample_rate: u32);
+    /// Write port.
     fn write_port(&mut self, port: u8, addr: u8, data: u8) {
         let _ = port;
         self.write(addr, data);
     }
-    fn is_initialized(&self) -> bool { true }
+    /// Is initialized.
+    fn is_initialized(&self) -> bool {
+        true
+    }
+    /// Load pcm data.
     fn load_pcm_data(&mut self, _block_type: u8, _data: &[u8]) {}
 }
 
@@ -217,14 +253,22 @@ pub struct SilentChip {
 }
 
 impl SilentChip {
+    /// New.
     pub fn new(name: &'static str, clock: u32) -> Self {
-        Self { chip_name: name, chip_clock: clock }
+        Self {
+            chip_name: name,
+            chip_clock: clock,
+        }
     }
 }
 
 impl SoundChipEmulator for SilentChip {
-    fn name(&self) -> &'static str { self.chip_name }
-    fn clock_rate(&self) -> u32 { self.chip_clock }
+    fn name(&self) -> &'static str {
+        self.chip_name
+    }
+    fn clock_rate(&self) -> u32 {
+        self.chip_clock
+    }
     fn reset(&mut self) {}
     fn write(&mut self, _addr: u8, _data: u8) {}
     fn clock(&mut self) {}
@@ -247,10 +291,7 @@ pub fn generate_mixed_samples(
     sample_rate: u32,
 ) {
     // Create temporary buffer for each chip
-    let mut temp_buffers: Vec<Vec<f32>> = chips
-        .iter()
-        .map(|_| vec![0.0; buffer.len()])
-        .collect();
+    let mut temp_buffers: Vec<Vec<f32>> = chips.iter().map(|_| vec![0.0; buffer.len()]).collect();
 
     // Generate samples from each chip
     for (i, chip) in chips.iter_mut().enumerate() {
@@ -270,7 +311,6 @@ pub fn generate_mixed_samples(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_clock_chip() {

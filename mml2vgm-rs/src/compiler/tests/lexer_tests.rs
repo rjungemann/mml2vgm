@@ -4,7 +4,7 @@
 
 use std::time::Instant;
 
-use crate::compiler::lexer::{Token, tokenize};
+use crate::compiler::lexer::{tokenize, Token};
 
 const TIMEOUT_SECS: u64 = 1;
 
@@ -24,7 +24,10 @@ fn timed_tokenize(source: &str) -> Vec<Token> {
 #[test]
 fn lex_empty_input() {
     let tokens = timed_tokenize("");
-    assert!(tokens.is_empty(), "empty input should yield no tokens (eof filtered)");
+    assert!(
+        tokens.is_empty(),
+        "empty input should yield no tokens (eof filtered)"
+    );
 }
 
 #[test]
@@ -52,7 +55,13 @@ fn lex_all_note_letters() {
     let tokens = timed_tokenize("c d e f g a b");
     let notes: Vec<char> = tokens
         .iter()
-        .filter_map(|t| if let Token::Note(c) = t { Some(*c) } else { None })
+        .filter_map(|t| {
+            if let Token::Note(c) = t {
+                Some(*c)
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(notes, vec!['C', 'D', 'E', 'F', 'G', 'A', 'B']);
 }
@@ -273,7 +282,10 @@ fn lex_very_long_note_sequence() {
     let source: String = "c d e f g a b ".repeat(1_429); // ~10_003 notes
     let start = Instant::now();
     let tokens = tokenize(&source).expect("tokenize failed");
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "lex_very_long_note_sequence exceeded timeout");
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "lex_very_long_note_sequence exceeded timeout"
+    );
     assert!(!tokens.is_empty());
 }
 
@@ -285,7 +297,10 @@ fn lex_deeply_nested_loops() {
     let source = format!("{}c{}", opens, closes);
     let start = Instant::now();
     let tokens = tokenize(&source).expect("tokenize failed");
-    assert!(start.elapsed().as_secs() < TIMEOUT_SECS, "lex_deeply_nested_loops exceeded timeout");
+    assert!(
+        start.elapsed().as_secs() < TIMEOUT_SECS,
+        "lex_deeply_nested_loops exceeded timeout"
+    );
     assert!(!tokens.is_empty());
 }
 
@@ -309,9 +324,9 @@ fn lex_note_number_command_uppercase() {
 fn lex_note_number_in_sequence() {
     // n37 sandwiched between regular notes: a n37 a
     let tokens = timed_tokenize("a n37 a");
-    let kinds: Vec<_> = tokens.iter().map(|t| std::mem::discriminant(t)).collect();
+    let kinds: Vec<_> = tokens.iter().map(std::mem::discriminant).collect();
     // Note, NoteNumberCommand, Number, Note
-    assert!(tokens.iter().any(|t| *t == Token::NoteNumberCommand));
+    assert!(tokens.contains(&Token::NoteNumberCommand));
     assert_eq!(tokens[0], Token::Note('A'));
     assert_eq!(tokens[1], Token::NoteNumberCommand);
     assert_eq!(tokens[2], Token::Number(37));

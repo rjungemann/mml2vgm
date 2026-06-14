@@ -31,6 +31,7 @@ struct PokeyChannel {
     phase_acc: f32,
 }
 
+/// Pokey.
 pub struct Pokey {
     clock_rate: u32,
     channels: [PokeyChannel; NUM_CHANNELS],
@@ -43,10 +44,12 @@ pub struct Pokey {
 }
 
 impl Pokey {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(1_789_772)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -67,7 +70,11 @@ impl Pokey {
             2 => (self.audctl & 0x02) != 0,
             _ => false,
         };
-        let div = if high_freq { POKEY_DIV_HIGH } else { POKEY_DIV_LOW };
+        let div = if high_freq {
+            POKEY_DIV_HIGH
+        } else {
+            POKEY_DIV_LOW
+        };
         self.clock_rate as f32 / (2.0 * div * (audf + 1.0))
     }
 
@@ -91,19 +98,35 @@ impl Pokey {
 
     fn noise_bit(&self, use_poly4: bool) -> f32 {
         if use_poly4 {
-            if (self.poly4_lfsr & 1) != 0 { 1.0 } else { -1.0 }
+            if (self.poly4_lfsr & 1) != 0 {
+                1.0
+            } else {
+                -1.0
+            }
         } else if (self.audctl & 0x80) != 0 {
             // poly9 mode
-            if (self.poly9_lfsr & 1) != 0 { 1.0 } else { -1.0 }
+            if (self.poly9_lfsr & 1) != 0 {
+                1.0
+            } else {
+                -1.0
+            }
         } else {
-            if (self.poly17_lfsr & 1) != 0 { 1.0 } else { -1.0 }
+            if (self.poly17_lfsr & 1) != 0 {
+                1.0
+            } else {
+                -1.0
+            }
         }
     }
 }
 
 impl SoundChipEmulator for Pokey {
-    fn name(&self) -> &'static str { "POKEY" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "POKEY"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         *self = Self::with_clock_rate(self.clock_rate);
@@ -111,35 +134,37 @@ impl SoundChipEmulator for Pokey {
 
     fn write(&mut self, addr: u8, data: u8) {
         let a = (addr & 0x0F) as usize;
-        if a < 16 { self.regs[a] = data; }
+        if a < 16 {
+            self.regs[a] = data;
+        }
         match a {
             0 => self.channels[0].audf = data,
             1 => {
-                self.channels[0].volume    = data & 0x0F;
+                self.channels[0].volume = data & 0x0F;
                 self.channels[0].noise_mode = (data & 0x10) != 0; // bit4 NOTONE: 1=poly/noise, 0=tone
-                self.channels[0].use_poly4  = (data & 0x20) != 0; // bit5 POLY4
-                self.channels[0].mute       = (data & 0x80) != 0;
+                self.channels[0].use_poly4 = (data & 0x20) != 0; // bit5 POLY4
+                self.channels[0].mute = (data & 0x80) != 0;
             }
             2 => self.channels[1].audf = data,
             3 => {
-                self.channels[1].volume    = data & 0x0F;
+                self.channels[1].volume = data & 0x0F;
                 self.channels[1].noise_mode = (data & 0x10) != 0;
-                self.channels[1].use_poly4  = (data & 0x20) != 0;
-                self.channels[1].mute       = (data & 0x80) != 0;
+                self.channels[1].use_poly4 = (data & 0x20) != 0;
+                self.channels[1].mute = (data & 0x80) != 0;
             }
             4 => self.channels[2].audf = data,
             5 => {
-                self.channels[2].volume    = data & 0x0F;
+                self.channels[2].volume = data & 0x0F;
                 self.channels[2].noise_mode = (data & 0x10) != 0;
-                self.channels[2].use_poly4  = (data & 0x20) != 0;
-                self.channels[2].mute       = (data & 0x80) != 0;
+                self.channels[2].use_poly4 = (data & 0x20) != 0;
+                self.channels[2].mute = (data & 0x80) != 0;
             }
             6 => self.channels[3].audf = data,
             7 => {
-                self.channels[3].volume    = data & 0x0F;
+                self.channels[3].volume = data & 0x0F;
                 self.channels[3].noise_mode = (data & 0x10) != 0;
-                self.channels[3].use_poly4  = (data & 0x20) != 0;
-                self.channels[3].mute       = (data & 0x80) != 0;
+                self.channels[3].use_poly4 = (data & 0x20) != 0;
+                self.channels[3].mute = (data & 0x80) != 0;
             }
             8 => self.audctl = data,
             _ => {}
@@ -148,7 +173,11 @@ impl SoundChipEmulator for Pokey {
 
     fn read(&self, addr: u8) -> u8 {
         let a = (addr & 0x0F) as usize;
-        if a < 16 { self.regs[a] } else { 0xFF }
+        if a < 16 {
+            self.regs[a]
+        } else {
+            0xFF
+        }
     }
 
     fn clock(&mut self) {}
@@ -159,7 +188,9 @@ impl SoundChipEmulator for Pokey {
 
             let mut out = 0.0f32;
             for ch in 0..NUM_CHANNELS {
-                if self.channels[ch].mute || self.channels[ch].volume == 0 { continue; }
+                if self.channels[ch].mute || self.channels[ch].volume == 0 {
+                    continue;
+                }
                 let freq = self.channel_freq_hz(ch);
                 let phase_inc = freq / sample_rate as f32;
                 self.channels[ch].phase_acc += phase_inc;
@@ -188,7 +219,9 @@ impl SoundChipEmulator for Pokey {
 }
 
 impl Default for Pokey {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +252,10 @@ mod tests {
         chip.write(0x01, 0x0F); // ch1 vol=15, tone
         let mut buf = [0.0f32; 16];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().any(|&s| s != 0.0), "active POKEY channel must produce output");
+        assert!(
+            buf.iter().any(|&s| s != 0.0),
+            "active POKEY channel must produce output"
+        );
     }
 
     #[test]

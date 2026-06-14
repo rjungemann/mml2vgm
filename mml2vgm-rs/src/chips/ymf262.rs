@@ -14,18 +14,27 @@
 //! - 0xBD: Rhythm mode (bank 0 only)
 //! - 0xC0-0xC8: Channel feedback/connection + OPL3 L/R enable
 //! - 0xE0-0xF5: Operator waveform
+//!
 //! Bank 0 addr 0x05 bit 0: OPL3 mode enable
 
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+const FREQ_MULT: [f32; 16] = [
+    0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0,
+];
 
 fn slot_to_ch_op(slot_offset: u8) -> Option<(usize, usize)> {
     let row = (slot_offset / 8) as usize;
     let col = (slot_offset % 8) as usize;
-    if row > 2 || col > 5 { return None; }
-    if col < 3 { Some((row * 3 + col, 0)) } else { Some((row * 3 + col - 3, 1)) }
+    if row > 2 || col > 5 {
+        return None;
+    }
+    if col < 3 {
+        Some((row * 3 + col, 0))
+    } else {
+        Some((row * 3 + col - 3, 1))
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -37,7 +46,11 @@ struct FmOperator {
 
 impl Default for FmOperator {
     fn default() -> Self {
-        Self { phase_acc: 0.0, total_level: 0, mult: 1 }
+        Self {
+            phase_acc: 0.0,
+            total_level: 0,
+            mult: 1,
+        }
     }
 }
 
@@ -57,8 +70,13 @@ impl Default for FmChannel {
     fn default() -> Self {
         Self {
             operators: [FmOperator::default(); 2],
-            f_num: 0, block: 0, key_on: false, connection: 0, feedback: 0,
-            left_enable: true, right_enable: true,
+            f_num: 0,
+            block: 0,
+            key_on: false,
+            connection: 0,
+            feedback: 0,
+            left_enable: true,
+            right_enable: true,
         }
     }
 }
@@ -70,15 +88,18 @@ pub struct YMF262 {
     regs: [u8; 0x200],
     channels: [FmChannel; 18],
     opl3_mode: bool,
+    #[allow(dead_code)]
     accumulated_cycles: f32,
     mod_feedback: [f32; 18],
 }
 
 impl YMF262 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(14_318_180)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -100,7 +121,9 @@ impl YMF262 {
 
     fn advance_phases(&mut self, sample_rate: u32) {
         for ch in 0..18 {
-            if !self.channels[ch].key_on { continue; }
+            if !self.channels[ch].key_on {
+                continue;
+            }
             let base_freq = self.channel_freq_hz(ch);
             for op in 0..2 {
                 let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
@@ -114,7 +137,9 @@ impl YMF262 {
     }
 
     fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {
-        if ch >= 18 || !self.channels[ch].key_on { return (0.0, 0.0); }
+        if ch >= 18 || !self.channels[ch].key_on {
+            return (0.0, 0.0);
+        }
         let op0_phase = self.channels[ch].operators[0].phase_acc;
         let op1_phase = self.channels[ch].operators[1].phase_acc;
         let tl0 = 1.0 - self.channels[ch].operators[0].total_level as f32 / 63.0;
@@ -127,8 +152,16 @@ impl YMF262 {
         };
         self.mod_feedback[ch] = mod_out;
         let sample = (output * 0.1).clamp(-1.0, 1.0);
-        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
-        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
+        let left = if self.channels[ch].left_enable {
+            sample
+        } else {
+            0.0
+        };
+        let right = if self.channels[ch].right_enable {
+            sample
+        } else {
+            0.0
+        };
         (left, right)
     }
 
@@ -138,19 +171,25 @@ impl YMF262 {
 
         match addr {
             // OPL3 enable (bank 0 only)
-            0x05 if bank == 0 => { self.opl3_mode = (data & 0x01) != 0; }
+            0x05 if bank == 0 => {
+                self.opl3_mode = (data & 0x01) != 0;
+            }
 
             // Operator registers (slot-addressed within bank)
             0x20..=0x35 => {
                 if let Some((ch, op)) = slot_to_ch_op(addr - 0x20) {
                     let ch_abs = ch_base + ch;
-                    if ch_abs < 18 { self.channels[ch_abs].operators[op].mult = data & 0x0F; }
+                    if ch_abs < 18 {
+                        self.channels[ch_abs].operators[op].mult = data & 0x0F;
+                    }
                 }
             }
             0x40..=0x55 => {
                 if let Some((ch, op)) = slot_to_ch_op(addr - 0x40) {
                     let ch_abs = ch_base + ch;
-                    if ch_abs < 18 { self.channels[ch_abs].operators[op].total_level = data & 0x3F; }
+                    if ch_abs < 18 {
+                        self.channels[ch_abs].operators[op].total_level = data & 0x3F;
+                    }
                 }
             }
             0x60..=0x75 | 0x80..=0x95 | 0xE0..=0xF5 => {}
@@ -158,7 +197,9 @@ impl YMF262 {
             // Channel registers
             0xA0..=0xA8 => {
                 let ch = ch_base + (addr - 0xA0) as usize;
-                if ch < 18 { self.channels[ch].f_num = (self.channels[ch].f_num & 0x300) | data as u16; }
+                if ch < 18 {
+                    self.channels[ch].f_num = (self.channels[ch].f_num & 0x300) | data as u16;
+                }
             }
             0xB0..=0xB8 => {
                 let ch = ch_base + (addr - 0xB0) as usize;
@@ -166,7 +207,8 @@ impl YMF262 {
                     let prev = self.channels[ch].key_on;
                     self.channels[ch].key_on = (data & 0x20) != 0;
                     self.channels[ch].block = (data >> 2) & 0x07;
-                    self.channels[ch].f_num = (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
+                    self.channels[ch].f_num =
+                        (self.channels[ch].f_num & 0x0FF) | (((data as u16) & 0x03) << 8);
                     if !prev && self.channels[ch].key_on {
                         self.channels[ch].operators[0].phase_acc = 0.0;
                         self.channels[ch].operators[1].phase_acc = 0.0;
@@ -289,7 +331,10 @@ mod tests {
         chip.write(0xB0, 0x31);
         let mut buffer = [0.0f32; 8];
         chip.generate_samples(&mut buffer, 44100);
-        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
+        assert!(
+            buffer.iter().any(|&s| s != 0.0),
+            "active channel must produce output"
+        );
     }
 
     #[test]

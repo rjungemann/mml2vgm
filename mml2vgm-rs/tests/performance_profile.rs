@@ -3,14 +3,14 @@
 //! Run with: cargo test --test performance_profile -- --nocapture
 //! This test measures compilation time for each example file with per-file timeouts.
 
+use mml2vgm::compiler::compiler::MmlCompiler;
+use mml2vgm::{CompileOptions, OutputFormat};
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
-use mml2vgm::{CompileOptions, OutputFormat};
-use mml2vgm::compiler::compiler::MmlCompiler;
 
-const TIMEOUT_PER_FILE_SECS: u64 = 15;  // 15 second timeout per file
-const MAX_TOTAL_TIME_SECS: u64 = 60;   // 60 second total timeout for entire test
+const TIMEOUT_PER_FILE_SECS: u64 = 15; // 15 second timeout per file
+const MAX_TOTAL_TIME_SECS: u64 = 60; // 60 second total timeout for entire test
 
 #[test]
 fn profile_compilation_performance() {
@@ -22,8 +22,7 @@ fn profile_compilation_performance() {
     }
 
     // Find all .gwi files
-    let entries = fs::read_dir(&samples_dir)
-        .expect("Failed to read samples directory");
+    let entries = fs::read_dir(&samples_dir).expect("Failed to read samples directory");
 
     let mut gwi_files: Vec<_> = entries
         .filter_map(|e| e.ok())
@@ -48,7 +47,10 @@ fn profile_compilation_performance() {
     for entry in gwi_files {
         // Check global timeout
         if test_start.elapsed().as_secs() > MAX_TOTAL_TIME_SECS {
-            println!("\n⏱️  Global timeout reached ({} seconds). Stopping profiling.", MAX_TOTAL_TIME_SECS);
+            println!(
+                "\n⏱️  Global timeout reached ({} seconds). Stopping profiling.",
+                MAX_TOTAL_TIME_SECS
+            );
             break;
         }
 
@@ -78,7 +80,10 @@ fn profile_compilation_performance() {
 
         // Check per-file timeout
         if elapsed.as_secs() > TIMEOUT_PER_FILE_SECS {
-            println!("⏱️  {:30} {:.2}ms (SLOW - exceeded {}s limit)", filename, elapsed_ms, TIMEOUT_PER_FILE_SECS);
+            println!(
+                "⏱️  {:30} {:.2}ms (SLOW - exceeded {}s limit)",
+                filename, elapsed_ms, TIMEOUT_PER_FILE_SECS
+            );
             continue;
         }
 
@@ -258,7 +263,12 @@ fn repeated_compile_stable() {
     let min = times_ms.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = times_ms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
-    println!("Repeated compile: min={:.2}ms  max={:.2}ms  ratio={:.2}x", min, max, max / min.max(0.001));
+    println!(
+        "Repeated compile: min={:.2}ms  max={:.2}ms  ratio={:.2}x",
+        min,
+        max,
+        max / min.max(0.001)
+    );
 
     // Max must be within 10× of min (generous allowance for CI noise).
     assert!(
@@ -268,4 +278,3 @@ fn repeated_compile_stable() {
         max
     );
 }
-

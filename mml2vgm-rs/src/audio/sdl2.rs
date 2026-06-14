@@ -6,8 +6,8 @@
 
 use super::backend::AudioBackend;
 use crate::{MmlError, MmlResult};
-use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 /// SDL2 audio backend for compatibility with SDL2-based applications
 pub struct Sdl2Backend {
@@ -50,12 +50,11 @@ impl AudioBackend for Sdl2Backend {
     }
 
     fn write_samples(&mut self, samples: &[f32]) -> MmlResult<()> {
-        let mut buffer = self.sample_buffer.lock()
-            .map_err(|_| MmlError::AudioError(
-                super::backend::AudioError::BufferError(
-                    "Failed to acquire buffer lock".to_string()
-                )
-            ))?;
+        let mut buffer = self.sample_buffer.lock().map_err(|_| {
+            MmlError::AudioError(super::backend::AudioError::BufferError(
+                "Failed to acquire buffer lock".to_string(),
+            ))
+        })?;
 
         for &sample in samples {
             buffer.push_back(sample.clamp(-1.0, 1.0));

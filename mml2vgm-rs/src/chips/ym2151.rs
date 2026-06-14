@@ -16,12 +16,15 @@
 //! - 0xA0-0xBF: Operator AM/D1R
 //! - 0xC0-0xDF: Operator DT2/D2R
 //! - 0xE0-0xFF: Operator D1L/RR
+//!
 //! Operator layout: base + op*8 + ch (op: 0=M1, 1=M2, 2=C1, 3=C2)
 
 use super::SoundChipEmulator;
 use std::f32::consts::PI;
 
-const FREQ_MULT: [f32; 16] = [0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0];
+const FREQ_MULT: [f32; 16] = [
+    0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 12.0, 12.0, 15.0, 15.0,
+];
 
 /// OPM note-code-to-semitone mapping (KC bits 3:0); values 3/7/11/15 are unused (treat as invalid)
 const KC_NOTE_SEMITONE: [i32; 16] = [0, 1, 2, 2, 3, 4, 5, 5, 6, 7, 8, 8, 9, 10, 11, 11];
@@ -37,7 +40,12 @@ struct FmOperator {
 
 impl Default for FmOperator {
     fn default() -> Self {
-        Self { phase_acc: 0.0, total_level: 0, mult: 1, key_on: false }
+        Self {
+            phase_acc: 0.0,
+            total_level: 0,
+            mult: 1,
+            key_on: false,
+        }
     }
 }
 
@@ -57,8 +65,12 @@ impl Default for FmChannel {
     fn default() -> Self {
         Self {
             operators: [FmOperator::default(); 4],
-            kc: 0, kf: 0, algorithm: 0, feedback: 0,
-            left_enable: true, right_enable: true,
+            kc: 0,
+            kf: 0,
+            algorithm: 0,
+            feedback: 0,
+            left_enable: true,
+            right_enable: true,
         }
     }
 }
@@ -72,15 +84,18 @@ pub struct YM2151 {
     lfo_counter: u16,
     lfo_enabled: bool,
     lfo_frequency: u8,
+    #[allow(dead_code)]
     accumulated_cycles: f32,
     op_feedback: [f32; 8],
 }
 
 impl YM2151 {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(3_579_545)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -110,7 +125,9 @@ impl YM2151 {
         for ch in 0..8 {
             let base_freq = self.channel_freq_hz(ch);
             for op in 0..4 {
-                if !self.channels[ch].operators[op].key_on { continue; }
+                if !self.channels[ch].operators[op].key_on {
+                    continue;
+                }
                 let mult = FREQ_MULT[self.channels[ch].operators[op].mult as usize & 0xF];
                 let inc = base_freq * mult * 2.0 * PI / sample_rate as f32;
                 self.channels[ch].operators[op].phase_acc += inc;
@@ -122,7 +139,9 @@ impl YM2151 {
     }
 
     fn op_output(&self, ch: usize, op: usize, mod_input: f32) -> f32 {
-        if !self.channels[ch].operators[op].key_on { return 0.0; }
+        if !self.channels[ch].operators[op].key_on {
+            return 0.0;
+        }
         let phase = self.channels[ch].operators[op].phase_acc + mod_input;
         let tl = 1.0 - self.channels[ch].operators[op].total_level as f32 / 127.0;
         phase.sin() * tl
@@ -130,7 +149,9 @@ impl YM2151 {
 
     fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {
         let any_key_on = self.channels[ch].operators.iter().any(|op| op.key_on);
-        if !any_key_on { return (0.0, 0.0); }
+        if !any_key_on {
+            return (0.0, 0.0);
+        }
 
         let fb = if self.channels[ch].feedback > 0 {
             self.op_feedback[ch] * (self.channels[ch].feedback as f32 / 7.0) * 0.5
@@ -193,8 +214,16 @@ impl YM2151 {
         };
 
         let sample = (output * 0.2).clamp(-1.0, 1.0);
-        let left = if self.channels[ch].left_enable { sample } else { 0.0 };
-        let right = if self.channels[ch].right_enable { sample } else { 0.0 };
+        let left = if self.channels[ch].left_enable {
+            sample
+        } else {
+            0.0
+        };
+        let right = if self.channels[ch].right_enable {
+            sample
+        } else {
+            0.0
+        };
         (left, right)
     }
 }
@@ -216,7 +245,9 @@ impl SoundChipEmulator for YM2151 {
         self.regs[addr as usize] = data;
 
         match addr {
-            0x01 => { self.lfo_enabled = (data & 0x02) != 0; }
+            0x01 => {
+                self.lfo_enabled = (data & 0x02) != 0;
+            }
             0x08 => {
                 // Key on/off: ch=bits[2:0], M1=bit3, C1=bit4, M2=bit5, C2=bit6
                 let ch = (data & 0x07) as usize;
@@ -231,7 +262,9 @@ impl SoundChipEmulator for YM2151 {
                     }
                 }
             }
-            0x18 => { self.lfo_frequency = data; }
+            0x18 => {
+                self.lfo_frequency = data;
+            }
             // Channel control: L/R/FB/CON
             0x20..=0x27 => {
                 let ch = (addr - 0x20) as usize;
@@ -374,11 +407,14 @@ mod tests {
     fn test_ym2151_generate_samples_active() {
         let mut chip = YM2151::new();
         chip.write(0x20, 0b1100_0111); // ch0: L+R, AL=7 (additive)
-        chip.write(0x28, 0x4C);         // ch0 KC: A4
-        chip.write(0x08, 0x78);         // key on all ops ch0
+        chip.write(0x28, 0x4C); // ch0 KC: A4
+        chip.write(0x08, 0x78); // key on all ops ch0
         let mut buffer = [0.0f32; 8];
         chip.generate_samples(&mut buffer, 44100);
-        assert!(buffer.iter().any(|&s| s != 0.0), "active channel must produce output");
+        assert!(
+            buffer.iter().any(|&s| s != 0.0),
+            "active channel must produce output"
+        );
     }
 
     #[test]

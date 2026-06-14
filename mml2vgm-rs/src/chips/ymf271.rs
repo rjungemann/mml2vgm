@@ -45,13 +45,35 @@ extern "C" {
 mod wasm_stubs {
     use std::os::raw::c_void;
     const MSG: &str = "YMF271 emulator is not available on wasm32";
-    pub unsafe fn ymf271_ffi_create(_clock: u32) -> *mut c_void { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_create(_clock: u32) -> *mut c_void {
+        panic!("{}", MSG)
+    }
     pub unsafe fn ymf271_ffi_destroy(_chip: *mut c_void) {}
-    pub unsafe fn ymf271_ffi_reset(_chip: *mut c_void) { panic!("{}", MSG) }
-    pub unsafe fn ymf271_ffi_write(_chip: *mut c_void, _offset: u8, _data: u8) { panic!("{}", MSG) }
-    pub unsafe fn ymf271_ffi_update(_chip: *mut c_void, _samples: u32, _left: *mut i32, _right: *mut i32) { panic!("{}", MSG) }
-    pub unsafe fn ymf271_ffi_alloc_rom(_chip: *mut c_void, _rom_size: u32) { panic!("{}", MSG) }
-    pub unsafe fn ymf271_ffi_write_rom(_chip: *mut c_void, _offset: u32, _length: u32, _data: *const u8) { panic!("{}", MSG) }
+    pub unsafe fn ymf271_ffi_reset(_chip: *mut c_void) {
+        panic!("{}", MSG)
+    }
+    pub unsafe fn ymf271_ffi_write(_chip: *mut c_void, _offset: u8, _data: u8) {
+        panic!("{}", MSG)
+    }
+    pub unsafe fn ymf271_ffi_update(
+        _chip: *mut c_void,
+        _samples: u32,
+        _left: *mut i32,
+        _right: *mut i32,
+    ) {
+        panic!("{}", MSG)
+    }
+    pub unsafe fn ymf271_ffi_alloc_rom(_chip: *mut c_void, _rom_size: u32) {
+        panic!("{}", MSG)
+    }
+    pub unsafe fn ymf271_ffi_write_rom(
+        _chip: *mut c_void,
+        _offset: u32,
+        _length: u32,
+        _data: *const u8,
+    ) {
+        panic!("{}", MSG)
+    }
 }
 #[cfg(target_arch = "wasm32")]
 use wasm_stubs::*;
@@ -66,26 +88,45 @@ pub struct YMF271 {
 unsafe impl Send for YMF271 {}
 unsafe impl Sync for YMF271 {}
 
+impl Default for YMF271 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl YMF271 {
+    /// New.
     pub fn new() -> Self {
         let chip = unsafe { ymf271_ffi_create(CLOCK) };
         assert!(!chip.is_null(), "ymf271_ffi_create returned null");
-        Self { chip, rom: Vec::new(), rom_loaded: false }
+        Self {
+            chip,
+            rom: Vec::new(),
+            rom_loaded: false,
+        }
     }
 }
 
 impl Drop for YMF271 {
     fn drop(&mut self) {
-        unsafe { ymf271_ffi_destroy(self.chip); }
+        unsafe {
+            ymf271_ffi_destroy(self.chip);
+        }
     }
 }
 
 impl SoundChipEmulator for YMF271 {
-    fn name(&self) -> &'static str { "YMF271" }
-    fn clock_rate(&self) -> u32 { CLOCK }
+    fn name(&self) -> &'static str {
+        "YMF271"
+    }
+    fn clock_rate(&self) -> u32 {
+        CLOCK
+    }
 
     fn reset(&mut self) {
-        unsafe { ymf271_ffi_reset(self.chip); }
+        unsafe {
+            ymf271_ffi_reset(self.chip);
+        }
     }
 
     fn write(&mut self, addr: u8, data: u8) {
@@ -97,7 +138,7 @@ impl SoundChipEmulator for YMF271 {
 
     fn write_port(&mut self, port: u8, addr: u8, data: u8) {
         unsafe {
-            ymf271_ffi_write(self.chip, port * 2,     addr);
+            ymf271_ffi_write(self.chip, port * 2, addr);
             ymf271_ffi_write(self.chip, port * 2 + 1, data);
         }
     }
@@ -108,12 +149,7 @@ impl SoundChipEmulator for YMF271 {
         if !self.rom.is_empty() && !self.rom_loaded {
             unsafe {
                 ymf271_ffi_alloc_rom(self.chip, self.rom.len() as u32);
-                ymf271_ffi_write_rom(
-                    self.chip,
-                    0,
-                    self.rom.len() as u32,
-                    self.rom.as_ptr(),
-                );
+                ymf271_ffi_write_rom(self.chip, 0, self.rom.len() as u32, self.rom.as_ptr());
             }
             self.rom_loaded = true;
         }
@@ -123,12 +159,7 @@ impl SoundChipEmulator for YMF271 {
         let mut right = vec![0i32; n];
 
         unsafe {
-            ymf271_ffi_update(
-                self.chip,
-                n as u32,
-                left.as_mut_ptr(),
-                right.as_mut_ptr(),
-            );
+            ymf271_ffi_update(self.chip, n as u32, left.as_mut_ptr(), right.as_mut_ptr());
         }
 
         const SCALE: f32 = 1.0 / 32768.0;
@@ -176,7 +207,7 @@ mod tests {
         chip.write_port(1, 0x40, 0x00); // bank 1, group 0, TL=0
         chip.write_port(2, 0x40, 0x00); // bank 2, group 0, TL=0
         chip.write_port(3, 0x40, 0x00); // bank 3, group 0, TL=0
-        // AR=31 (fastest attack, reg 5) — also per-bank:
+                                        // AR=31 (fastest attack, reg 5) — also per-bank:
         chip.write_port(0, 0x50, 0x1f);
         chip.write_port(1, 0x50, 0x1f);
         chip.write_port(2, 0x50, 0x1f);

@@ -5,10 +5,10 @@
 //!
 //! Run with: cargo test --test compile_examples -- --nocapture
 
+use mml2vgm::compiler::compiler::MmlCompiler;
+use mml2vgm::{CompileOptions, OutputFormat};
 use std::fs;
 use std::path::PathBuf;
-use mml2vgm::{CompileOptions, OutputFormat};
-use mml2vgm::compiler::compiler::MmlCompiler;
 
 const VGM_HEADER_SIZE: usize = 0x40;
 
@@ -38,7 +38,10 @@ fn assert_valid_vgm_output(bytes: &[u8]) {
     );
 
     let version = read_u32_le(bytes, 8);
-    assert!(version >= 0x0000_0150, "unexpected VGM version: {version:#x}");
+    assert!(
+        version >= 0x0000_0150,
+        "unexpected VGM version: {version:#x}"
+    );
 }
 
 #[test]
@@ -52,8 +55,7 @@ fn test_compile_all_examples() {
     }
 
     // Find all .gwi files
-    let entries = fs::read_dir(&samples_dir)
-        .expect("Failed to read samples directory");
+    let entries = fs::read_dir(&samples_dir).expect("Failed to read samples directory");
 
     let mut gwi_files: Vec<_> = entries
         .filter_map(|e| e.ok())
@@ -67,7 +69,10 @@ fn test_compile_all_examples() {
 
     gwi_files.sort_by_key(|e| e.path());
 
-    println!("\n========== Compiling {} example files ==========\n", gwi_files.len());
+    println!(
+        "\n========== Compiling {} example files ==========\n",
+        gwi_files.len()
+    );
 
     let mut success_count = 0;
     let mut failure_count = 0;
@@ -130,22 +135,22 @@ fn test_compile_all_examples() {
 #[test]
 fn test_simple_compilation() {
     use std::time::Instant;
-    
+
     let mml = "o4 c4 d4 e4 f4 g4";
     let options = CompileOptions {
         format: OutputFormat::VGM,
         ..Default::default()
     };
-    
+
     let compiler = MmlCompiler::new(options);
-    
+
     println!("Starting compilation of simple MML...");
     let start = Instant::now();
     let result = compiler.compile_from_source(mml);
     let elapsed = start.elapsed();
-    
+
     println!("Compilation took: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
-    
+
     match result {
         Ok(result) => {
             assert_valid_vgm_output(&result.data);
@@ -162,22 +167,22 @@ fn test_simple_compilation() {
 fn test_file_compilation() {
     use std::path::Path;
     use std::time::Instant;
-    
+
     let input_path = Path::new("../browser-ide/public/samples/hello_world.gwi");
     let options = CompileOptions {
         format: OutputFormat::VGM,
         ..Default::default()
     };
-    
+
     let compiler = MmlCompiler::new(options);
-    
+
     println!("Starting file-based compilation of {:?}...", input_path);
     let start = Instant::now();
     let result = compiler.compile(input_path);
     let elapsed = start.elapsed();
-    
+
     println!("Compilation took: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
-    
+
     match result {
         Ok(result) => {
             assert_valid_vgm_output(&result.data);
@@ -196,7 +201,10 @@ fn test_compile_bundled_examples() {
     let examples_dir = PathBuf::from("../examples");
 
     if !examples_dir.exists() {
-        eprintln!("Skipping: examples directory not found at {:?}", examples_dir);
+        eprintln!(
+            "Skipping: examples directory not found at {:?}",
+            examples_dir
+        );
         return;
     }
 
@@ -207,13 +215,20 @@ fn test_compile_bundled_examples() {
         .collect();
     entries.sort_by_key(|e| e.path());
 
-    assert!(!entries.is_empty(), "expected at least one .gwi in examples/");
+    assert!(
+        !entries.is_empty(),
+        "expected at least one .gwi in examples/"
+    );
 
     for entry in entries {
         let path = entry.path();
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        let compiler = MmlCompiler::new(CompileOptions { format: OutputFormat::VGM, ..Default::default() });
-        let result = compiler.compile(&path)
+        let compiler = MmlCompiler::new(CompileOptions {
+            format: OutputFormat::VGM,
+            ..Default::default()
+        });
+        let result = compiler
+            .compile(&path)
             .unwrap_or_else(|e| panic!("examples/{} failed to compile: {}", name, e));
         assert_valid_vgm_output(&result.data);
     }
@@ -231,7 +246,9 @@ fn test_browser_sample_comment_lines_compile_from_source() {
     });
 
     let start = Instant::now();
-    let result = compiler.compile_from_source(&mml).expect("Compilation failed");
+    let result = compiler
+        .compile_from_source(&mml)
+        .expect("Compilation failed");
     let elapsed = start.elapsed();
 
     assert!(

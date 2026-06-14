@@ -88,7 +88,6 @@ fn muap_fixture_compile() {
 
 #[test]
 fn muap_fixture_sections_compile() {
-    let fixture =
-        "@OPNA\n@FM0 o4 c4 d4\n@SSG0 o5 e4 f4\n@RHYTHM0 BD HH\n@ADPCM0 c4\n";
+    let fixture = "@OPNA\n@FM0 o4 c4 d4\n@SSG0 o5 e4 f4\n@RHYTHM0 BD HH\n@ADPCM0 c4\n";
     compile_fixture(&MuapDriver, fixture, "muap_fixture_sections_compile");
 }

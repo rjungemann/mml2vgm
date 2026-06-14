@@ -15,6 +15,7 @@ use std::path::PathBuf;
 /// Return `None` if the sample is unavailable; the compiler will skip the
 /// data block and (where the VGM format requires it) emit a warning.
 pub trait SampleResolver: Send + Sync {
+    /// Resolve.
     fn resolve(&self, name: &str) -> Option<&[f32]>;
 }
 
@@ -34,6 +35,7 @@ pub struct MemorySampleResolver {
 }
 
 impl MemorySampleResolver {
+    /// New.
     pub fn new(map: HashMap<String, Vec<f32>>) -> Self {
         Self { map }
     }
@@ -63,14 +65,20 @@ impl SampleResolver for MemorySampleResolver {
 /// A future phase will add a WAV decoder (e.g. via the `hound` crate) so the
 /// CLI can embed PCM samples without requiring a separate pre-processing step.
 pub struct DiskSampleResolver {
+    /// Base dir.
     pub base_dir: PathBuf,
     /// Pre-loaded samples (populated lazily or up-front).
+    #[allow(dead_code)]
     cache: HashMap<String, Vec<f32>>,
 }
 
 impl DiskSampleResolver {
+    /// New.
     pub fn new(base_dir: PathBuf) -> Self {
-        Self { base_dir, cache: HashMap::new() }
+        Self {
+            base_dir,
+            cache: HashMap::new(),
+        }
     }
 }
 

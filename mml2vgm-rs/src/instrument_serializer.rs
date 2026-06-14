@@ -1,14 +1,3 @@
-/// Instrument serialization utilities for parsing and generating MML instrument definitions.
-///
-/// Provides round-trip serialization (parse MML → data structure → regenerate MML) for:
-/// - FM Tone: `'@ M/F NNN` (4-operator instruments)
-/// - PCM Sample: `'@ P NNN` (WAV-based samples)
-/// - Envelope: `'@ E NNN` (volume envelope sequences)
-/// - Arpeggio: `'@ A NNN` (note sequences)
-
-use crate::MmlResult;
-use std::collections::HashMap;
-
 // ============================================================================
 // FM Instrument Types
 // ============================================================================
@@ -38,7 +27,9 @@ pub struct FmInstrumentDef {
 }
 
 /// Parameter names in order for FM operators
-pub const FM_PARAM_NAMES: &[&str] = &["AR", "DR", "SR", "RR", "SL", "TL", "KS", "ML", "DT", "AM", "SSG"];
+pub const FM_PARAM_NAMES: &[&str] = &[
+    "AR", "DR", "SR", "RR", "SL", "TL", "KS", "ML", "DT", "AM", "SSG",
+];
 
 /// Max values for each FM parameter
 pub const FM_PARAM_MAX: &[u32] = &[31, 31, 31, 15, 15, 127, 3, 15, 7, 1, 15];
@@ -71,8 +62,8 @@ pub fn parse_fm_instruments(source: &str) -> Vec<FmInstrumentDef> {
         let line = lines[i].trim();
 
         // Match: '@ M 000 or '@ F 001 "optional name"
-        if line.starts_with("'@") {
-            let rest = &line[2..].trim();
+        if let Some(rest) = line.strip_prefix("'@") {
+            let rest = rest.trim();
             let parts: Vec<&str> = rest.split_whitespace().collect();
             if parts.len() >= 2 && (parts[0] == "M" || parts[0] == "F") {
                 if let Ok(number) = parts[1].parse::<u32>() {
@@ -109,7 +100,10 @@ pub fn parse_fm_instruments(source: &str) -> Vec<FmInstrumentDef> {
                                 while vals.len() < 11 {
                                     vals.push(0);
                                 }
-                                ops.push([vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7], vals[8], vals[9], vals[10]]);
+                                ops.push([
+                                    vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6],
+                                    vals[7], vals[8], vals[9], vals[10],
+                                ]);
                                 j += 1;
                                 continue;
                             }
@@ -133,11 +127,14 @@ pub fn parse_fm_instruments(source: &str) -> Vec<FmInstrumentDef> {
                     let mut end_line = j as i32;
                     while j < lines.len() {
                         let alg_line = lines[j].trim();
-                        if alg_line.starts_with("'@") {
-                            let vals_str = &alg_line[2..].trim();
+                        if let Some(vals_str) = alg_line.strip_prefix("'@") {
+                            let vals_str = vals_str.trim();
                             let parts: Vec<&str> = vals_str.split(',').collect();
                             if parts.len() >= 2 {
-                                if let (Ok(a), Ok(f)) = (parts[0].trim().parse::<u32>(), parts[1].trim().parse::<u32>()) {
+                                if let (Ok(a), Ok(f)) = (
+                                    parts[0].trim().parse::<u32>(),
+                                    parts[1].trim().parse::<u32>(),
+                                ) {
                                     alg = a;
                                     fb = f;
                                     end_line = j as i32;
@@ -189,7 +186,11 @@ pub fn serialize_fm_instrument(inst: &FmInstrumentDef) -> String {
     let col_header = "   AR  DR  SR  RR  SL  TL  KS  ML  DT  AM  SSG-EG";
     let mut op_lines = Vec::new();
     for op in &inst.ops {
-        let vals = op.iter().map(|v| format!("{:03}", v)).collect::<Vec<_>>().join(",");
+        let vals = op
+            .iter()
+            .map(|v| format!("{:03}", v))
+            .collect::<Vec<_>>()
+            .join(",");
         op_lines.push(format!("'@ {}", vals));
     }
     let alg_line = "   ALG FB";
@@ -209,13 +210,21 @@ pub fn serialize_fm_instrument(inst: &FmInstrumentDef) -> String {
 /// PCM/Sample instrument definition.
 #[derive(Debug, Clone)]
 pub struct PcmInstrumentDef {
+    /// Number.
     pub number: u32,
+    /// Filename.
     pub filename: String,
+    /// Frequency.
     pub frequency: u32,
+    /// Volume.
     pub volume: u32,
+    /// Chip.
     pub chip: String,
+    /// Option.
     pub option: String,
+    /// Start line.
     pub start_line: i32,
+    /// End line.
     pub end_line: i32,
 }
 
@@ -281,8 +290,10 @@ pub fn serialize_pcm_instrument(inst: &PcmInstrumentDef) -> String {
     } else {
         format!(",{}", inst.option)
     };
-    format!("'@ P {},{}\"{}\",{},{},{}{}",
-        num, "\"", inst.filename, inst.frequency, inst.volume, inst.chip, opt)
+    format!(
+        "'@ P {},{}\"{}\",{},{},{}{}",
+        num, "\"", inst.filename, inst.frequency, inst.volume, inst.chip, opt
+    )
 }
 
 // ============================================================================
@@ -292,9 +303,13 @@ pub fn serialize_pcm_instrument(inst: &PcmInstrumentDef) -> String {
 /// Envelope definition (volume sequence).
 #[derive(Debug, Clone)]
 pub struct EnvelopeDef {
+    /// Number.
     pub number: u32,
+    /// Steps.
     pub steps: Vec<u32>,
+    /// Start line.
     pub start_line: i32,
+    /// End line.
     pub end_line: i32,
 }
 
@@ -331,7 +346,12 @@ pub fn parse_envelopes(source: &str) -> Vec<EnvelopeDef> {
 /// Serialize a single envelope definition back to MML text.
 pub fn serialize_envelope(env: &EnvelopeDef) -> String {
     let num = format!("{:03}", env.number);
-    let steps = env.steps.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",");
+    let steps = env
+        .steps
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
     format!("'@ E {}, {}", num, steps)
 }
 
@@ -342,9 +362,13 @@ pub fn serialize_envelope(env: &EnvelopeDef) -> String {
 /// Arpeggio definition (note sequence).
 #[derive(Debug, Clone)]
 pub struct ArpeggioDef {
+    /// Number.
     pub number: u32,
+    /// Notes.
     pub notes: Vec<String>,
+    /// Start line.
     pub start_line: i32,
+    /// End line.
     pub end_line: i32,
 }
 
@@ -392,7 +416,12 @@ pub fn serialize_arpeggio(arp: &ArpeggioDef) -> String {
 
 /// Replace an existing instrument definition block in source text with a new one.
 /// If start_line == -1 (new instrument), append to end of source.
-pub fn replace_definition_block(source: &str, start_line: i32, end_line: i32, new_block: &str) -> String {
+pub fn replace_definition_block(
+    source: &str,
+    start_line: i32,
+    end_line: i32,
+    new_block: &str,
+) -> String {
     if start_line == -1 {
         let sep = if source.ends_with('\n') { "\n" } else { "\n\n" };
         return format!("{}{}{}\n", source, sep, new_block);

@@ -60,12 +60,12 @@ fn build_pan_table() -> [u8; 33] {
 fn pan_gains(pan_word: u16, tbl: &[u8; 33]) -> (f32, f32) {
     let base = pan_word & 0xFFF0;
     let n = (pan_word & 0x000F) as usize; // 0..15
-    // s = pan step: 0 = hard left, 16 = centre, 32 = hard right
+                                          // s = pan step: 0 = hard left, 16 = centre, 32 = hard right
     let s: usize = match base {
-        0x0110 => n,           // left half: n=0 → s=0 (hard left), n=16 → s=16 (centre)
-        0x0120 => 16,          // exact centre
-        0x0130 => 16 + n,      // right half: n=0 → s=16 (centre), n=16 → s=32 (hard right)
-        _ => 16,               // fallback centre
+        0x0110 => n,      // left half: n=0 → s=0 (hard left), n=16 → s=16 (centre)
+        0x0120 => 16,     // exact centre
+        0x0130 => 16 + n, // right half: n=0 → s=16 (centre), n=16 → s=32 (hard right)
+        _ => 16,          // fallback centre
     };
     let s = s.min(32);
     let l = tbl[32 - s] as f32 / 256.0;
@@ -234,12 +234,15 @@ impl EchoUnit {
 
     /// Update delay length from register 0xD9.  Clamped to valid hardware range.
     fn set_delay(&mut self, samples: u16) {
-        self.delay_len = (samples as usize).clamp(0x055A, 0x0FFF).min(ECHO_BUF_MAX / 2 - 1);
+        self.delay_len = (samples as usize)
+            .clamp(0x055A, 0x0FFF)
+            .min(ECHO_BUF_MAX / 2 - 1);
     }
 }
 
 // ── QSound chip ───────────────────────────────────────────────────────────────
 
+/// Q Sound.
 pub struct QSound {
     clock_rate: u32,
     voices: [QSoundVoice; NUM_PCM],
@@ -252,10 +255,12 @@ pub struct QSound {
 }
 
 impl QSound {
+    /// New.
     pub fn new() -> Self {
         Self::with_clock_rate(4_000_000)
     }
 
+    /// With clock rate.
     pub fn with_clock_rate(clock_rate: u32) -> Self {
         Self {
             clock_rate,
@@ -270,6 +275,7 @@ impl QSound {
 
     // ── ROM access ────────────────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn read_word(&self, bank: u8, addr: u16) -> i16 {
         let byte_off = (bank as usize * 65536 + addr as usize) * 2;
         if byte_off + 1 < self.rom.len() {
@@ -279,9 +285,14 @@ impl QSound {
         }
     }
 
+    #[allow(dead_code)]
     fn read_byte(&self, bank: u8, addr: u32) -> u8 {
         let byte_off = bank as usize * 65536 + addr as usize;
-        if byte_off < self.rom.len() { self.rom[byte_off] } else { 0 }
+        if byte_off < self.rom.len() {
+            self.rom[byte_off]
+        } else {
+            0
+        }
     }
 
     // ── Register write ────────────────────────────────────────────────────────
@@ -298,7 +309,9 @@ impl QSound {
                 0 => v.pending_bank = (data >> 8) as u8, // upper byte = bank bits
                 1 => {
                     v.addr = data;
-                    if data != 0 { v.active = true; }
+                    if data != 0 {
+                        v.active = true;
+                    }
                 }
                 2 => v.rate = data,
                 3 => v.phase = data,
@@ -306,7 +319,9 @@ impl QSound {
                 5 => {
                     v.end_addr = data;
                     // Writing 0 to end_addr deactivates
-                    if data == 0 { v.active = false; }
+                    if data == 0 {
+                        v.active = false;
+                    }
                 }
                 6 => v.volume = data & 0x7FFF,
                 _ => {}
@@ -336,7 +351,7 @@ impl QSound {
             let offset = addr - 0xCA;
             if offset < 12 {
                 // 3 channels × 4 regs each: start, end, bank, volume
-                let ch = (offset / 4) as usize;
+                let ch = offset / 4;
                 let reg = offset % 4;
                 if ch < NUM_ADPCM {
                     match reg {
@@ -349,7 +364,7 @@ impl QSound {
                 }
             } else {
                 // offsets 12–14 (0xD6–0xD8): key-on for channels 0–2
-                let ch = (offset - 12) as usize;
+                let ch = offset - 12;
                 if ch < NUM_ADPCM && data != 0 {
                     let av = &mut self.adpcm[ch];
                     av.active = true;
@@ -432,7 +447,7 @@ impl QSound {
                 continue;
             }
             av.phase_acc += 1.0; // one native tick
-            // Advance ADPCM decoder at ~8012 Hz (every NATIVE_RATE/ADPCM_RATE ticks)
+                                 // Advance ADPCM decoder at ~8012 Hz (every NATIVE_RATE/ADPCM_RATE ticks)
             let ticks_per_adpcm = NATIVE_RATE / ADPCM_RATE; // ≈ 3.0
             if av.phase_acc >= ticks_per_adpcm {
                 av.phase_acc -= ticks_per_adpcm;
@@ -442,9 +457,18 @@ impl QSound {
                 if av.byte_pos >= end_byte.saturating_sub(start_byte) {
                     av.active = false;
                 } else {
-                    let rom_byte_off = (av.bank as usize * 65536 + av.start as usize) + av.byte_pos as usize;
-                    let byte_val = if rom_byte_off < self.rom.len() { self.rom[rom_byte_off] } else { 0 };
-                    let nibble = if av.nibble_hi { (byte_val >> 4) & 0x0F } else { byte_val & 0x0F };
+                    let rom_byte_off =
+                        (av.bank as usize * 65536 + av.start as usize) + av.byte_pos as usize;
+                    let byte_val = if rom_byte_off < self.rom.len() {
+                        self.rom[rom_byte_off]
+                    } else {
+                        0
+                    };
+                    let nibble = if av.nibble_hi {
+                        (byte_val >> 4) & 0x0F
+                    } else {
+                        byte_val & 0x0F
+                    };
                     av.nibble_hi = !av.nibble_hi;
                     if !av.nibble_hi {
                         av.byte_pos += 1;
@@ -482,8 +506,12 @@ fn read_word_static(bank: u8, addr: u16, rom: &[u8]) -> i16 {
 // ── SoundChipEmulator trait ───────────────────────────────────────────────────
 
 impl SoundChipEmulator for QSound {
-    fn name(&self) -> &'static str { "QSound" }
-    fn clock_rate(&self) -> u32 { self.clock_rate }
+    fn name(&self) -> &'static str {
+        "QSound"
+    }
+    fn clock_rate(&self) -> u32 {
+        self.clock_rate
+    }
 
     fn reset(&mut self) {
         for v in &mut self.voices {
@@ -546,7 +574,9 @@ impl SoundChipEmulator for QSound {
 }
 
 impl Default for QSound {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -555,7 +585,9 @@ impl Default for QSound {
 mod tests {
     use super::*;
 
-    fn make_chip() -> QSound { QSound::new() }
+    fn make_chip() -> QSound {
+        QSound::new()
+    }
 
     // ── Phase 1 tests ─────────────────────────────────────────────────────────
 
@@ -572,7 +604,10 @@ mod tests {
         let mut chip = make_chip();
         let mut buf = [0.0f32; 16];
         chip.generate_samples(&mut buf, 44100);
-        assert!(buf.iter().all(|&s| s == 0.0), "idle chip must produce silence");
+        assert!(
+            buf.iter().all(|&s| s == 0.0),
+            "idle chip must produce silence"
+        );
     }
 
     #[test]
@@ -589,7 +624,10 @@ mod tests {
         let mut chip = make_chip();
         let data: Vec<u8> = vec![0xAB; 256];
         chip.load_pcm_data(0x88, &data); // must NOT overwrite
-        assert_ne!(chip.rom[0], 0xAB, "block type 0x88 (Y8950) must not overwrite QSound ROM");
+        assert_ne!(
+            chip.rom[0], 0xAB,
+            "block type 0x88 (Y8950) must not overwrite QSound ROM"
+        );
     }
 
     #[test]
@@ -656,7 +694,10 @@ mod tests {
         let carry = new_frac >> 12;
         v.phase = (v.phase & 0xF000) | ((new_frac & 0xFFF) as u16);
         v.addr = v.addr.wrapping_add((int_inc + carry) as u16);
-        assert_eq!(v.addr, 101, "unity rate must advance addr by exactly 1 per tick");
+        assert_eq!(
+            v.addr, 101,
+            "unity rate must advance addr by exactly 1 per tick"
+        );
     }
 
     #[test]
@@ -683,7 +724,10 @@ mod tests {
         advance_one_tick(&mut v);
         assert_eq!(v.addr, 100, "half rate must NOT advance addr after 1 tick");
         advance_one_tick(&mut v);
-        assert_eq!(v.addr, 101, "half rate must advance addr by 1 after 2 ticks");
+        assert_eq!(
+            v.addr, 101,
+            "half rate must advance addr by 1 after 2 ticks"
+        );
     }
 
     #[test]
@@ -694,7 +738,7 @@ mod tests {
         for i in 0..128usize {
             let val: i16 = 0x4000;
             let idx = i * 2;
-            chip.rom[idx]     = val as u8;
+            chip.rom[idx] = val as u8;
             chip.rom[idx + 1] = (val >> 8) as u8;
         }
 
@@ -707,14 +751,17 @@ mod tests {
         chip.write_port(0x00, 0x05, 0x80); // end_addr = 0x0080
         chip.write_port(0x7F, 0x06, 0xFF); // volume = 0x7FFF
         chip.write_port(0x01, 0x07, 0x20); // pan centre = 0x0120
-        // Activate by writing addr
+                                           // Activate by writing addr
         chip.write_port(0x00, 0x01, 0x01); // addr = 1, triggers active=true
 
         let mut buf = vec![0.0f32; 256];
         chip.generate_samples(&mut buf, 44100);
 
         let any_nonzero = buf.iter().any(|&s| s != 0.0);
-        assert!(any_nonzero, "key-on voice with ROM data must produce non-silent output");
+        assert!(
+            any_nonzero,
+            "key-on voice with ROM data must produce non-silent output"
+        );
     }
 
     #[test]
@@ -753,7 +800,10 @@ mod tests {
     fn test_qsound_pan_centre_equal_power() {
         let tbl = build_pan_table();
         let (l, r) = pan_gains(0x0120, &tbl); // exact centre
-        assert!((l - r).abs() < 1e-4, "centre pan must produce equal L/R gains, got l={l}, r={r}");
+        assert!(
+            (l - r).abs() < 1e-4,
+            "centre pan must produce equal L/R gains, got l={l}, r={r}"
+        );
         assert!(l > 0.0, "centre pan gains must be positive");
     }
 
@@ -771,7 +821,10 @@ mod tests {
         let tbl = build_pan_table();
         // 0x0130 + 16 = hard right (n=16 → s=32)
         let (l, r) = pan_gains(0x0130 | 0x000F, &tbl); // max n = 15
-        assert!(r > l, "right half pan must produce more right gain than left");
+        assert!(
+            r > l,
+            "right half pan must produce more right gain than left"
+        );
     }
 
     // ── Phase 3 tests ─────────────────────────────────────────────────────────
@@ -788,7 +841,7 @@ mod tests {
     fn test_qsound_echo_delay_register() {
         let mut chip = make_chip();
         chip.write_port(0x07, 0xD9, 0x00); // reg 0xD9, value 0x0700
-        // 0x0700 = 1792, within valid range 0x055A..0x0FFF
+                                           // 0x0700 = 1792, within valid range 0x055A..0x0FFF
         assert_eq!(chip.echo.delay_len, 0x0700);
     }
 
@@ -823,7 +876,7 @@ mod tests {
         for i in 0..64usize {
             let val: i16 = 0x4000;
             let idx = i * 2;
-            chip.rom[idx]     = val as u8;
+            chip.rom[idx] = val as u8;
             chip.rom[idx + 1] = (val >> 8) as u8;
         }
         chip.write_port(0x10, 0x02, 0x00); // rate = unity
@@ -845,7 +898,10 @@ mod tests {
 
         // With feedback=0.8, echo should still be ringing
         let any_nonzero = post_buf.iter().any(|&s| s.abs() > 1e-6);
-        assert!(any_nonzero, "echo feedback=0.8 should produce a decaying tail after voice stops");
+        assert!(
+            any_nonzero,
+            "echo feedback=0.8 should produce a decaying tail after voice stops"
+        );
     }
 
     #[test]
@@ -881,7 +937,10 @@ mod tests {
         let mut buf = vec![0.0f32; 256];
         chip.generate_samples(&mut buf, 44100);
         // All-zero ROM with IMA-ADPCM = all-zero nibbles = zero output
-        assert!(buf.iter().all(|&s| s == 0.0), "ADPCM with zero ROM must produce silence");
+        assert!(
+            buf.iter().all(|&s| s == 0.0),
+            "ADPCM with zero ROM must produce silence"
+        );
     }
 
     #[test]
@@ -892,8 +951,8 @@ mod tests {
         chip.write_port(0x00, 0xCC, 0x01); // ch0 bank  = 1
         chip.write_port(0x40, 0xCD, 0x00); // ch0 vol   = 0x4000
         assert_eq!(chip.adpcm[0].start, 0x0100);
-        assert_eq!(chip.adpcm[0].end,   0x0200);
-        assert_eq!(chip.adpcm[0].bank,  0x01);
+        assert_eq!(chip.adpcm[0].end, 0x0200);
+        assert_eq!(chip.adpcm[0].bank, 0x01);
         assert_eq!(chip.adpcm[0].volume, 0x4000);
     }
 }

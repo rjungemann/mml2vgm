@@ -5,15 +5,16 @@
 //!
 //! Note: Function names use the `mml2vgm_` prefix to avoid conflicts with C++ code.
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 use std::sync::OnceLock;
 
-use crate::chips::{ChipType, ChipInstance as RustChipInstance, create_chip};
+use crate::chips::{create_chip, ChipInstance as RustChipInstance, ChipType};
 
 // Opaque handle for chip instances (matches ChipHandle in C)
 // This is a pointer to a Rust-allocated ChipInstance
 #[repr(C)]
+/// Chip Handle.
 pub struct ChipHandle {
     // We use a raw pointer to avoid lifetime issues with FFI
     ptr: *mut RustChipInstance,
@@ -23,7 +24,7 @@ impl ChipHandle {
     fn new(instance: *mut RustChipInstance) -> Self {
         Self { ptr: instance }
     }
-    
+
     fn is_null(&self) -> bool {
         self.ptr.is_null()
     }
@@ -55,24 +56,27 @@ pub extern "C" fn mml2vgm_chip_create(type_ffi: i32, sample_rate: f32) -> *mut C
         Ok(t) => t,
         Err(_) => return std::ptr::null_mut(),
     };
-    
+
     let instance = create_chip(chip_type, sample_rate as f64);
     if instance.is_none() {
         return std::ptr::null_mut();
     }
-    
+
     let instance = Box::new(RustChipInstance::new(instance.unwrap(), sample_rate as f64));
     let handle = Box::new(ChipHandle::new(Box::into_raw(instance)));
     Box::into_raw(handle)
 }
 
 /// Destroy a chip instance
+/// # Safety
+/// `handle` must be a valid pointer returned by this library (or null), and any
+/// output pointers must be valid for writes. The handle must not be used after free.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_destroy(handle: *mut ChipHandle) {
+pub unsafe extern "C" fn mml2vgm_chip_destroy(handle: *mut ChipHandle) {
     if handle.is_null() {
         return;
     }
-    
+
     unsafe {
         let handle = Box::from_raw(handle);
         if !handle.is_null() {
@@ -83,8 +87,11 @@ pub extern "C" fn mml2vgm_chip_destroy(handle: *mut ChipHandle) {
 
 /// Process a single sample
 /// left and right are pointers to float values to accumulate into
+/// # Safety
+/// `handle` must be a valid pointer returned by this library (or null), and any
+/// output pointers must be valid for writes. The handle must not be used after free.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_process_sample(
+pub unsafe extern "C" fn mml2vgm_chip_process_sample(
     handle: *mut ChipHandle,
     left: *mut f32,
     right: *mut f32,
@@ -92,7 +99,7 @@ pub extern "C" fn mml2vgm_chip_process_sample(
     if handle.is_null() || left.is_null() || right.is_null() {
         return;
     }
-    
+
     unsafe {
         let chip_instance = &mut *(*handle).ptr;
         let (l, r) = chip_instance.render_sample();
@@ -102,12 +109,15 @@ pub extern "C" fn mml2vgm_chip_process_sample(
 }
 
 /// Reset a chip to initial state
+/// # Safety
+/// `handle` must be a valid pointer returned by this library (or null), and any
+/// output pointers must be valid for writes. The handle must not be used after free.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_reset(handle: *mut ChipHandle) {
+pub unsafe extern "C" fn mml2vgm_chip_reset(handle: *mut ChipHandle) {
     if handle.is_null() {
         return;
     }
-    
+
     unsafe {
         let chip_instance = &mut *(*handle).ptr;
         chip_instance.reset();
@@ -121,23 +131,20 @@ pub extern "C" fn mml2vgm_chip_get_param_count(type_ffi: i32) -> i32 {
         Ok(t) => t,
         Err(_) => return 0,
     };
-    
+
     chip_type.param_count() as i32
 }
 
 /// Get parameter name
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_get_param_name(
-    type_ffi: i32,
-    param_id: i32,
-) -> *const c_char {
+pub extern "C" fn mml2vgm_chip_get_param_name(type_ffi: i32, param_id: i32) -> *const c_char {
     let chip_type: ChipType = match type_ffi.try_into() {
         Ok(t) => t,
         Err(_) => return std::ptr::null(),
     };
-    
+
     let name = chip_type.param_name(param_id as usize);
-    
+
     match CString::new(name) {
         Ok(s) => s.into_raw(),
         Err(_) => std::ptr::null(),
@@ -145,15 +152,15 @@ pub extern "C" fn mml2vgm_chip_get_param_name(
 }
 
 /// Get parameter value
+/// # Safety
+/// `handle` must be a valid pointer returned by this library (or null), and any
+/// output pointers must be valid for writes. The handle must not be used after free.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_get_param(
-    handle: *mut ChipHandle,
-    param_id: i32,
-) -> f32 {
+pub unsafe extern "C" fn mml2vgm_chip_get_param(handle: *mut ChipHandle, param_id: i32) -> f32 {
     if handle.is_null() {
         return 0.0;
     }
-    
+
     unsafe {
         let chip_instance = &mut *(*handle).ptr;
         chip_instance.get_param(param_id as usize)
@@ -161,8 +168,11 @@ pub extern "C" fn mml2vgm_chip_get_param(
 }
 
 /// Set parameter value
+/// # Safety
+/// `handle` must be a valid pointer returned by this library (or null), and any
+/// output pointers must be valid for writes. The handle must not be used after free.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_set_param(
+pub unsafe extern "C" fn mml2vgm_chip_set_param(
     handle: *mut ChipHandle,
     param_id: i32,
     value: f32,
@@ -170,7 +180,7 @@ pub extern "C" fn mml2vgm_chip_set_param(
     if handle.is_null() {
         return;
     }
-    
+
     unsafe {
         let chip_instance = &mut *(*handle).ptr;
         chip_instance.set_param(param_id as usize, value);
@@ -184,9 +194,9 @@ pub extern "C" fn mml2vgm_chip_get_name(type_ffi: i32) -> *const c_char {
         Ok(t) => t,
         Err(_) => return std::ptr::null(),
     };
-    
+
     let name = chip_type.name();
-    
+
     match CString::new(name) {
         Ok(s) => s.into_raw(),
         Err(_) => std::ptr::null(),
@@ -200,9 +210,9 @@ pub extern "C" fn mml2vgm_chip_get_short_name(type_ffi: i32) -> *const c_char {
         Ok(t) => t,
         Err(_) => return std::ptr::null(),
     };
-    
+
     let name = chip_type.short_name();
-    
+
     match CString::new(name) {
         Ok(s) => s.into_raw(),
         Err(_) => std::ptr::null(),
@@ -210,8 +220,12 @@ pub extern "C" fn mml2vgm_chip_get_short_name(type_ffi: i32) -> *const c_char {
 }
 
 // Helper to free C strings allocated by Rust
+/// Free a C string previously returned by this library.
+///
+/// # Safety
+/// `s` must be a pointer previously returned by this library and not yet freed.
 #[no_mangle]
-pub extern "C" fn mml2vgm_chip_free_string(s: *mut c_char) {
+pub unsafe extern "C" fn mml2vgm_chip_free_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
             let _ = CString::from_raw(s);
