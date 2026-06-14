@@ -5,8 +5,16 @@
  * This enables the IDE to work offline after the first load.
  */
 
-// Cache version - increment when cache contents change
-const CACHE_VERSION = 'mml2vgm-ide-v2';
+// Cache version — increment whenever the JS/CSS bundle hashes change in a
+// way that's already been deployed, so users with the previous SW don't
+// keep serving stale bundles via stale-while-revalidate. The activate
+// handler deletes every cache whose name doesn't match CACHE_NAME.
+//
+// Bumped v2 → v3 (2026-06-13): playback pipeline rewrite — Atomics.wait
+// removed, writeChipRegisterSync added, MonacoEditor `monaco` null-guard,
+// silence-warning text replaced. Stale v2 users hit "waiting is not
+// allowed on this thread" and Monaco "S is undefined" errors.
+const CACHE_VERSION = 'mml2vgm-ide-v3';
 const CACHE_NAME = CACHE_VERSION;
 const OFFLINE_URL = '/index.html';
 
