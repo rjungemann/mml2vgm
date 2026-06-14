@@ -179,6 +179,8 @@ struct PartCodegenState {
     nes_ch: u8,
     dmg_ch: u8,
     vrc6_ch: u8,
+    /// SN76489 channel (0-2 = tone, 3 = noise).
+    psg_ch: u8,
     /// YMF271 group index (0-11)
     ymf271_group: u8,
 }
@@ -208,6 +210,7 @@ impl PartCodegenState {
             dmg_ch: 0,
             vrc6_ch: 0,
             ymf271_group: 0,
+            psg_ch: 0,
         }
     }
 }
@@ -245,6 +248,10 @@ pub struct VgmGenerator {
     next_vrc6_channel: u8,
     /// Next YM2413 (OPLL) channel to allocate (0-8)
     next_ym2413_channel: u8,
+    /// Next SN76489 (DCSG) tone channel to allocate (0-2; ch3 is noise).
+    /// Parts beyond ch2 fall back to ch0 with has_channel=false, matching
+    /// the other chips' overflow handling.
+    next_psg_channel: u8,
     /// Next AY8910 channel to allocate (0-2: A, B, C)
     next_ay8910_channel: u8,
     /// Next HuC6280 channel to allocate (0-5)
@@ -319,6 +326,7 @@ impl VgmGenerator {
             next_dmg_channel: 0,
             next_vrc6_channel: 0,
             next_ym2413_channel: 0,
+            next_psg_channel: 0,
             next_ay8910_channel: 0,
             next_huc6280_channel: 0,
             next_rf5c164_channel: 0,
@@ -1137,6 +1145,18 @@ impl VgmGenerator {
                     (0, 0, 0, 0, false)
                 }
             }
+            Some("SN76489") => {
+                // SN76489 has 3 tone channels (0-2). Bumping the counter
+                // here only; the actual channel index is stashed on the
+                // PartCodegenState a few lines below (state.psg_ch).
+                let ch = self.next_psg_channel;
+                self.next_psg_channel = self.next_psg_channel.saturating_add(1);
+                if ch < 3 {
+                    (0, 0, 0, 0, true)
+                } else {
+                    (0, 0, 0, 0, false)
+                }
+            }
             Some("YM2413") | Some("OPLL") => {
                 let ch = self.next_ym2413_channel;
                 self.next_ym2413_channel = self.next_ym2413_channel.saturating_add(1);
@@ -1272,6 +1292,10 @@ impl VgmGenerator {
         };
         state.ymf271_group = match chip_str {
             Some("YMF271") | Some("YMF271_PCM") => self.next_ymf271_group.saturating_sub(1),
+            _ => 0,
+        };
+        state.psg_ch = match chip_str {
+            Some("SN76489") => self.next_psg_channel.saturating_sub(1).min(2),
             _ => 0,
         };
         state.has_channel = has_channel;
@@ -1517,14 +1541,19 @@ impl VgmGenerator {
                     }
                     state.keyed_on = false;
                 }
-                // Silence SN76489 ch0 during a rest (max attenuation = 0x9F)
+                // Silence the SN76489 channel this part owns during a rest
+                // (max attenuation byte = 0x90 | ch_bits | 0x0F).
+                // Previously hardcoded `0x9F` (channel 0) — when multiple
+                // parts shared the chip the rest from B2/B3 would silence
+                // whichever channel B1 had just keyed on.
                 if matches!(
                     state.chip.as_deref(),
                     Some("SN76489") | Some("SN76489X2") | None
                 ) {
+                    let ch_bits = (state.psg_ch.min(2) & 0x03) << 5;
                     self.commands.push(VgmCommand {
                         command_type: VgmCommandType::Sn76489Write,
-                        data: vec![0x9F],
+                        data: vec![0x90 | ch_bits | 0x0F],
                         time: *time,
                     });
                 }
@@ -2622,17 +2651,29 @@ impl VgmGenerator {
         let midi = note.midi_note();
         let (_, tone) = self.midi_note_to_psg_freq(midi);
 
-        // Write tone register for channel 0 (simplified)
+        // SN76489 latch byte:
+        //   bit 7  = 1 (latch)
+        //   bits 6-5 = channel (00 = tone0, 01 = tone1, 10 = tone2, 11 = noise)
+        //   bit 4  = type (0 = tone, 1 = volume)
+        //   bits 3-0 = data low (tone period low nibble, or volume attenuation)
+        //
+        // Previously the codegen always emitted ch=00 for every part, so
+        // three parts assigned to B1/B2/B3 all stomped on tone channel 0
+        // and only the last writer's note survived. Now uses `state.psg_ch`
+        // (0-2 for the three tone channels) allocated in `process_part`.
+        let ch = state.psg_ch.min(2);
+        let ch_bits = (ch & 0x03) << 5; // bits 6-5 of the latch byte
+
         let tone_low = (tone & 0x0F) as u8;
         let tone_high = ((tone >> 4) & 0x3F) as u8;
         self.commands.push(VgmCommand {
             command_type: VgmCommandType::Sn76489Write,
-            data: vec![0x80 | tone_low],
+            data: vec![0x80 | ch_bits | tone_low], // latch tone <ch>
             time: *time,
         });
         self.commands.push(VgmCommand {
             command_type: VgmCommandType::Sn76489Write,
-            data: vec![tone_high],
+            data: vec![tone_high], // data continuation (no latch bit)
             time: *time,
         });
 
@@ -2640,7 +2681,7 @@ impl VgmGenerator {
         let atten = (15u8).saturating_sub((state.volume >> 3) & 0x0F);
         self.commands.push(VgmCommand {
             command_type: VgmCommandType::Sn76489Write,
-            data: vec![0x90 | (atten & 0x0F)],
+            data: vec![0x90 | ch_bits | (atten & 0x0F)], // latch volume <ch>
             time: *time,
         });
     }
