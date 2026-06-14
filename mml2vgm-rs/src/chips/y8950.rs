@@ -114,9 +114,13 @@ impl Y8950 {
     }
 
     fn channel_freq_hz(&self, ch: usize) -> f32 {
+        // Y8950 (MSX-AUDIO): same OPL-family formula as YM3812. See
+        // ym3812.rs for the missing-/72 history.
         let f_num = self.channels[ch].f_num as f32;
         let block = self.channels[ch].block as i32;
-        f_num * 2_f32.powi(block - 1) * self.clock_rate as f32 / (1u32 << 19) as f32
+        const OPL_CLOCK_DIVIDER: f32 = 72.0;
+        let sample_rate = self.clock_rate as f32 / OPL_CLOCK_DIVIDER;
+        f_num * 2_f32.powi(block) * sample_rate / (1u32 << 20) as f32
     }
 
     fn advance_phases(&mut self, sample_rate: u32) {

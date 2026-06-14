@@ -118,9 +118,16 @@ impl YM3812 {
     }
 
     fn channel_freq_hz(&self, ch: usize) -> f32 {
+        // YM3812 (OPL2) output: F_out = f_num * 2^block * (clock / 72) / 2^20
+        // The chip's internal divider is 72 (master clock → ~49.7 kHz audio
+        // sample rate at the canonical 3.58 MHz clock). Previous version
+        // omitted the /72 and produced frequencies 72× too high — A4 came
+        // out near 32 kHz instead of 440 Hz.
         let f_num = self.channels[ch].f_num as f32;
         let block = self.channels[ch].block as i32;
-        f_num * 2_f32.powi(block - 1) * self.clock_rate as f32 / (1u32 << 19) as f32
+        const OPL_CLOCK_DIVIDER: f32 = 72.0;
+        let sample_rate = self.clock_rate as f32 / OPL_CLOCK_DIVIDER;
+        f_num * 2_f32.powi(block) * sample_rate / (1u32 << 20) as f32
     }
 
     fn get_channel_output(&mut self, ch: usize) -> (f32, f32) {

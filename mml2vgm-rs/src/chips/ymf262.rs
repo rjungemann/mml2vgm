@@ -113,10 +113,17 @@ impl YMF262 {
     }
 
     fn channel_freq_hz(&self, ch: usize) -> f32 {
+        // YMF262 (OPL3): F_out = f_num * 2^block * (clock / 288) / 2^20.
+        // OPL3 is clocked at 14.318 MHz with a divider of 288, yielding the
+        // same ~49.7 kHz internal sample rate as OPL2's 3.58 MHz / 72.
+        // Previous formula used `clock/4 / 2^19` which omitted the /72
+        // entirely and produced notes ~72× too high (A4 came out around
+        // 32 kHz instead of 440 Hz).
         let f_num = self.channels[ch].f_num as f32;
         let block = self.channels[ch].block as i32;
-        // OPL3 runs at clock/288, YM3812 at clock/72; adjust for actual OPL3 clock
-        f_num * 2_f32.powi(block - 1) * (self.clock_rate as f32 / 4.0) / (1u32 << 19) as f32
+        const OPL3_CLOCK_DIVIDER: f32 = 288.0;
+        let sample_rate = self.clock_rate as f32 / OPL3_CLOCK_DIVIDER;
+        f_num * 2_f32.powi(block) * sample_rate / (1u32 << 20) as f32
     }
 
     fn advance_phases(&mut self, sample_rate: u32) {

@@ -309,3 +309,68 @@ fn pokey_channel_produces_audio() {
 ",
     );
 }
+
+/// YM3812 (OPL2) note pitch sanity. With proper /72 OPL clock division,
+/// MIDI 69 (A4 = 440 Hz) renders with peak FFT energy in the 200-700 Hz
+/// band. Before the fix, the chip omitted /72 and produced output around
+/// 32 kHz which aliased to nonsense.
+#[test]
+fn ym3812_a4_lands_in_audible_band() {
+    let mml = "\
+'{
+    TitleName = OPL2 A4
+    Format = VGM
+    ClockCount = 192
+    PartYM3812 = J
+}
+'@ M 000
+'@ 015,000,000,000,000,000,000,001,000,000,000
+'@ 015,000,000,000,000,000,000,001,000,000,000
+'@ 007,000
+'J1 T120 @0 v100 l1 o4 a
+";
+    let buf = render_mml(mml, 0.5);
+
+    // Zero-crossing rate: ~880 crossings/sec for a 440 Hz sine.
+    // (Each full cycle has 2 zero-crossings on either channel.) We
+    // accept a wide tolerance (300-1500 crossings) so the test catches
+    // 72× errors (would be ~57k crossings) but not minor mistuning.
+    let left: Vec<f32> = buf.chunks_exact(2).map(|c| c[0]).collect();
+    let crossings = left.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
+    let crossings_per_sec = crossings as f32 / 0.5;
+    eprintln!("YM3812 A4 zero-crossings/sec: {}", crossings_per_sec);
+    assert!(
+        (300.0..1500.0).contains(&crossings_per_sec),
+        "expected A4 pitch (≈880 crossings/sec), got {} — likely OPL clock-divider bug",
+        crossings_per_sec,
+    );
+}
+
+/// YMF262 (OPL3) note pitch sanity, same rationale as YM3812 above.
+#[test]
+fn ymf262_a4_lands_in_audible_band() {
+    let mml = "\
+'{
+    TitleName = OPL3 A4
+    Format = VGM
+    ClockCount = 192
+    PartYMF262 = K
+}
+'@ M 000
+'@ 015,000,000,000,000,000,000,001,000,000,000
+'@ 015,000,000,000,000,000,000,001,000,000,000
+'@ 007,000
+'K1 T120 @0 v100 l1 o4 a
+";
+    let buf = render_mml(mml, 0.5);
+
+    let left: Vec<f32> = buf.chunks_exact(2).map(|c| c[0]).collect();
+    let crossings = left.windows(2).filter(|w| w[0].signum() != w[1].signum()).count();
+    let crossings_per_sec = crossings as f32 / 0.5;
+    eprintln!("YMF262 A4 zero-crossings/sec: {}", crossings_per_sec);
+    assert!(
+        (300.0..1500.0).contains(&crossings_per_sec),
+        "expected A4 pitch (≈880 crossings/sec), got {} — likely OPL clock-divider bug",
+        crossings_per_sec,
+    );
+}
